@@ -1,0 +1,30 @@
+{
+  "name": "thin",
+  "about": "历史不足 60 根K线：准入直接拒绝，没有任何模型调用。",
+  "request": {
+    "ticker": "THIN",
+    "as_of": "2026-09-30"
+  },
+  "replies": {},
+  "config": {
+    "flow": {
+      "debate_rounds": 1,
+      "audit": "on",
+      "judges": true,
+      "audit_rounds": 3,
+      "judge_rounds": 2,
+      "quorum": 2
+    },
+    "budget": {
+      "run_tokens": 0,
+      "roles": {}
+    }
+  },
+  "expect": {
+    "status": "review",
+    "reason": "insufficient_history",
+    "facts_and_rules": "unverified",
+    "judgment": "not reviewed",
+    "calls": []
+  }
+}

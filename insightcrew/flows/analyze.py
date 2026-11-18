@@ -14,6 +14,7 @@ from ..domain.types import Contract, Finding, Outcome, Verdict
 from ..kernel.runtime import Halt, Malformed, Role, Run, run_role
 from ..roles import BEAR, BULL, JUDGES, MANAGER, TECHNICAL, TRADER
 from . import stages
+from .deps import Deps
 
 
 class FlowConfig(Contract):
@@ -70,7 +71,7 @@ async def run_from(run: Run, cfg: FlowConfig, start: str, why: str = "") -> None
 
 # ---- 第一道关：代码审计（L2 数字，L3 规则）----
 
-async def pass_audit(run: Run, cfg: FlowConfig, deps: Any) -> bool:
+async def pass_audit(run: Run, cfg: FlowConfig, deps: Deps) -> bool:
     """循环到审计通过为止。返回 True 表示当前方案已通过审计。"""
     previous = None
     for attempt in range(cfg.audit_rounds + 1):
@@ -92,7 +93,7 @@ async def pass_audit(run: Run, cfg: FlowConfig, deps: Any) -> bool:
 
 # ---- 第二道关：模型评审（L4 判断）。评审只能否决，不能改数字 ----
 
-async def scrutinise(run: Run, cfg: FlowConfig, deps: Any) -> str:
+async def scrutinise(run: Run, cfg: FlowConfig, deps: Deps) -> str:
     """返回判断标签，例如 "accepted 2/3"。多数反对且返工用尽时停止运行。"""
     for round_no in range(1, cfg.judge_rounds + 1):
         verdicts: list[Verdict] = []
@@ -130,7 +131,10 @@ async def scrutinise(run: Run, cfg: FlowConfig, deps: Any) -> str:
 # ---- 入口 ----
 
 async def analyze(run: Run, request: dict[str, Any], deps: Any, cfg: FlowConfig | None = None) -> Outcome:
-    """deps 是代码阶段需要的外部依赖（行情、规则、指标声明、时钟），由 app 层装配后传入。"""
+    """deps 是代码阶段需要的外部依赖（行情、规则、指标声明、时钟），由 app 层装配后传入。
+
+    入口参数保持 Any：参照测试 test_flow.py 以 None 传入（它用替身阶段，从不触到真实依赖），
+    而参照测试不可改动；pass_audit 与 scrutinise 已经以 Deps 为准。"""
     cfg = cfg or FlowConfig()
     try:
         stages.intake(run, request, deps)               # 范围闸门：不在范围内直接 Halt

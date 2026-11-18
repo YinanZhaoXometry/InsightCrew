@@ -1,0 +1,30 @@
+{
+  "name": "stale",
+  "about": "最后一根K线距分析日超过上限：准入拒绝，没有任何模型调用。",
+  "request": {
+    "ticker": "STALE",
+    "as_of": "2026-09-30"
+  },
+  "replies": {},
+  "config": {
+    "flow": {
+      "debate_rounds": 1,
+      "audit": "on",
+      "judges": true,
+      "audit_rounds": 3,
+      "judge_rounds": 2,
+      "quorum": 2
+    },
+    "budget": {
+      "run_tokens": 0,
+      "roles": {}
+    }
+  },
+  "expect": {
+    "status": "review",
+    "reason": "stale_data",
+    "facts_and_rules": "unverified",
+    "judgment": "not reviewed",
+    "calls": []
+  }
+}

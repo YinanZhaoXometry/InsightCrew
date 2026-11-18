@@ -1,0 +1,30 @@
+# InsightCrew 的设置。本文件不含密钥；密钥放在 .env（不进 git），变量名见 .env.example。
+
+[run]
+universe = "synthetic"
+output_mode = "auto"         # auto | native | tool | prompted  （见 BLUEPRINT 5.6）
+
+[flow]
+debate_rounds = 1
+judges = true
+audit_rounds = 3
+judge_rounds = 2
+quorum = 2
+
+[limits]
+max_requests = 40
+max_seconds = 600
+request_timeout_s = 120
+
+[budget]
+run_tokens = 200000          # 0 = 不设上限
+run_cost = 0.0               # 0 = 不设上限。设了成本上限就需要一个库能查到价格的模型。
+batch_tokens = 0
+batch_cost = 0.0
+
+[budget.roles]               # 每个角色组的 token 上限；可选
+# judge = 30000
+
+[tiers]                      # "供应商:模型名"，或不带前缀的裸名字 + IC_BASE_URL（见 BLUEPRINT 9.1）
+quick = "deepseek:deepseek-chat"
+deep = "deepseek:deepseek-chat"
