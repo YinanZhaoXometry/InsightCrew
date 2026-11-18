@@ -1,0 +1,581 @@
+{
+  "stats": {
+    "OK": {
+      "hit": 10,
+      "n": 10,
+      "layer_ok": 10
+    },
+    "NUMERIC": {
+      "hit": 10,
+      "n": 10,
+      "layer_ok": 10
+    },
+    "NO_REFUND": {
+      "hit": 10,
+      "n": 10,
+      "layer_ok": 10
+    },
+    "NO_COUPON": {
+      "hit": 10,
+      "n": 10,
+      "layer_ok": 10
+    },
+    "NO_CANCEL": {
+      "hit": 10,
+      "n": 10,
+      "layer_ok": 10
+    }
+  },
+  "detail": [
+    {
+      "id": "Q01",
+      "case": "OK",
+      "value": 1036538.28,
+      "verdict": "PASS",
+      "layer": "L2+L3",
+      "expect": "PASS",
+      "want_layer": null,
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q01",
+      "case": "NUMERIC",
+      "value": 1171288.26,
+      "verdict": "REVISE",
+      "layer": "L2",
+      "expect": "REVISE",
+      "want_layer": "L2",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q01",
+      "case": "NO_REFUND",
+      "value": 1150599.46,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q01",
+      "case": "NO_COUPON",
+      "value": 1075673.39,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q01",
+      "case": "NO_CANCEL",
+      "value": 1282811.23,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q02",
+      "case": "OK",
+      "value": 994772.11,
+      "verdict": "PASS",
+      "layer": "L2+L3",
+      "expect": "PASS",
+      "want_layer": null,
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q02",
+      "case": "NUMERIC",
+      "value": 1124092.48,
+      "verdict": "REVISE",
+      "layer": "L2",
+      "expect": "REVISE",
+      "want_layer": "L2",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q02",
+      "case": "NO_REFUND",
+      "value": 1118222.32,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q02",
+      "case": "NO_COUPON",
+      "value": 1034048.81,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q02",
+      "case": "NO_CANCEL",
+      "value": 1180899.27,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q03",
+      "case": "OK",
+      "value": 3031580.71,
+      "verdict": "PASS",
+      "layer": "L2+L3",
+      "expect": "PASS",
+      "want_layer": null,
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q03",
+      "case": "NUMERIC",
+      "value": 3425686.2,
+      "verdict": "REVISE",
+      "layer": "L2",
+      "expect": "REVISE",
+      "want_layer": "L2",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q03",
+      "case": "NO_REFUND",
+      "value": 3395952.81,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q03",
+      "case": "NO_COUPON",
+      "value": 3148835.14,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q03",
+      "case": "NO_CANCEL",
+      "value": 3750714.25,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q04",
+      "case": "OK",
+      "value": 385555.26,
+      "verdict": "PASS",
+      "layer": "L2+L3",
+      "expect": "PASS",
+      "want_layer": null,
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q04",
+      "case": "NUMERIC",
+      "value": 435677.44,
+      "verdict": "REVISE",
+      "layer": "L2",
+      "expect": "REVISE",
+      "want_layer": "L2",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q04",
+      "case": "NO_REFUND",
+      "value": 421886.58,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q04",
+      "case": "NO_COUPON",
+      "value": 401369.9,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q04",
+      "case": "NO_CANCEL",
+      "value": 488873.77,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q05",
+      "case": "OK",
+      "value": 957707.02,
+      "verdict": "PASS",
+      "layer": "L2+L3",
+      "expect": "PASS",
+      "want_layer": null,
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q05",
+      "case": "NUMERIC",
+      "value": 1082208.93,
+      "verdict": "REVISE",
+      "layer": "L2",
+      "expect": "REVISE",
+      "want_layer": "L2",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q05",
+      "case": "NO_REFUND",
+      "value": 1067800.1,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q05",
+      "case": "NO_COUPON",
+      "value": 992271.43,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q05",
+      "case": "NO_CANCEL",
+      "value": 1185168.14,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q06",
+      "case": "OK",
+      "value": 1036538.28,
+      "verdict": "PASS",
+      "layer": "L2+L3",
+      "expect": "PASS",
+      "want_layer": null,
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q06",
+      "case": "NUMERIC",
+      "value": 1171288.26,
+      "verdict": "REVISE",
+      "layer": "L2",
+      "expect": "REVISE",
+      "want_layer": "L2",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q06",
+      "case": "NO_REFUND",
+      "value": 1150599.46,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q06",
+      "case": "NO_COUPON",
+      "value": 1075673.39,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q06",
+      "case": "NO_CANCEL",
+      "value": 1282811.23,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q07",
+      "case": "OK",
+      "value": 1036538.28,
+      "verdict": "PASS",
+      "layer": "L2+L3",
+      "expect": "PASS",
+      "want_layer": null,
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q07",
+      "case": "NUMERIC",
+      "value": 1171288.26,
+      "verdict": "REVISE",
+      "layer": "L2",
+      "expect": "REVISE",
+      "want_layer": "L2",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q07",
+      "case": "NO_REFUND",
+      "value": 1150599.46,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q07",
+      "case": "NO_COUPON",
+      "value": 1075673.39,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q07",
+      "case": "NO_CANCEL",
+      "value": 1282811.23,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q08",
+      "case": "OK",
+      "value": 1036538.28,
+      "verdict": "PASS",
+      "layer": "L2+L3",
+      "expect": "PASS",
+      "want_layer": null,
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q08",
+      "case": "NUMERIC",
+      "value": 1171288.26,
+      "verdict": "REVISE",
+      "layer": "L2",
+      "expect": "REVISE",
+      "want_layer": "L2",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q08",
+      "case": "NO_REFUND",
+      "value": 1150599.46,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q08",
+      "case": "NO_COUPON",
+      "value": 1075673.39,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q08",
+      "case": "NO_CANCEL",
+      "value": 1282811.23,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q09",
+      "case": "OK",
+      "value": 1036538.28,
+      "verdict": "PASS",
+      "layer": "L2+L3",
+      "expect": "PASS",
+      "want_layer": null,
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q09",
+      "case": "NUMERIC",
+      "value": 1171288.26,
+      "verdict": "REVISE",
+      "layer": "L2",
+      "expect": "REVISE",
+      "want_layer": "L2",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q09",
+      "case": "NO_REFUND",
+      "value": 1150599.46,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q09",
+      "case": "NO_COUPON",
+      "value": 1075673.39,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q09",
+      "case": "NO_CANCEL",
+      "value": 1282811.23,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q10",
+      "case": "OK",
+      "value": 320550.06,
+      "verdict": "PASS",
+      "layer": "L2+L3",
+      "expect": "PASS",
+      "want_layer": null,
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q10",
+      "case": "NUMERIC",
+      "value": 362221.57,
+      "verdict": "REVISE",
+      "layer": "L2",
+      "expect": "REVISE",
+      "want_layer": "L2",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q10",
+      "case": "NO_REFUND",
+      "value": 353645.6,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q10",
+      "case": "NO_COUPON",
+      "value": 330531.34,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    },
+    {
+      "id": "Q10",
+      "case": "NO_CANCEL",
+      "value": 357978.53,
+      "verdict": "REVISE",
+      "layer": "L3",
+      "expect": "REVISE",
+      "want_layer": "L3",
+      "hit": true,
+      "layer_ok": true
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "version": "2.3",
+  "source": "《财务与运营指标口径手册 v2.3》",
+  "metrics": [
+    {
+      "name": "营收",
+      "aliases": ["营收", "收入", "营业收入", "revenue", "销售额", "净营收"],
+      "unit": "CNY",
+      "definition": "统计期内有效订单的订单金额，扣除优惠券分摊与退款金额。",
+      "formula": "SUM(order.amount - order.coupon) - SUM(refund.refund_amount)",
+      "required_filters": [
+        {"key": "exclude_cancelled", "desc": "排除 status='cancelled' 的订单", "source": "口径手册 §4.1"},
+        {"key": "coupon_deduction", "desc": "扣除订单优惠券金额（coupon 字段）", "source": "口径手册 §4.1"},
+        {"key": "subtract_refund", "desc": "扣除 refunds 表中的退款金额", "source": "口径手册 §4.2"}
+      ],
+      "pitfall": "最常见的错误是只汇总 amount，既没扣优惠券也没扣退款，会系统性高估 8%~15%。"
+    },
+    {
+      "name": "订单量",
+      "aliases": ["订单量", "订单数", "单量", "order count"],
+      "unit": "笔",
+      "definition": "统计期内下单且未取消的订单笔数，按订单号去重。",
+      "formula": "COUNT(DISTINCT order_id) WHERE status <> 'cancelled'",
+      "required_filters": [
+        {"key": "exclude_cancelled", "desc": "排除 status='cancelled' 的订单", "source": "口径手册 §4.3"}
+      ],
+      "pitfall": "订单明细表若已拆行（一单多商品），直接 COUNT(*) 会重复计数。"
+    },
+    {
+      "name": "客单价",
+      "aliases": ["客单价", "平均订单金额", "AOV", "average order value"],
+      "unit": "CNY/笔",
+      "definition": "营收 ÷ 订单量。分子按营收口径（扣优惠券、扣退款），分母为排除已取消订单的订单笔数，分子分母必须使用同一时间与地区筛选。",
+      "formula": "营收 / 订单量（两者同一筛选口径）",
+      "required_filters": [
+        {"key": "exclude_cancelled", "desc": "排除 status='cancelled' 的订单", "source": "口径手册 §4.4"},
+        {"key": "coupon_deduction", "desc": "分子使用扣除优惠券后的营收", "source": "口径手册 §4.4"},
+        {"key": "subtract_refund", "desc": "分子扣除退款金额", "source": "口径手册 §4.4"}
+      ],
+      "pitfall": "分子扣了退款、分母没排除取消单，会得到偏低的客单价。"
+    },
+    {
+      "name": "退款率",
+      "aliases": ["退款率", "退货率", "refund rate"],
+      "unit": "%",
+      "definition": "退款金额 ÷ 同期有效订单的订单金额（amount，券前），分子必须关联 refunds 表；结果以百分数表示，3.21 表示 3.21%。",
+      "formula": "SUM(refund_amount) / SUM(order.amount) × 100%",
+      "required_filters": [
+        {"key": "exclude_cancelled", "desc": "分母为同期有效订单（排除 status='cancelled'）的订单金额合计", "source": "口径手册 §4.5"}
+      ],
+      "pitfall": "两个高频错误：①用退款笔数除订单笔数得到的是'退款单占比'，与金额口径的退款率不是一回事；②分母误用扣券后的金额，应使用订单金额 amount（券前）。"
+    },
+    {
+      "name": "毛利率",
+      "aliases": ["毛利率", "gross margin"],
+      "unit": "%",
+      "definition": "(营收 - 成本) ÷ 营收。本数据集不含成本字段，无法计算。",
+      "formula": "(营收 - 成本) / 营收",
+      "required_filters": [],
+      "pitfall": "数据集中没有 cost 字段，遇到该指标应回答'数据不支持'，不允许估算。"
+    }
+  ]
+}

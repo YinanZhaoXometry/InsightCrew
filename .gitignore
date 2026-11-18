@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 运行产物(每次运行生成的 trace/blackboard/报告)
+runs/
+
+# 环境与密钥(只提交 .env.example)
+.env
+.env.local
+
+# macOS / 编辑器
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# 注意:eval/result_*.json 是评测存档,README 引用了其中数字,必须保留
