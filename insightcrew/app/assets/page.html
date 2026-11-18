@@ -632,7 +632,16 @@
         allEvents.push(JSON.parse(msg.data));
         if (!playing) { revealed = allEvents.length; renderAll(); }
       });
-      source.addEventListener("end", function () { source.close(); revealed = allEvents.length; renderAll(); });
+      source.addEventListener("end", function () {
+        source.close();
+        revealed = allEvents.length;
+        renderAll();
+        fetch("/api/runs/" + encodeURIComponent(runId) + "/bars")
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.bars && data.bars.length) { bars = data.bars; renderAll(); }
+          });
+      });
     }
   }
 
