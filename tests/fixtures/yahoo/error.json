@@ -1,0 +1,9 @@
+{
+  "chart": {
+    "result": null,
+    "error": {
+      "code": "Unauthorized",
+      "description": "Invalid Cookie"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "HKD",
+          "symbol": "0700.HK",
+          "gmtoffset": 28800,
+          "timezone": "Asia/Hong_Kong",
+          "exchangeName": "HKG",
+          "longName": "Tencent Holdings Limited",
+          "shortName": "Tencent"
+        },
+        "timestamp": [1762135200, 1762221600, 1762308000, 1762394400, 1762480800],
+        "indicators": {
+          "quote": [
+            {
+              "open": [596.0, 598.5, 602.0, 601.5, null],
+              "high": [601.5, 603.8, 604.9, 605.0, null],
+              "low": [594.2, 597.1, 599.6, 600.3, null],
+              "close": [599.0, 602.5, 601.2, 604.4, null],
+              "volume": [12345600, 11098400, 9876500, 13456200, null]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

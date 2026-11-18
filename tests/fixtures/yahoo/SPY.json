@@ -1,0 +1,29 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "SPY",
+          "gmtoffset": -18000,
+          "timezone": "America/New_York",
+          "exchangeName": "PCX",
+          "shortName": "SPDR S&P 500 ETF Trust"
+        },
+        "timestamp": [1762203600, 1762290000],
+        "indicators": {
+          "quote": [
+            {
+              "open": [676.5, 680.9],
+              "high": [681.2, 683.4],
+              "low": [675.8, 679.6],
+              "close": [680.3, 682.7],
+              "volume": [51200300, 48112200]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

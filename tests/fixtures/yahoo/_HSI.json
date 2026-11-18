@@ -1,0 +1,30 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "HKD",
+          "symbol": "^HSI",
+          "gmtoffset": 28800,
+          "timezone": "Asia/Hong_Kong",
+          "exchangeName": "HKG",
+          "longName": "Hang Seng Index",
+          "shortName": "HSI"
+        },
+        "timestamp": [1762135200, 1762221600],
+        "indicators": {
+          "quote": [
+            {
+              "open": [25987.3, 26053.2],
+              "high": [26102.5, 26120.8],
+              "low": [25920.1, 26001.4],
+              "close": [26053.2, 26100.9],
+              "volume": [0, 0]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}
