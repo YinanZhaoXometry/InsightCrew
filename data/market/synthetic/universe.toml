@@ -1,0 +1,55 @@
+[ACME]
+name = "Acme Robotics（合成数据）"
+market = "US"
+currency = "USD"
+benchmark = "SYNUS"
+lot = 1
+synthetic = true
+
+["0000.HK"]
+name = "Zero Holdings（合成数据）"
+market = "HK"
+currency = "HKD"
+benchmark = "SYNHK"
+lot = 100
+synthetic = true
+
+[SYNUS]
+name = "Synthetic US Benchmark（合成数据）"
+market = "US"
+currency = "USD"
+benchmark = "SPY"
+lot = 0
+synthetic = true
+
+[SYNHK]
+name = "Synthetic HK Benchmark（合成数据）"
+market = "HK"
+currency = "HKD"
+benchmark = "^HSI"
+lot = 0
+synthetic = true
+
+[THIN]
+name = "Thin Trades Ltd.（合成数据）"
+market = "US"
+currency = "USD"
+benchmark = "SPY"
+lot = 0
+synthetic = true
+
+[STALE]
+name = "Stale Signal Corp.（合成数据）"
+market = "US"
+currency = "USD"
+benchmark = "SPY"
+lot = 0
+synthetic = true
+
+[GAPPY]
+name = "Gappy Works（合成数据）"
+market = "US"
+currency = "USD"
+benchmark = "SPY"
+lot = 0
+synthetic = true
