@@ -34,15 +34,15 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 |---|---|---|---|
 | 0 | Clean branch, reference extracted, environment built, 58 tests pass | done | Committed by tonight's delegated session (the owner authorised "do all the planned work" on 2026-11-19 evening). `uv sync` succeeded; no certificate problem. |
 | 1 | Withdrawn | n/a | The kernel is in the reference and frozen from WP0 |
-| 2 | Symbols, bars, CSV adapter, synthetic universe | not started | After WP0 |
-| 3 | Indicator registry and the ledger | not started | After WP2 |
-| 4A | Rulebook and audit, with their tests | not started | Needs only WP0. May run beside WP2 and WP3. |
+| 2 | Symbols, bars, CSV adapter, synthetic universe | done | 44 tests. Determinism, point-in-time, all error classes verified. Interpretations in the session log. |
+| 3 | Indicator registry and the ledger | in progress | Agent started 2026-11-19 evening, beside WP9A |
+| 4A | Rulebook and audit, with their tests | done | 66 tests. Intake evaluator signatures and other interpretations in the session log. |
 | 4B | `load_rules` and the injection evaluation | not started | After WP3 and WP4A |
-| 5 | The offline system | not started | After WP4B. **Reserved for the planning session.** Other agents do not start it. |
+| 5 | The offline system | in progress | Head start (permitted by section 5) done by the orchestrator while WP2/WP4A run: `app/__init__.py`, `app/settings.py`, `app/report.py`, `adapters/store_fs.py`, `insightcrew.toml`, `tests/test_settings.py`, `tests/test_report.py`. `store_fs.py` imports `domain.symbols` (WP2), so pyright shows a transient error in that one file until WP2 lands. |
 | 6 | `check` and `replay` commands | not started | After WP5. May run beside WP7, WP9B, WP10, WP12. |
 | 7 | Offline evaluations as commands | not started | After WP5. May run beside WP6, WP9B, WP10, WP12. |
 | 8 | Real-model runs, prompt fixes, ablation | blocked | No API key yet. **Reserved for the planning session.** |
-| 9A | Yahoo adapter and its test | not started | After WP2. May run beside anything. |
+| 9A | Yahoo adapter and its test | in progress | Agent started 2026-11-19 evening, beside WP3 |
 | 9B | `fetch` command | not started | After WP5 and WP9A. May run beside WP6, WP7, WP10, WP12. |
 | 10 | Run page, static | not started | After WP5. **Reserved for the planning session.** |
 | 12 | Local web app (`serve`) | not started | After WP10. **Reserved for the planning session.** |
@@ -334,6 +334,68 @@ Files created or changed: the 27 reference files under `insightcrew/` and `tests
 Committed: on `main` `1d5e4e4` (tag `v1-data-analyst`); on `v2` the WP0 commit (hash in the next entry's place: see `git log`).
 
 For the next session: WP2 and WP4A may start together. Tonight's session continues with WP2, WP4A, then WP3 and WP9A, then WP4B, then WP5.
+
+### 2026-11-19 (evening) · WP2 · agent under the overnight delegated session
+
+Result: done. 44 new tests; the full suite at the end of the run was 189 passed.
+
+Commands run, with the last lines of their output:
+
+- `uv run pytest -q` → `189 passed in 1.93s` (58 reference + 44 market + tests of the parallel agents).
+- `uv run ruff check .` → `All checks passed!` (after the orchestrator fixed its own `wiring.py` findings).
+- `uv run python data/make_market.py && git status --short data/` → second run changed nothing (deterministic bytes).
+
+Files created: `insightcrew/domain/market.py`, `insightcrew/domain/symbols.py`, `insightcrew/adapters/market_csv.py`, `data/make_market.py`, `data/market/synthetic/` (7 CSVs + `universe.toml`), `tests/test_market.py`.
+
+Interpretations where the blueprint was silent (agent's own list, for the owner to glance at):
+
+1. `CsvMarket(root, universe)`: root is the directory containing universes, so `CsvMarket("data/market", "synthetic")`.
+2. A five-digit HK code without a leading zero stays five digits (`99992.HK` unchanged); 6.2's rules only cover shorter and leading-zero codes.
+3. `normalize` refuses index forms (`^HSI` → `InvalidTicker`), per "not accepted from the user".
+4. For SYNUS/SYNHK/THIN/STALE/GAPPY, `universe.toml` carries `benchmark_for`'s answer as benchmark and `lot = 0`.
+5. Generator parameters (start prices, drift, per-ticker volume, GAPPY's anomaly positions) chosen within the spec's words; ACME is a mild 2.3× uptrend, no one-day move over 40 percent.
+6. `dropped_rows(ticker)` counts empty-close rows over the whole file; unknown ticker raises `UnknownTicker`.
+7. A missing or malformed `universe.toml` propagates as `FileNotFoundError` / `TOMLDecodeError` (start-up configuration error, not `SourceUnavailable`); a table with an unknown field raises `ValidationError` naming the field.
+8. A readable CSV with zero usable rows raises `NoData` (the source reads fine; there is just no settled bar).
+9. An empty field other than close makes the file malformed → `SourceUnavailable`.
+10. Error messages are in Chinese.
+
+Not run: nothing against a real model or the network.
+
+Committed: yes, by path, on `v2` (hash in git log).
+
+For the next session: WP3 may start (WP2 done).
+
+### 2026-11-19 (evening) · WP4A · agent under the overnight delegated session
+
+Result: done. 66 new tests (34 rules, 32 audit); the full suite at the end of the run was 189 passed.
+
+Commands run, with the last lines of their output:
+
+- `uv run pytest -q` → `189 passed`.
+- `uv run ruff check .` on its own files → clean; whole-repo findings were the orchestrator's `wiring.py` (since fixed).
+- `uv run pyright` on its own files → 0 errors. `domain/types.py` diff: 20 insertions, 0 deletions (append-only).
+
+Files created: `data/rules.toml` (14 rules in table order), `insightcrew/domain/rules.py`, `insightcrew/domain/audit.py`, `tests/test_rules.py`, `tests/test_audit.py`. Edited: `insightcrew/domain/types.py` (appended `RuleSpec`, `RuleResult`).
+
+Interpretations where the blueprint was silent (agent's own list):
+
+1. Intake evaluator signatures: `data_fresh(last_bar: date, as_of: date, spec: RuleSpec) -> RuleResult` and `min_history(bars: int, spec: RuleSpec) -> RuleResult`. WP5's intake uses these.
+2. `RuleSpec.limit: float | None = None` — TOML omits `limit` for the rules with no numeric limit (TOML cannot express null), as BLUEPRINT 5.1 permits for code-filled fields.
+3. `RuleResult.limit`/`actual` default to `None`.
+4. `source` strings invented for 13 of the 14 rules on a consistent scheme ("数据规则 1.x", "交易规则 3.x", "风控规则 2.x"), keeping "风控规则 2.1" where the blueprint pinned it.
+5. `cash_sufficient`'s result `limit` is the caller's `cash_pct`; `size_range` carries `limit=None` (its bounds are fixed constants, stated in the message).
+6. A rule missing from the declaration gives an `n/a` result naming the rule, not an error.
+7. `min_stop_distance_atr` / `entry_near_market` are `n/a` when `atr_14` / `close` is absent from the facts; `stop_side` is `n/a` when entry or stop is null.
+8. `point_cites_claimed_fact` fails a point that cites any unclaimed ID; `proposal_cites_known_fact` subjects are `proposal.cites` / `proposal.cites[i]`.
+9. L3 subjects are `proposal` except `stop_required` / `stop_side` → `proposal.stop`.
+10. L2 findings carry `limit`/`actual` null except `claim_value_matches_fact` (pinned by 6.7).
+
+Not run: nothing against a model or the network. `load_rules` (WP4B) will re-validate `rules.toml` at start-up.
+
+Committed: yes, by path, on `v2`.
+
+For the next session: WP4B may start when WP3 is done.
 
 ## 9. Prompts for starting a session
 
