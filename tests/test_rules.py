@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from insightcrew.adapters.declarations import load_rules
 from insightcrew.domain import rules
 from insightcrew.domain.types import Action, Proposal, Rating, RuleResult, RuleSpec, Thesis
 
@@ -305,3 +306,65 @@ def test_comparisons_allow_1e9_slack():
     outside = by_key(run(make_proposal(size=20.0 + 1e-8)))
     assert inside["max_position_pct"].status == "pass"
     assert outside["max_position_pct"].status == "fail"
+
+
+# ---- load_rules（WP4B）：rules.toml 的装载与校验（蓝图 9.5） ----
+
+# 一张合法的规则表，各字段都在契约之内。
+_DECLARATION = """[max_risk_per_trade_pct]
+limit = 1.0
+formula = "(entry − stop) / entry × size_pct"
+desc = "止损被触发时的亏损，占权益的百分比"
+source = "风控规则 2.1"
+"""
+
+
+def test_load_rules_reads_the_real_rulebook_in_file_order():
+    specs = load_rules(_RULES_TOML)
+    assert isinstance(specs, tuple)
+    assert [s.key for s in specs] == [s.key for s in load_specs()]   # 与 tomllib 手工读入的顺序一致
+    for spec, hand in zip(specs, load_specs(), strict=True):
+        assert spec == hand                                          # 字段值也一致
+
+
+def test_load_rules_keeps_the_blueprint_default_limits():
+    specs = load_rules(_RULES_TOML)
+    limits = {s.key: s.limit for s in specs}
+    assert len(specs) == len({*INTAKE_KEYS, *rules.ORDER})           # 14 条规则都在
+    for key, limit in LIMITS.items():
+        assert limits[key] == limit
+    for key in (*rules.ORDER, *INTAKE_KEYS):
+        if key not in LIMITS:
+            assert limits[key] is None
+
+
+@pytest.mark.parametrize(("name", "text", "field"), [
+    ("missing", _DECLARATION.replace('desc = "止损被触发时的亏损，占权益的百分比"\n', ""), "desc"),
+    ("mistyped_limit", _DECLARATION.replace("limit = 1.0", 'limit = "1.0"'), "limit"),
+    ("mistyped_formula", _DECLARATION.replace('formula = "(entry − stop) / entry × size_pct"',
+                                              "formula = 1"), "formula"),
+    ("unknown", _DECLARATION + "bogus = 1\n", "bogus"),
+    ("key_in_table", _DECLARATION + 'key = "max_risk_per_trade_pct"\n', "key"),
+])
+def test_load_rules_refuses_missing_mistyped_and_unknown_fields(
+        tmp_path: Path, name: str, text: str, field: str) -> None:
+    path = tmp_path / f"{name}.toml"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match="max_risk_per_trade_pct") as excinfo:
+        load_rules(path)
+    message = str(excinfo.value)
+    assert field in message and "max_risk_per_trade_pct" in message   # 点名表和字段
+
+
+def test_load_rules_accepts_an_integer_limit_as_a_float(tmp_path: Path) -> None:
+    path = tmp_path / "int_limit.toml"
+    path.write_text(_DECLARATION.replace("limit = 1.0", "limit = 1"), encoding="utf-8")
+    (spec,) = load_rules(path)
+    assert spec.limit == 1.0
+
+
+def test_load_rules_refuses_a_top_level_value_that_is_not_a_table(tmp_path: Path) -> None:
+    path = tmp_path / "scalar.toml"
+    path.write_text('noise = "x"\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="noise"):
+        load_rules(path)
