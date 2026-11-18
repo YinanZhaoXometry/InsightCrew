@@ -39,7 +39,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 4A | Rulebook and audit, with their tests | done | 66 tests. Intake evaluator signatures and other interpretations in the session log. |
 | 4B | `load_rules` and the injection evaluation | done | 19/19 mutations detected, 0/6 false alarms, exit 0. 8 new loader tests. |
 | 5 | The offline system | done | All 16 scenarios match; `analyze --no-open` delivers with `accepted 2/3`; THIN refused with no model call; `IC_TODAY` board.json byte-identical; four stub commands exit 2. |
-| 6 | `check` and `replay` commands | in progress | Agent started 2026-11-19 night, beside WP7 and WP9B. |
+| 6 | `check` and `replay` commands | done | `replay` reproduces a demo run identically (exit 0) and a THIN refusal; `check` prints settings without secrets and the no-key reason, exit 2. Against a real provider: not run, no key — the with-model path was exercised against a temporary stand-in server and is covered by `tests/test_models.py`. |
 | 7 | Offline evaluations as commands | done | `eval all` runs inject (19/19), consistency (277 points × 29 outputs), pit (864 facts) — exit 0. |
 | 8 | Real-model runs, prompt fixes, ablation | blocked | No API key yet. **Reserved for the planning session.** |
 | 9A | Yahoo adapter and its test | done | 16 tests over saved fixtures; no network in tests. |
@@ -48,7 +48,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 12 | Local web app (`serve`) | done | Verified live in the browser: form starts a demo run, stream advances stages, same outcome and confidence lines as the CLI; THIN refuses; past runs open; clean shutdown. 409 covered by test. |
 | 11 | Documents and packaging | not started | Not yet assigned. Its precondition ("everything else done or cut") is not met while WP8 is blocked — the documents need real-model results. |
 
-**Next: WP6 (running), then only WP8 (needs an API key) and WP11 (after WP8) remain.** [Section 5](#5-what-may-run-at-the-same-time) says what may run at the same time.
+**Everything buildable tonight is built. Remaining: WP8 (needs an API key, then a session for real-model runs) and WP11 (documents, after WP8).** [Section 5](#5-what-may-run-at-the-same-time) says what may run at the same time.
 
 ## 3. The repository at handoff
 
@@ -528,6 +528,30 @@ Commands run, with the last lines of their output:
 Files created or changed: `insightcrew/app/server.py`, `tests/test_server.py`, the `serve` command in `insightcrew/app/cli.py` (WP5's cli already carries it — noted here), live-mode UI in `insightcrew/app/assets/page.html`.
 
 Committed: `f93f394` (server + tests), page fixes `e5e06e5`.
+
+### 2026-11-19 (night) · WP6 · agent under the overnight delegated session
+
+Result: done.
+
+Commands run, with the last lines of their output:
+
+- `uv run pytest -q` → `296 passed`. `uv run ruff check .` → clean. `uv run pyright` → 0 errors.
+- `uv run insightcrew replay runs/20261119-033737-ACME-2026-09-30-8652` → `一致：结果（delivered，原因 ok，判断 accepted 2/3）与黑板快照完全相同`, exit 0. Also verified: the bare-id form and a degraded run (THIN → review / insufficient_history) both `一致`.
+- `uv run insightcrew check` → prints the settings (`"api_key": null`; masked `**********` when set), then `档位 quick（deepseek:deepseek-chat）没有可用模型：Set the DEEPSEEK_API_KEY environment variable…` for both tiers and `没有可用的模型：两个档位都无法构造…`, exit 2.
+- `uv run insightcrew scenarios` → all match.
+- With-model path exercised against a temporary local stand-in server (outside the repo, deleted after): four lines per tier, all four output modes accepted, tokens printed, exit 0; plus the mixed case and `IC_FORCE_OFFLINE`.
+
+Not run, and why: `check` against a real provider — no API key on this machine. Real-provider specifics (401 handling, a refused output mode, pricing) remain covered only by `tests/test_models.py`.
+
+Interpretations where the blueprint was silent (agent's list):
+
+1. Replay restores everything `run.started` records (flow, output_mode, universe, limits, run-level ceilings) via a `settings.model_copy`; role-group ceilings, batch ceilings, tiers and `IC_TODAY` come from current settings. Noted for the owner: recording `budget.roles` in `run.started` would make budget-halted runs replay faithfully — a wiring change, reported not made.
+2. `check` with a partial build prints the failing tier's reason and probes the tier that built, exit 0; exit 2 only when no model is available at all. A refused output mode is printed as a result, not a failure.
+3. Replay of a missing/unreadable run directory exits 1 with a reason.
+
+Files changed: `insightcrew/app/check.py`, `insightcrew/app/replay.py`.
+
+Committed: `3a9b082`.
 
 ## 9. Prompts for starting a session
 
