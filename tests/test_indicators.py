@@ -1,13 +1,22 @@
-"""两条计算路径（Python 与 SQL）必须在每一个分析日给出同样的数。"""
+"""两条计算路径（Python 与 SQL）必须在每一个分析日给出同样的数。
+
+比较由声明文件驱动（data/indicators.toml）：注册表里的每个表目都按两条路径各自的
+调用约定逐一比较；back 超过现有根数这一声明之外的边界仍单独保留。
+"""
 import math
 import random
 from contextlib import closing
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 
+from insightcrew.adapters.declarations import load_indicators
 from insightcrew.domain import indicators as py
 from insightcrew.domain import recompute as sql
+
+ROOT = Path(__file__).resolve().parent.parent
+SPECS = load_indicators(ROOT / "data" / "indicators.toml")
 
 CUTS = (5, 14, 15, 16, 20, 26, 33, 34, 35, 60, 200, 201, 300)
 
@@ -47,25 +56,16 @@ def test_python_and_sql_agree_at_every_as_of(seed):
 def _compare(db, part: list[tuple]) -> None:
     day = part[-1][1]
     cut = len(part)
-    hi, lo, cl, vo = ([r[i] for r in part] for i in (3, 4, 5, 6))
+    op, hi, lo, cl, vo = ([r[i] for r in part] for i in (2, 3, 4, 5, 6))
+    series = {"open": op, "high": hi, "low": lo, "close": cl, "volume": vo}
 
     def q(fn, inputs, **kw):
         return getattr(sql, fn)(db, "ACME", day, inputs, **kw)
 
-    same(py.last(cl), q("last", ["close"]))
-    same(py.last(cl, 1), q("last", ["close"], back=1))
-    same(py.last(cl, cut), q("last", ["close"], back=cut))
-    same(py.sma(cl, 20), q("sma", ["close"], n=20))
-    same(py.sma(cl, 200), q("sma", ["close"], n=200))
-    same(py.sma(vo, 20), q("sma", ["volume"], n=20))
-    same(py.ema(cl, 12), q("ema", ["close"], n=12))
-    same(py.rsi(cl, 14), q("rsi", ["close"], n=14))
-    same(py.atr(hi, lo, cl, 14), q("atr", ["high", "low", "close"], n=14))
-    same(py.macd(cl), q("macd", ["close"], fast=12, slow=26, signal=9))
-    same(py.bollinger(cl), q("bollinger", ["close"], n=20, width=2.0))
-    same(py.highest(hi, 20), q("highest", ["high"], n=20))
-    same(py.lowest(lo, 20), q("lowest", ["low"], n=20))
-    same(py.ret_pct(cl, 20), q("ret_pct", ["close"], n=20))
+    for spec in SPECS:                        # 注册表驱动：每个声明按两条路径各自的调用约定比较
+        same(getattr(py, spec.fn)(*(series[c] for c in spec.inputs), **spec.args),
+             q(spec.fn, spec.inputs, **spec.args))
+    same(py.last(cl, cut), q("last", ["close"], back=cut))   # 声明之外的边界：back 超过现有根数
 
 
 def test_future_bars_change_nothing():

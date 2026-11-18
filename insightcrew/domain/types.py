@@ -126,3 +126,41 @@ class RuleResult(Contract):
     limit: float | None = None    # 本次比较实际使用的界限（cash_sufficient 用调用方给的现金占比）
     actual: float | None = None   # 规则算出的实际值；不适用或无从计算时为 null
     message: str                  # 一句中文，说明结果或为什么不适用
+
+
+class Unavailable(Contract):
+    """一条算不出来的事实：记下它的 ID 与原因，而不是悄悄少一个数。"""
+
+    id: str                       # 事实 ID，与 indicators.toml 的 outputs 一致
+    reason: str                   # 一句中文，说明为什么算不出来
+
+
+class DataCard(Contract):
+    """数据卡：一次分析所用行情数据的画像，随事实一起上黑板（ledger/card）。"""
+
+    first_bar: str                # 第一根已结算 K 线的日期（ISO）
+    last_bar: str                 # 最后一根已结算 K 线的日期（ISO）
+    bars: int                     # 交给账本的已结算 K 线根数
+    stale_days: int               # 最后一根 K 线到分析日的自然日数
+    dropped_rows: int             # 数据源里 close 为空、被丢弃的行数
+    gaps: tuple[str, ...]         # 超过五个自然日没有 K 线的时段，一句中文一段
+    unavailable: tuple[Unavailable, ...]   # 历史不足而算不出的事实
+    warnings: tuple[str, ...]     # 数据异常提醒，例如单日涨跌超过 40% 的疑似除权/除息
+
+
+class Scope(Contract):
+    """准入的结果：这次分析对象是谁、到哪一天为止。之后任何阶段只从这里拿范围。"""
+
+    ticker: str                   # 规范化后的代码
+    as_of: str                    # 分析日（ISO）；不晚于今天
+    universe: str                 # 数据集名字
+    requested: str                # 用户原文里敲的代码，未规范化
+
+
+class AuditStatus(Contract):
+    """审计的结论与它通过时的三个版本号：方案、论点、读数任何一个变了，审计就算过期。"""
+
+    verdict: Literal["pass", "revise"]
+    proposal_seq: int             # 通过审计时的 trader/proposal 事件序号
+    thesis_seq: int               # 通过审计时的 manager/thesis 事件序号
+    analysis_seq: int             # 通过审计时的 technical/analysis 事件序号

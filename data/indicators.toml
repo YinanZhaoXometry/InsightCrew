@@ -1,0 +1,236 @@
+# 指标声明（蓝图 6.4）。一个指标只有同时出现在三个地方才算存在：
+# 这里（声明）、domain/indicators.py（路径 1，Python）、domain/recompute.py（路径 2，SQL）。
+# 表名是指标的键；单输出的表省略 outputs（唯一输出的事实 ID 就是表名），
+# 多输出的表按 outputs 顺序给出事实 ID，labels 与 outputs 一一对应。
+# fn 是两条路径里同名的函数；inputs 只能取 open/high/low/close/volume；
+# min_bars 是算出值所需的最少 K 线根数，不足时账本产出 Unavailable 而不是事实。
+# 公式口径在蓝图 6.4 固定：EMA 用前 n 个值的简单平均作种子、k = 2/(n+1)；
+# RSI 与 ATR 用 Wilder 平滑；RSI 在平均跌幅为零时取 100；布林带用总体标准差；收益率以百分比计。
+# 表的顺序就是蓝图 6.4 表格的顺序，也是账本产出事实的顺序。
+
+[close]
+fn = "last"
+inputs = ["close"]
+args = { back = 0 }
+min_bars = 1
+unit = "price"
+labels = ["收盘价"]
+formula = "最后一根已结算 K 线的收盘价"
+
+[open]
+fn = "last"
+inputs = ["open"]
+args = { back = 0 }
+min_bars = 1
+unit = "price"
+labels = ["开盘价"]
+formula = "最后一根已结算 K 线的开盘价"
+
+[high]
+fn = "last"
+inputs = ["high"]
+args = { back = 0 }
+min_bars = 1
+unit = "price"
+labels = ["最高价"]
+formula = "最后一根已结算 K 线的最高价"
+
+[low]
+fn = "last"
+inputs = ["low"]
+args = { back = 0 }
+min_bars = 1
+unit = "price"
+labels = ["最低价"]
+formula = "最后一根已结算 K 线的最低价"
+
+[prev_close]
+fn = "last"
+inputs = ["close"]
+args = { back = 1 }
+min_bars = 2
+unit = "price"
+labels = ["前一日收盘价"]
+formula = "前一交易日的收盘价"
+
+[volume]
+fn = "last"
+inputs = ["volume"]
+args = { back = 0 }
+min_bars = 1
+unit = "shares"
+labels = ["成交量"]
+formula = "最后一根已结算 K 线的成交量"
+
+[avg_volume_20]
+fn = "sma"
+inputs = ["volume"]
+args = { n = 20 }
+min_bars = 20
+unit = "shares"
+labels = ["20日平均成交量"]
+formula = "最近 20 个成交量的算术平均"
+
+[sma_20]
+fn = "sma"
+inputs = ["close"]
+args = { n = 20 }
+min_bars = 20
+unit = "price"
+labels = ["20日简单均线"]
+formula = "最近 20 个收盘价的算术平均"
+
+[sma_50]
+fn = "sma"
+inputs = ["close"]
+args = { n = 50 }
+min_bars = 50
+unit = "price"
+labels = ["50日简单均线"]
+formula = "最近 50 个收盘价的算术平均"
+
+[sma_200]
+fn = "sma"
+inputs = ["close"]
+args = { n = 200 }
+min_bars = 200
+unit = "price"
+labels = ["200日简单均线"]
+formula = "最近 200 个收盘价的算术平均"
+
+[ema_12]
+fn = "ema"
+inputs = ["close"]
+args = { n = 12 }
+min_bars = 12
+unit = "price"
+labels = ["12日指数均线"]
+formula = "指数均线：种子是前 12 个收盘价的简单平均，系数 k = 2/(12+1)，递推到分析日"
+
+[ema_26]
+fn = "ema"
+inputs = ["close"]
+args = { n = 26 }
+min_bars = 26
+unit = "price"
+labels = ["26日指数均线"]
+formula = "指数均线：种子是前 26 个收盘价的简单平均，系数 k = 2/(26+1)，递推到分析日"
+
+[rsi_14]
+fn = "rsi"
+inputs = ["close"]
+args = { n = 14 }
+min_bars = 15
+unit = "none"
+labels = ["14日相对强弱指数"]
+formula = "涨幅均值与跌幅均值之比换算的强弱指数（Wilder 平滑，种子是前 14 个变动的简单平均），跌幅为零时取 100"
+
+[atr_14]
+fn = "atr"
+inputs = ["high", "low", "close"]
+args = { n = 14 }
+min_bars = 15
+unit = "price"
+labels = ["14日平均真实波幅"]
+formula = "真实波幅（当日振幅与相对前收盘价两处跳空三者的最大值）的 Wilder 平滑均值，种子是前 14 个真实波幅的简单平均"
+
+[macd]
+fn = "macd"
+inputs = ["close"]
+args = { fast = 12, slow = 26, signal = 9 }
+outputs = ["macd", "macd_signal", "macd_hist"]
+labels = ["MACD", "MACD 信号线", "MACD 柱"]
+min_bars = 34
+unit = "price"
+formula = "EMA12 − EMA26；信号线为其 9 期 EMA；柱为两者之差"
+
+[bollinger_20]
+fn = "bollinger"
+inputs = ["close"]
+args = { n = 20, width = 2.0 }
+outputs = ["bb_upper_20", "bb_mid_20", "bb_lower_20"]
+labels = ["20日布林上轨", "20日布林中轨", "20日布林下轨"]
+min_bars = 20
+unit = "price"
+formula = "中轨为最近 20 个收盘价的算术平均，上下轨为中轨加减 2 倍总体标准差"
+
+[high_20]
+fn = "highest"
+inputs = ["high"]
+args = { n = 20 }
+min_bars = 20
+unit = "price"
+labels = ["20日最高价"]
+formula = "最近 20 根 K 线最高价的最大值"
+
+[high_60]
+fn = "highest"
+inputs = ["high"]
+args = { n = 60 }
+min_bars = 60
+unit = "price"
+labels = ["60日最高价"]
+formula = "最近 60 根 K 线最高价的最大值"
+
+[high_252]
+fn = "highest"
+inputs = ["high"]
+args = { n = 252 }
+min_bars = 252
+unit = "price"
+labels = ["252日最高价"]
+formula = "最近 252 根 K 线最高价的最大值"
+
+[low_20]
+fn = "lowest"
+inputs = ["low"]
+args = { n = 20 }
+min_bars = 20
+unit = "price"
+labels = ["20日最低价"]
+formula = "最近 20 根 K 线最低价的最小值"
+
+[low_60]
+fn = "lowest"
+inputs = ["low"]
+args = { n = 60 }
+min_bars = 60
+unit = "price"
+labels = ["60日最低价"]
+formula = "最近 60 根 K 线最低价的最小值"
+
+[low_252]
+fn = "lowest"
+inputs = ["low"]
+args = { n = 252 }
+min_bars = 252
+unit = "price"
+labels = ["252日最低价"]
+formula = "最近 252 根 K 线最低价的最小值"
+
+[ret_5]
+fn = "ret_pct"
+inputs = ["close"]
+args = { n = 5 }
+min_bars = 6
+unit = "pct"
+labels = ["5日收益率"]
+formula = "分析日收盘价相对 5 个交易日前收盘价的涨跌幅，以百分比计"
+
+[ret_20]
+fn = "ret_pct"
+inputs = ["close"]
+args = { n = 20 }
+min_bars = 21
+unit = "pct"
+labels = ["20日收益率"]
+formula = "分析日收盘价相对 20 个交易日前收盘价的涨跌幅，以百分比计"
+
+[ret_60]
+fn = "ret_pct"
+inputs = ["close"]
+args = { n = 60 }
+min_bars = 61
+unit = "pct"
+labels = ["60日收益率"]
+formula = "分析日收盘价相对 60 个交易日前收盘价的涨跌幅，以百分比计"
