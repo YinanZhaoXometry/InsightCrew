@@ -1,0 +1,108 @@
+"""领域契约。角色之间传递的每一种结构都在这里定义，且只在这里定义。
+
+全部是不可变的 Pydantic 模型，不接受契约之外的字段。数值与等级只出现在这些结构里，绝不藏在自由文本中。
+字段的 description 会进入发给模型的输出格式说明，所以它既是文档，也是提示词的一部分。
+"""
+from __future__ import annotations
+
+import enum
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
+
+
+class Contract(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class Rating(enum.StrEnum):
+    BUY = "Buy"
+    OVERWEIGHT = "Overweight"
+    HOLD = "Hold"
+    UNDERWEIGHT = "Underweight"
+    SELL = "Sell"
+
+
+class Action(enum.StrEnum):
+    BUY = "Buy"
+    HOLD = "Hold"
+    SELL = "Sell"
+
+
+class Fact(Contract):
+    """由代码算出的一个数。模型永远不产生 Fact。"""
+
+    id: str                       # 语义化 ID，例如 "close"、"rsi_14"、"atr_14"
+    label: str                    # 中文名，用于报告
+    value: FiniteFloat
+    unit: str                     # "USD" | "HKD" | "%" | "" | "shares"
+    as_of: str                    # 这个数所属的交易日（ISO），不晚于分析日
+    source: str                   # 计算它的函数，例如 "indicators.rsi"
+    bars_used: int
+
+
+class Claim(Contract):
+    fact: str = Field(description="被引用的事实 ID，必须出现在给你的事实列表中")
+    value: FiniteFloat = Field(description="该事实的数值，照抄，不要四舍五入到别的精度")
+    reading: str = Field(description="你对这个数的解读，一句话，不要包含其他数字")
+
+
+class Analysis(Contract):
+    claims: tuple[Claim, ...]
+    narrative: str = Field(description="整体判断，三到五句")
+
+
+class Point(Contract):
+    text: str
+    cites: tuple[str, ...] = Field(description="支撑这一点的事实 ID，至少一个")
+
+
+class Argument(Contract):
+    points: tuple[Point, ...]
+    rebuttal: str = Field(description="对对方上一轮论点的回应；对方尚未发言时写空字符串")
+
+
+class Thesis(Contract):
+    rating: Rating
+    horizon_days: int = Field(description="预期持有的交易日数")
+    points: tuple[Point, ...]
+    invalidation: tuple[str, ...] = Field(description="哪些情况出现就说明这个判断错了")
+    summary: str
+
+
+class Proposal(Contract):
+    action: Action
+    entry: FiniteFloat | None = Field(description="入场价，绝对价格。action 不是 Buy 时为 null")
+    stop: FiniteFloat | None = Field(description="止损价，绝对价格。action 不是 Buy 时为 null")
+    target: FiniteFloat | None = Field(description="目标价，绝对价格，可为 null")
+    size_pct: FiniteFloat = Field(description="仓位占权益的百分比，0 到 100")
+    horizon_days: int
+    cites: tuple[str, ...]
+    rationale: str
+
+
+class Verdict(Contract):
+    accept: bool
+    target: Literal["thesis", "levels", "none"] = Field(
+        description="不接受时，问题出在论点（thesis）还是价位与仓位（levels）；接受时为 none")
+    critique: str
+    cites: tuple[str, ...]
+
+
+class Finding(Contract):
+    """审计发现的一个问题。owner 是能修它的角色。"""
+
+    check: str                    # 检查项或规则的键
+    layer: Literal["L2", "L3"]
+    owner: Literal["technical", "manager", "trader"]
+    subject: str                  # 出问题的对象，例如 "claims[2]"、"proposal.stop"
+    message: str
+    limit: float | None = None
+    actual: float | None = None
+
+
+class Outcome(Contract):
+    status: Literal["delivered", "review"]
+    reason: str                   # delivered 时为 "ok"；review 时为停止原因
+    facts_and_rules: Literal["verified", "unverified"]
+    judgment: str                 # "accepted 2/3" | "contested" | "not reviewed: <原因>"

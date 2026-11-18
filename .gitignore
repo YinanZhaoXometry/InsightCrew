@@ -19,3 +19,10 @@ runs/
 *.swp
 
 # 注意:eval/result_*.json 是评测存档,README 引用了其中数字,必须保留
+
+# 测试与工具缓存
+.pytest_cache/
+.ruff_cache/
+
+# 真实行情（fetch 命令写入，不进 git）
+data/market/real/

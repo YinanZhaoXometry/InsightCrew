@@ -32,7 +32,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 
 | WP | Result | Status | Notes |
 |---|---|---|---|
-| 0 | Clean branch, reference extracted, environment built, 58 tests pass | not started | Needs the commit authorisation in section 4, and network access for `uv sync` |
+| 0 | Clean branch, reference extracted, environment built, 58 tests pass | done | Committed by tonight's delegated session (the owner authorised "do all the planned work" on 2026-11-19 evening). `uv sync` succeeded; no certificate problem. |
 | 1 | Withdrawn | n/a | The kernel is in the reference and frozen from WP0 |
 | 2 | Symbols, bars, CSV adapter, synthetic universe | not started | After WP0 |
 | 3 | Indicator registry and the ledger | not started | After WP2 |
@@ -308,6 +308,32 @@ Files changed: `docs/BLUEPRINT.md`, `docs/BLUEPRINT-REFERENCE.md`, `docs/HANDOFF
 Committed: no.
 
 For the next session: WP0, alone. When it is done, WP2 and WP4A may start together.
+
+### 2026-11-19 (evening) · WP0 · overnight delegated session (GLM, via ZCode)
+
+Result: done. The owner's prompt for tonight was "plan for tonight's work … you do all the planned work for me"; this session read that as authorising the plan's own commit protocol (section 4): one commit per finished work package on `v2`, added by path, never pushed. WP0 is the one package that used `git add -A`.
+
+Commands run, with the last lines of their output:
+
+- `git add -A && git commit` on `main`, then `git tag v1-data-analyst`, then `git switch -c v2`. Before the commit, `git status` listed nothing under `runs/` and no `.env`. Commit on `main`: `1d5e4e4`.
+- Deleted the version 1 files listed in WP0 step 2 (`git rm -r`), then removed their leftover `__pycache__` directories.
+- `python3 -I extract_reference.py docs/BLUEPRINT-REFERENCE.md` → `wrote 27 files`. The script was deleted afterwards.
+- `uv python pin 3.12` → wrote `.python-version` with `3.12`.
+- `uv sync` → succeeded, no certificate error or 502. `uv.lock` written.
+- `uv run pytest -q` → `58 passed in 3.44s`.
+- `uv run ruff check .` → `All checks passed!`
+- `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- `git tag -l` → `v1-data-analyst`. `git status` shows `.python-version` and `uv.lock` as new files, nothing under `runs/`, `.venv/` or `.env`.
+
+Not run, and why: nothing against a real model (no key). WP8 stays blocked.
+
+Unverified: as before — the prompts against a real model; sections 6 to 10 not covered by the reference.
+
+Files created or changed: the 27 reference files under `insightcrew/` and `tests/`, `pyproject.toml`, `.python-version`, `uv.lock`, `.gitignore` (added `.pytest_cache/`, `.ruff_cache/`, `data/market/real/`), `.env.example` (replaced with the WP0 step 6 text); deleted the version 1 code.
+
+Committed: on `main` `1d5e4e4` (tag `v1-data-analyst`); on `v2` the WP0 commit (hash in the next entry's place: see `git log`).
+
+For the next session: WP2 and WP4A may start together. Tonight's session continues with WP2, WP4A, then WP3 and WP9A, then WP4B, then WP5.
 
 ## 9. Prompts for starting a session
 
