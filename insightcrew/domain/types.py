@@ -106,3 +106,23 @@ class Outcome(Contract):
     reason: str                   # delivered 时为 "ok"；review 时为停止原因
     facts_and_rules: Literal["verified", "unverified"]
     judgment: str                 # "accepted 2/3" | "contested" | "not reviewed: <原因>"
+
+
+class RuleSpec(Contract):
+    """规则手册里一条规则的声明。由 adapters 从 data/rules.toml 读入，不进入看板。"""
+
+    key: str                      # 与 domain/rules.py 里的同名评估函数对应
+    limit: float | None = None    # 数值型上限/下限；结构规则没有 limit，TOML 里省略该键
+    formula: str                  # 给交易员和报告看的公式文字，不会被求值
+    desc: str
+    source: str                   # 这条规则出自风控手册的哪一条
+
+
+class RuleResult(Contract):
+    """一条规则的一次评估。status 为 n/a 表示规则不适用于这个提案，不是通过。"""
+
+    key: str
+    status: Literal["pass", "fail", "n/a"]
+    limit: float | None = None    # 本次比较实际使用的界限（cash_sufficient 用调用方给的现金占比）
+    actual: float | None = None   # 规则算出的实际值；不适用或无从计算时为 null
+    message: str                  # 一句中文，说明结果或为什么不适用

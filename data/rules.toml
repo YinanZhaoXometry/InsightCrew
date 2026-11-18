@@ -1,0 +1,82 @@
+# 规则手册（蓝图 6.6）。每张表对应 domain/rules.py 里的同名评估函数；
+# 一个规则只有在两处都存在时才算存在，tests/test_rules.py 会核对两边一致。
+# limit 是默认界限；没有数值界限的结构规则省略 limit 键（RuleSpec.limit 为 null）。
+# formula、desc、source 是给交易员和在报告里展示的文字，formula 永远不会被求值。
+# 表的顺序就是蓝图 6.6 表格的顺序，也是 evaluate() 给出结果的顺序。
+
+[data_fresh]
+limit = 10
+formula = "分析日 − 最后一个已结算交易日的日期（自然日数）"
+desc = "数据必须足够新：最后一根已结算 K 线距分析日不超过上限天数"
+source = "数据规则 1.1"
+
+[min_history]
+limit = 60
+formula = "已结算 K 线的根数"
+desc = "历史必须足够长：已结算 K 线至少要有下限根数，否则指标算不出来"
+source = "数据规则 1.2"
+
+[action_matches_rating]
+formula = "Buy 只能配 Buy 或 Overweight 评级；Sell 只能配 Underweight 或 Sell 评级；Hold 可配任何评级"
+desc = "交易动作必须与评级方向一致，不能评级看空却提议买入"
+source = "交易规则 3.1"
+
+[hold_is_flat]
+formula = "entry、stop、target 均为 null，且 size_pct = 0"
+desc = "Hold 动作必须空仓：不给任何价位，仓位为 0"
+source = "交易规则 3.2"
+
+[sell_requires_position]
+formula = "position_pct > 0，且 size_pct ≤ position_pct，且 entry、stop、target 均为 null"
+desc = "Sell 只能减仓：必须有持仓，卖出不超过持仓，且不给出任何价位"
+source = "交易规则 3.3"
+
+[stop_required]
+formula = "entry > 0 且 stop > 0"
+desc = "买入必须同时给出大于 0 的入场价与止损价"
+source = "风控规则 2.2"
+
+[stop_side]
+formula = "stop < entry，且给出 target 时 target > entry"
+desc = "止损必须低于入场价，目标价（如给出）必须高于入场价，方向不能反"
+source = "风控规则 2.3"
+
+[size_range]
+formula = "0 < size_pct ≤ 100"
+desc = "仓位必须是 (0, 100] 区间内的百分比"
+source = "风控规则 2.4"
+
+[max_risk_per_trade_pct]
+limit = 1.0
+formula = "(entry − stop) / entry × size_pct"
+desc = "止损被触发时的亏损，占权益的百分比"
+source = "风控规则 2.1"
+
+[max_position_pct]
+limit = 20
+formula = "size_pct + position_pct"
+desc = "新仓加上现有持仓后的总仓位，占权益的百分比，不得超过上限"
+source = "风控规则 2.5"
+
+[min_reward_risk]
+limit = 1.5
+formula = "(target − entry) / (entry − stop)"
+desc = "潜在收益与风险之比，至少要有下限倍数；没有目标价时不适用"
+source = "风控规则 2.6"
+
+[min_stop_distance_atr]
+limit = 1.0
+formula = "(entry − stop) / atr_14"
+desc = "止损距离至少是多少倍 ATR，避免止损贴着市价被噪音扫掉"
+source = "风控规则 2.7"
+
+[entry_near_market]
+limit = 2.0
+formula = "abs(entry − close) / atr_14"
+desc = "入场价偏离市价不超过多少倍 ATR，避免远离市价的追价"
+source = "风控规则 2.8"
+
+[cash_sufficient]
+formula = "size_pct ≤ cash_pct"
+desc = "新仓占用的现金不超过可用现金占比；调用方没有给出现金占比时不适用"
+source = "风控规则 2.9"
