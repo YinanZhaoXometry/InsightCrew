@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 手工构造的夹具（WP30）：按 Google News RSS 搜索响应的公开形状编写，未发出任何真实请求。 -->
+<rss version="2.0">
+  <channel>
+    <title>Apple - Google News</title>
+    <link>https://news.google.com/search?q=AAPL&amp;hl=en-US&amp;gl=US&amp;ceid=US:en</link>
+    <description>Google News</description>
+    <item>
+      <title>Apple unveils M5 MacBook Pro lineup - Bloomberg</title>
+      <link>https://news.google.com/rss/articles/CBMi1GVtNWJvb2twcm8?oc=5</link>
+      <guid isPermaLink="false">CBMi1GVtNWJvb2twcm8</guid>
+      <pubDate>Thu, 19 Nov 2026 09:12:00 GMT</pubDate>
+      <description>Apple announced updated MacBook Pro models with the M5 chip on Thursday.</description>
+      <source url="https://www.bloomberg.com">Bloomberg</source>
+    </item>
+    <item>
+      <title>AAPL closes at a record high as analysts raise targets - Reuters</title>
+      <link>https://news.google.com/rss/articles/CMi2cmV1dGVyc2NoZWNr?oc=5</link>
+      <guid isPermaLink="false">CMi2cmV1dGVyc2NoZWNr</guid>
+      <pubDate>Wed, 18 Nov 2026 22:47:00 GMT</pubDate>
+      <description>Shares of Apple ended at a record closing high on Wednesday.</description>
+      <source url="https://www.reuters.com">Reuters</source>
+    </item>
+    <item>
+      <title>Apple supplier Foxconn reports strong monthly sales</title>
+      <link>https://news.google.com/rss/articles/CMi3Zm94Y29ubmVjdA?oc=5</link>
+      <guid isPermaLink="false">CMi3Zm94Y29ubmVjdA</guid>
+      <pubDate>Tue, 17 Nov 2026 11:05:00 GMT</pubDate>
+      <description>Foxconn said monthly revenue rose 9% year over year.</description>
+    </item>
+    <item>
+      <title>Weekend read: what the M5 means for the iPad roadmap</title>
+      <link>https://news.google.com/rss/articles/CMi4aXBhZHJvYWRtYXA?oc=5</link>
+      <guid isPermaLink="false">CMi4aXBhZHJvYWRtYXA</guid>
+      <description>A look ahead at Apple's tablet plans.</description>
+      <source url="https://www.macrumors.com">MacRumors</source>
+    </item>
+  </channel>
+</rss>

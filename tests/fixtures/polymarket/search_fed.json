@@ -1,0 +1,69 @@
+{
+  "events": [
+    {
+      "id": "362813",
+      "slug": "fed-decision-december-2026",
+      "title": "Fed decision December 2026",
+      "markets": [
+        {
+          "id": "68091",
+          "question": "Will the Fed cut rates at the December 2026 meeting?",
+          "closed": false,
+          "active": true,
+          "outcomes": "[\"Yes\", \"No\"]",
+          "outcomePrices": "[\"0.76\", \"0.24\"]",
+          "volumeNum": 1254300.5,
+          "endDate": "2026-12-16T17:00:00Z"
+        },
+        {
+          "id": "68092",
+          "question": "Will the Fed cut 50bps at the December 2026 meeting?",
+          "closed": false,
+          "active": true,
+          "outcomes": "[\"Yes\", \"No\"]",
+          "outcomePrices": "[\"0.08\", \"0.92\"]",
+          "volumeNum": 312000,
+          "endDate": "2026-12-16T17:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "362814",
+      "slug": "us-recession-2027",
+      "title": "US recession in 2027?",
+      "markets": [
+        {
+          "id": "68093",
+          "question": "US recession announced by March 2027?",
+          "closed": false,
+          "active": true,
+          "outcomes": "[\"Yes\", \"No\"]",
+          "outcomePrices": "[\"0.18\", \"0.82\"]",
+          "volumeNum": 95400,
+          "endDate": "2027-03-31T00:00:00Z"
+        },
+        {
+          "id": "68094",
+          "question": "US recession in 2026?",
+          "closed": true,
+          "active": true,
+          "outcomes": "[\"Yes\", \"No\"]",
+          "outcomePrices": "[\"0.03\", \"0.97\"]",
+          "volumeNum": 2400000,
+          "endDate": "2026-01-05T00:00:00Z"
+        },
+        {
+          "id": "68095",
+          "question": "Fed cuts in Q1 2027?",
+          "closed": false,
+          "active": true,
+          "outcomes": "[\"Yes\", \"No\"]",
+          "outcomePrices": "[]",
+          "volumeNum": 50000,
+          "endDate": "2027-03-31T00:00:00Z"
+        }
+      ]
+    }
+  ],
+  "related": []
+}

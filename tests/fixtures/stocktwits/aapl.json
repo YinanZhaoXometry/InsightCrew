@@ -1,0 +1,26 @@
+{
+  "response": {"status": 200},
+  "messages": [
+    {
+      "id": 512344001,
+      "body": "$AAPL breakouts &amp; new highs — add &gt; trim later",
+      "created_at": "2026-11-19T13:42:00-05:00",
+      "user": {"id": 45678, "username": "macro_bull", "name": "Macro Bull"},
+      "entities": {"sentiment": {"basic": "Bullish"}}
+    },
+    {
+      "id": 512344002,
+      "body": "Chart looks heavy at these levels, fading the pop",
+      "created_at": "2026-11-19T11:07:00-05:00",
+      "user": {"id": 45679, "username": "tape_reader", "name": "Tape Reader"},
+      "entities": {"sentiment": {"basic": "Bearish"}}
+    },
+    {
+      "id": 512343999,
+      "body": "Holding thru earnings &#39;27, not trading this noise",
+      "created_at": "2026-11-18T18:55:00-05:00",
+      "user": {"id": 45680, "username": "long_only_lou", "name": "Lou"},
+      "entities": {}
+    }
+  ]
+}

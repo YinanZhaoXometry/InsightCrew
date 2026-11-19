@@ -1,0 +1,13 @@
+{
+  "realtime_start": "2026-11-19",
+  "realtime_end": "2026-11-19",
+  "observation_start": "2025-11-19",
+  "observation_end": "2026-11-19",
+  "units": "Percent",
+  "count": 3,
+  "observations": [
+    {"date": "2026-11-16", "realtime_start": "2026-11-17", "realtime_end": "9999-12-31", "value": "4.21"},
+    {"date": "2026-11-17", "realtime_start": "2026-11-18", "realtime_end": "9999-12-31", "value": "4.19"},
+    {"date": "2026-11-18", "realtime_start": "2026-11-19", "realtime_end": "9999-12-31", "value": "4.22"}
+  ]
+}

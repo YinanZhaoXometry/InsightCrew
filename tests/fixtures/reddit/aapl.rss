@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 手工构造的夹具（WP30）：按 Reddit 公开 Atom 搜索源的形状编写，未发出任何真实请求。
+     content 的 type="html"：正文再包一层 HTML 转义，自述文字在 SC_OFF/SC_ON 之间。 -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>r/wallstreetbets+stocks+investing: AAPL</title>
+  <link href="https://www.reddit.com/r/wallstreetbets+stocks+investing/search.rss?q=AAPL&amp;restrict_sr=on&amp;sort=new&amp;t=week"/>
+  <updated>2026-11-19T12:00:00+00:00</updated>
+  <id>https://www.reddit.com/r/wallstreetbets+stocks+investing/search.rss?q=AAPL</id>
+  <entry>
+    <title>AAPL what are your positions on the new Macs?</title>
+    <link href="https://www.reddit.com/r/stocks/comments/1k2m3n4/aapl_what_are_your_positions_on_the_new_macs/"/>
+    <published>2026-11-19T08:31:00+00:00</published>
+    <updated>2026-11-19T08:31:00+00:00</updated>
+    <category term="stocks"/>
+    <content type="html">&lt;!-- SC_OFF --&gt;&lt;div class="md"&gt;&lt;p&gt;M5 looks like a genuine leap, but the pricing&amp;#39;s steep. Anyone adding?&lt;/p&gt;&lt;/div&gt;&lt;!-- SC_ON --&gt;</content>
+  </entry>
+  <entry>
+    <title>Daily Discussion Thread - November 19, 2026</title>
+    <link href="https://www.reddit.com/r/wallstreetbets/comments/1k2m3n5/daily_discussion_thread_november_19_2026/"/>
+    <published>2026-11-19T03:00:00+00:00</published>
+    <updated>2026-11-19T03:00:00+00:00</updated>
+    <category term="wallstreetbets"/>
+    <content type="html">&lt;!-- SC_OFF --&gt;&lt;div class="md"&gt;&lt;p&gt;Your daily trading discussion thread.&lt;/p&gt;&lt;/div&gt;&lt;!-- SC_ON --&gt;</content>
+  </entry>
+  <entry>
+    <title>Is the rally overextended?</title>
+    <link href="https://www.reddit.com/r/investing/comments/1k2m3n6/is_the_rally_overextended/"/>
+    <published>2026-11-18T21:15:00+00:00</published>
+    <updated>2026-11-18T21:15:00+00:00</updated>
+    <category term="investing"/>
+    <content type="html">&lt;table class="md"&gt;&lt;tr&gt;&lt;th&gt;Metric&lt;/th&gt;&lt;th&gt;Value&lt;/th&gt;&lt;/tr&gt;&lt;/table&gt;</content>
+  </entry>
+</feed>

@@ -1,0 +1,22 @@
+{
+  "realtime_start": "2026-11-19",
+  "realtime_end": "2026-11-19",
+  "observation_start": "2025-11-19",
+  "observation_end": "2026-11-19",
+  "units": "Index 1982-84=100",
+  "count": 12,
+  "observations": [
+    {"date": "2025-11-01", "realtime_start": "2025-12-10", "realtime_end": "9999-12-31", "value": "322.500"},
+    {"date": "2025-12-01", "realtime_start": "2026-01-13", "realtime_end": "9999-12-31", "value": "323.100"},
+    {"date": "2026-01-01", "realtime_start": "2026-02-11", "realtime_end": "9999-12-31", "value": "324.391"},
+    {"date": "2026-02-01", "realtime_start": "2026-03-11", "realtime_end": "9999-12-31", "value": "325.586"},
+    {"date": "2026-03-01", "realtime_start": "2026-04-10", "realtime_end": "9999-12-31", "value": "326.603"},
+    {"date": "2026-04-01", "realtime_start": "2026-05-13", "realtime_end": "9999-12-31", "value": "327.171"},
+    {"date": "2026-05-01", "realtime_start": "2026-06-11", "realtime_end": "9999-12-31", "value": "328.120"},
+    {"date": "2026-06-01", "realtime_start": "2026-07-14", "realtime_end": "9999-12-31", "value": "328.860"},
+    {"date": "2026-07-01", "realtime_start": "2026-08-12", "realtime_end": "9999-12-31", "value": "329.310"},
+    {"date": "2026-08-01", "realtime_start": "2026-09-11", "realtime_end": "9999-12-31", "value": "330.040"},
+    {"date": "2026-09-01", "realtime_start": "2026-10-13", "realtime_end": "9999-12-31", "value": "331.082"},
+    {"date": "2026-10-01", "realtime_start": "2026-11-13", "realtime_end": "9999-12-31", "value": "."}
+  ]
+}

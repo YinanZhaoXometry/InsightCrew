@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 手工构造的夹具（WP30）：没有条目的空 RSS 频道，未发出任何真实请求。 -->
+<rss version="2.0">
+  <channel>
+    <title>ZZZZ - Google News</title>
+    <link>https://news.google.com/search?q=ZZZZ&amp;hl=en-US&amp;gl=US&amp;ceid=US:en</link>
+    <description>Google News</description>
+  </channel>
+</rss>
