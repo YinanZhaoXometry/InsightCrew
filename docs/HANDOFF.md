@@ -62,15 +62,15 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 20 | Version 2.1: documents and packaging | done | README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP updated (counts: 486 tests, 21 scenarios, 8 agent kinds, 43 archives, invariants 3/4/6 reworded, 17/18 added; the 30 v2.0 journals are marked as made before the prompt change, the 13 v2.1 after). Link check bad 0; the zip rebuilt from the head and verified from a fresh unzip. |
 
 | 21 | Version 2.2: tag `v2.1`, branch `v2.2`, no-network fixture, two literals, `NotConfigured`, `THIRD_PARTY_NOTICES.md` | done | Tag on `082a0a32`; branch `v2.2` and plan commit `506dd4d`; 486 tests, ruff/pyright clean; 21 scenarios 相符; 43/43 replays 一致; socket guard shown both ways (temp test, deleted). Question 15 (the notices' copyright line) awaits the owner. |
-| 22 | Version 2.2: LangGraph graph, parallel analysts, wall time, checkpointer, `resume` | not started | Critical path. First step `uv add langgraph langgraph-checkpoint-sqlite`; on failure stop (fallback in BLUEPRINT 19.5 item 7). Its parallel step waits for WP23. |
-| 23 | Version 2.2: kernel deferred commit and tools | not started | |
-| 24 | Version 2.2: portfolio core | not started | |
-| 25 | Version 2.2: risk core (contract, three prompts) | not started | |
-| 26 | Version 2.2: tools core | not started | |
-| 27 | Version 2.2: news and sentiment core | not started | |
-| 28 | Version 2.2: macro core | not started | |
-| 29 | Version 2.2: memory core | not started | |
-| 30 | Version 2.2: source chain, live adapters, `fetch` | not started | Every live request asked for first. FRED needs `IC_FRED_API_KEY` from the owner. |
+| 22 | Version 2.2: LangGraph graph, parallel analysts, wall time, checkpointer, `resume` | in progress | Critical path. First step `uv add langgraph langgraph-checkpoint-sqlite`; on failure stop (fallback in BLUEPRINT 19.5 item 7). Its parallel step waits for WP23. `uv add` done (langgraph 1.2.22, langgraph-checkpoint-sqlite 3.1.3); being built by the coordinator. |
+| 23 | Version 2.2: kernel deferred commit and tools | in progress | |
+| 24 | Version 2.2: portfolio core | done | Contracts byte-identical to 19.7 (plus PEP 8 blank lines); `state_for` four states; `fingerprint` SHA-256 first 16 over canonical JSON. Examples: held_acme (90 股 @ 100,现金 1000,权益 10000 → close 100 时 position_pct 恰为 90.0)、flat_usd、low_cash。23 tests;坏文件以文件名报 ValueError。Built by a delegated session; committed by the coordinator. |
+| 25 | Version 2.2: risk core (contract, three prompts) | done | `RiskView` exactly as 19.7 prints it: all seven fields required (built with keyword arguments); `size_pct`/`stop`/`target` nullable with no default, as declared. Three prompts adapted from the TradingAgents debators, each starting with the attribution line, naming 19.10's reads and explaining the four `portfolio/state` states (no default assumed when unavailable or 无). 5 tests; no role loads the prompts yet (WP31 declares them, WP32 the stage). |
+| 26 | Version 2.2: tools core | in progress | |
+| 27 | Version 2.2: news and sentiment core | in progress | |
+| 28 | Version 2.2: macro core | in progress | |
+| 29 | Version 2.2: memory core | in progress | |
+| 30 | Version 2.2: source chain, live adapters, `fetch` | in progress | Every live request asked for first. FRED needs `IC_FRED_API_KEY` from the owner. This build uses hand-made fixtures only; no live request made. |
 | 31 | Version 2.2: integration points (every shared file) | not started | Alone. Needs WP22 to WP29. |
 | 32 | Version 2.2: portfolio and risk in the flow | not started | |
 | 33 | Version 2.2: tools in the flow | not started | |
@@ -467,6 +467,7 @@ Questions for the owner, and gaps found while building:
 | 13 | 2026-11-19 | 30 | `IC_FRED_API_KEY` in `.env`: the owner said they will provide it. Until then FRED is `NotConfigured` and macro runs on synthetic series only. | — |
 | 14 | 2026-11-19 | 38 | WP38's spending cap. To be asked when WP38 starts, with an estimate from the pilot. | — |
 | 15 | 2026-11-19 | 21 | **The copyright line in `THIRD_PARTY_NOTICES.md`.** BLUEPRINT 19.4 rule 3 says to take "the Apache-2.0 text from `../TradingAgents-main/LICENSE` and its copyright line", but that LICENSE is the unfilled Apache template — its only copyright line is the placeholder `Copyright [yyyy] [name of copyright owner]` — and its `pyproject.toml` names no author. WP21 wrote `Copyright Tauric Research` above the verbatim license text, following the project's README and GitHub organisation, and noted this in the file. Confirm, or name the line to use; WP39 finalises the file. | — |
+| 16 | 2026-11-20 | 22 | **`run/usage.wall_ms`（19.5 第 5 条）按字面无法落地,需要定夺。** 冲突:(i) 19.5 要求 `run/usage` 增加 `wall_ms: {node: ms}`(真实时钟);(ii) `app/replay.py::_diff` 对黑板逐键全量比较,而 v2.2 的文件表里没有任何包 owns `app/replay.py`——重放任何带 wall_ms 的黑板必然"不一致"(重放时时钟不同),19.3 的证明与 WP38 的"归档全部一致"都无法成立;(iii) `run/usage` 今天是列表(`budget.table()`),`report.py` 直接迭代它,改形状立刻破坏报告;(iv) 新增日志事件类型需要改内核(`EventType` 是封闭字面量,19.6 之外);(v) flows 层无法用 `run.models` 区分重放(架构测试禁止 flows→adapters)。WP22 先在内存里记录每分析师的起止时刻(join 用),**不持久化**,待定夺。选项:A. 授权给 WP22 改 `app/replay.py` 的 `_diff` 使其忽略 `run/wall_ms` 键,wall_ms 作为**新黑板键** `run/wall_ms` 写入(不动 `run/usage` 列表,报告不破);B. 授权新增一种日志事件类型(内核改动)只存日志;C. 放弃持久化,WP38 的并行/串行对比在运行时内存中完成。**建议 A**(改动最小、可回滚)。 | — |
 
 ### Version 2.2: shared-file requests
 
@@ -1330,6 +1331,51 @@ Files created or changed: created `tests/conftest.py`, `THIRD_PARTY_NOTICES.md`;
 Committed: one commit on `v2.2` holding the files above plus this file (only my own edits were in it); see `git log` for the hash.
 
 For the next session: step 2 of section 5.5 — WP22 to WP30. WP22's first step is `uv add langgraph langgraph-checkpoint-sqlite`; ask the owner before running it. Question 15 waits for the owner; nothing blocks on it before WP39.
+
+### 2026-11-20 00:00 · WP25 · building session (GLM-5.3, via ZCode)
+
+Result: done
+
+Commands run, with the last lines of their output:
+  uv run pytest tests/test_risk.py -q → 5 passed in 0.02s
+  uv run pytest -q → 514 passed in 14.70s
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  uv run insightcrew scenarios → 21 × "✓ …相符"
+  IC_FORCE_OFFLINE=1 uv run insightcrew replay "$(printf '%s\n' insightcrew/evals/archive/*/ | head -1)" → exit 0；最后一行 "一致：结果（review，原因 malformed_output，判断 not reviewed）与黑板快照完全相同"
+
+Not run, and why: no network request and no real-model call (both are asked for first); no git command (the coordinator commits WP25).
+
+Unverified: the three prompts against a real model — nothing loads them yet by design (WP31 declares the roles, WP32 the stage); the attribution line stays out of every model call until `_prompt` drops `<!--` lines in WP31.
+
+Files created or changed: created `insightcrew/domain/risk.py`, `insightcrew/roles/prompts/risk_aggressive.md`, `risk_neutral.md`, `risk_conservative.md`, `tests/test_risk.py`; edited `docs/HANDOFF.md` (row 25, this entry).
+
+Committed: no
+
+For the next session: WP31 declares the three roles (19.10: `risk.aggressive`/`risk.neutral`/`risk.conservative`, tier quick, output `RiskView`, writes `risk/<stance>`, reads as listed); WP32 fills `flows/stage_risk.py`. Interpretation kept: 19.7 prints no `= None` defaults, so every `RiskView` field is required and only nullable — `tests/test_risk.py` asserts `is_required()`; the same pattern as `Proposal`'s nullable fields.
+
+### 2026-11-20 00:05 · WP24 · delegated session (GLM-5.3, via ZCode); row and this entry by the coordinator
+
+Result: done
+
+Commands run, with the last lines of their output (from the delegated session's report):
+  uv run pytest tests/test_portfolio.py -q → 23 passed in 0.16s
+  uv run pytest tests/test_portfolio.py tests/test_market.py -q → 67 passed in 0.56s
+  uv run pytest -q → 514 passed in 14.23s
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  uv run insightcrew scenarios → 21 × "✓ …相符"
+  IC_FORCE_OFFLINE=1 uv run insightcrew replay "$(printf '%s\n' insightcrew/evals/archive/*/ | head -1)" → exit 0, 一致
+
+Not run, and why: no network request (asked for first); no git command (the coordinator commits).
+
+Unverified: nothing yet wired into a flow — that is WP31/WP32, as planned.
+
+Files created or changed: created `insightcrew/domain/portfolio.py` (first line the attribution header; contracts as 19.7), `insightcrew/adapters/portfolio_json.py`, `data/portfolios/flat_usd.json`, `held_acme.json`, `low_cash_usd.json`, `tests/test_portfolio.py`. Interpretations kept, documented in code: exact normalized-ticker match; `flat` carries `quantity = 0.0` (known zero, not null); duplicate tickers — first position wins; fingerprint over canonical JSON (`sort_keys`, no spaces).
+
+Committed: with this entry, by the coordinator, by path (see `git log`).
+
+For the next session: WP31 wires `[portfolio]` settings and `--portfolio`; WP32 fills `flows/stage_portfolio.py` and adds the three portfolio scenarios.
 
 ## 9. Prompts for starting a session
 

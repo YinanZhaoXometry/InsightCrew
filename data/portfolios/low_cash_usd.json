@@ -1,0 +1,8 @@
+{
+  "currency": "USD",
+  "cash": 100.0,
+  "equity": 10000.0,
+  "positions": [
+    {"ticker": "SYNUS", "quantity": 99.0, "average_price": 100.0}
+  ]
+}
