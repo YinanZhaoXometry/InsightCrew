@@ -6,7 +6,7 @@ The status board for the rewrite described in [BLUEPRINT.md](BLUEPRINT.md). The 
 
 Last updated: 2026-11-19 evening, by the building session. Submission is 2026-11-23 23:59.
 
-> **Version 2.0 is built: work packages 0 to 12 are done. Version 2.1 is authorised (2026-11-19): the owner answered all seven questions under [Version 2.1](#version-21-traps-and-open-questions) in section 7.** It adds two evidence channels, fundamentals and disclosures, as work packages 13 to 20. The design is [BLUEPRINT.md section 18](BLUEPRINT.md#18-version-21-evidence-channels). Build WP13 to WP20 in the order of section 5.4.
+> **Version 2.1 is built: work packages 13 to 20 are done except WP17B's live acceptance, which is blocked on the network (see its row below and question 11).** The two evidence channels work end to end against a real model; the default behaviour with no channel open is byte-for-byte that of version 2.0, and every archived journal still replays. `../InsightCrew.zip` is the 2.1 package; version 2.0 remains at the tag `v2.0`.
 
 > **The plan changed on 2026-11-19.** The owner reversed the zero-dependency decision: the system is built on maintained libraries (Pydantic AI, Pydantic, FastAPI, Typer, uv). BLUEPRINT.md, BLUEPRINT-REFERENCE.md and this file were revised together and are consistent. If you remember, or find in an older transcript, a version of the plan that says "standard library only", `python3 -m unittest`, `kernel/schema.py` or `adapters/openai_compat.py`, it is void.
 
@@ -57,7 +57,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 17B | Version 2.1: `fetch` downloads evidence | blocked | Code done, three checks green. The live acceptance run is blocked: Eastmoney's bars endpoint twice answered `Server disconnected without sending a response` (Yahoo 429 as before), so `fetch` exits 1 at the bars stage and the evidence downloads never start. `IC_SEC_CONTACT` **is** set in `.env` (key checked, value not read). Stopped per the network rule; the owner decides. |
 | 18 | Version 2.1: run page sections | done | Pipeline shows the two analyst stages when a run has them; the evidence area gains a channel-status line, a fundamentals table with the card, and an item list with signals; verified in the in-app browser for `channels_clean`, `uncovered` and `demo` (no channel → the page shows nothing new). 486 tests. |
 | 19 | Version 2.1: real-model runs with channels, `eval channels` | done | 13 real runs archived (one pilot + 12 evaluation), every journal replays 一致; no prompt fix was needed (the pilot journal showed clean channel outputs and substantive, not mechanical, dissents); `[flow] channels` stays unset. Total spend ≈ 0.5 USD of the 2 USD cap. |
-| 20 | Version 2.1: documents and packaging | not started | Needs everything else built or cut |
+| 20 | Version 2.1: documents and packaging | done | README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP updated (counts: 486 tests, 21 scenarios, 8 agent kinds, 43 archives, invariants 3/4/6 reworded, 17/18 added; the 30 v2.0 journals are marked as made before the prompt change, the 13 v2.1 after). Link check bad 0; the zip rebuilt from the head and verified from a fresh unzip. |
 
 **Work packages 0 to 12 are done: that is version 2.0, and it is a complete submission.** [ROADMAP.md](ROADMAP.md) lists its known issues and next steps. Work packages 13 to 20 are version 2.1, in [BLUEPRINT.md section 18](BLUEPRINT.md#18-version-21-evidence-channels).
 
@@ -1110,6 +1110,28 @@ Files created: `insightcrew/evals/channels.py`, `insightcrew/evals/archive/chann
 Committed: by path, then this file. See `git log`.
 
 For the next session: WP20 (documents and packaging) — everything else is built or blocked; WP17B's live acceptance waits on the network or the owner's choice.
+
+### 2026-11-19 evening · WP20 · building session (GLM, via ZCode)
+
+Result: done. Version 2.1 is complete and packaged.
+
+What was updated, and the rule followed: every count that changed (486 tests, 21 scenarios, eight agent kinds, 43 archived journals, invariants 3/4/6 reworded and 17/18 added), the channels described in each document at the depth that document works at, the channels-evaluation table and the "must not be claimed" list in EVALUATION 7, the network block recorded as the first roadmap item, and the statement the blueprint requires: the 30 version-2.0 journals were made **before** the prompts of bull, bear, manager and judge gained their channels paragraph, the 13 version-2.1 journals after; prompts are not compared by replay, so they all replay either way.
+
+Commands run, with the last lines of their output:
+
+- Link check over README, AGENTS, ARCHITECTURE, EVALUATION and ROADMAP (files and GitHub-style heading anchors) → `bad 0`.
+- `uv run pytest -q` → `486 passed`. `uv run ruff check .` → `All checks passed!` `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- `git archive --format=zip --prefix=InsightCrew/ HEAD` → `../InsightCrew.zip` (223 files, including the 43 journals and both evaluation JSONs; no `.env`, `runs/` or `data/market/real/`). Unzipped into an empty directory under `/tmp`: `uv sync` ok; `uv run pytest -q` → `486 passed`; `IC_FORCE_OFFLINE=1 uv run insightcrew analyze --no-open` with no key → `结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified`; `uv run insightcrew scenarios` → 21 相符; `uv run insightcrew eval all` → all six lines. The old zip (version 2.0) was replaced; it can be rebuilt any time from the tag `v2.0`.
+
+Not run, and why: `start.bat` on Windows (no Windows machine), as in WP11.
+
+Unverified: nothing new; the page was verified in WP18, the evaluation numbers are tied to `channels.json` and the archived journals.
+
+Files changed: `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATION.md`, `docs/ROADMAP.md`, this file.
+
+Committed: by path, then this file. The zip is outside the repository. See `git log`.
+
+For the next session: nothing planned. The one open item is WP17B's live acceptance (network-bound, question 11 pending); everything else in version 2.1 is built, tested and packaged.
 
 ## 9. Prompts for starting a session
 
