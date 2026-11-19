@@ -6,6 +6,7 @@ Status: **plan, not yet built.** Written 2026-11-19, and revised the same day wh
 - [HANDOFF.md](HANDOFF.md) is the status board: which work packages are done, what the owner has authorised, and the session log. This document says what to build; that one says where the work stands.
 - [TRANSFORMATION.md](TRANSFORMATION.md) is the earlier proposal. It remains the record of what was learned from the two reference systems and of the fit with the course requirements. Where the two documents differ, this one wins. [Section 17](#17-relation-to-transformationmd) lists the differences.
 - Sections 0 to 17 describe version 2.0, which is built: work packages 0 to 12 are done. [Section 18](#18-version-21-evidence-channels) is the plan for version 2.1, which adds two evidence channels (fundamentals and disclosures). It was proposed on 2026-11-19 and nothing in it is built.
+- [Section 19](#19-version-22-langgraph-orchestration-and-five-capabilities) is the plan for version 2.2 (proposed 2026-11-19 late evening, version 2.1 by then built): LangGraph orchestration with parallel analysts and resume, a portfolio, a three-way risk debate, analyst tools, news with macro data and social sentiment, and memory with settlement and backtest. Nothing in it is built. Where it amends an earlier section, section 19 says so.
 
 ## 0. Reading guide
 
@@ -2225,4 +2226,617 @@ In addition to [12.4](#124-what-must-not-be-claimed):
 | Yahoo's RSS feed and Google News RSS for `AAPL` | 200. 19 items spanning about 6 hours, and 59 items spanning under 3 days. Too recent to keep the point-in-time rule; not used. |
 | GDELT | 429. Not used. |
 | The two new prompts, and the paragraphs added to four others | Not written. Untestable offline. |
+| Effort estimates | The author's. Not measured. |
+
+## 19. Version 2.2: LangGraph orchestration and five capabilities
+
+Status: **plan, not built.** Written 2026-11-19 late evening, after version 2.1 was built, committed and packaged (head of `v2.1`: `082a0a3`). The owner chose every item in it in a planning chat the same evening; the decisions are recorded in 19.2 and the authorisations in [HANDOFF.md](HANDOFF.md) section 4. Sections 0 to 18 still describe what is built. This section amends them where it says so, and only there.
+
+Readers: an implementer reads 19.1 to 19.4, then the subsections its work package names in 19.18. [HANDOFF.md](HANDOFF.md) section 5.5 says which packages may run at the same time and which files each owns.
+
+### 19.1 What is added, and why
+
+The owner compared InsightCrew with TradingAgents (the reference beside this repository) and asked for its useful architecture to be learned, without giving up what InsightCrew is: an assistant whose every number is computed by code and audited. Version 2.2 adds:
+
+| Capability | In one line |
+|---|---|
+| LangGraph orchestration | `flows/analyze.py`'s hand-written routing becomes a `StateGraph`: conditional edges for the audit and judge loops, analysts in parallel, a checkpointer for `resume`. Model calls stay in `kernel/runtime.py` on Pydantic AI. |
+| Portfolio | A JSON file gives cash, equity and positions. Code turns it into `portfolio/state`; the rules `sell_requires_position`, `max_position_pct` and `cash_sufficient` become meaningful. |
+| Risk debate | Three roles (aggressive, neutral, conservative) critique the trader's proposal; the trader then revises it once; the audit checks the revision. |
+| Analyst tools | The technical analyst may request indicators at windows the ledger does not hold. Each tool result is a fact computed by both paths and audited like any other. |
+| News, macro, sentiment | A news analyst reads dated headlines, macro series (FRED) and prediction markets (Polymarket); a sentiment analyst reads social posts (StockTwits, Reddit). Every item is dated and cited by ID; uncovered windows are `unavailable`. |
+| Memory | Delivered decisions are logged; code settles them once their holding window has traded; a reflector role writes a lesson; the manager sees only lessons whose outcome was known on the analysis date. `settle` and `backtest` commands. |
+| Engineering patterns | A data-source chain with typed errors; explicit-absence states; a no-network test fixture; atomic writes and file locks; run-signature resume; per-analyst wall time. |
+
+What stays: the ledger and its two paths, the rulebook and audit, the three judges, the journal as the only truth, replay, point-in-time, budgets, refuse-rather-than-guess.
+
+### 19.2 Decisions
+
+Numbered after section 18's last decision.
+
+| # | Decision | Why |
+|---|---|---|
+| 39 | TradingAgents may be **adapted**, not imported. Only framework-independent parts listed in 19.4 are adapted; each adapted file carries one header line; the repository root holds `THIRD_PARTY_NOTICES.md`. README and the other documents do not discuss it. | The owner's choice (2026-11-19). Apache-2.0 requires the notice and a statement of changes; nothing more. |
+| 40 | LangGraph orchestrates; Pydantic AI still makes every model call, inside `run_role`. LangChain model clients are not used. | Keeps invariant 1 and the replay adapters. LangGraph brings conditional edges, fan-out and checkpointing, which the hand-written flow lacks. |
+| 41 | The journal stays the only source of truth. LangGraph state holds only routing counters and flags; the board is folded from the journal as before. | Invariant 11. A checkpoint can always be checked against the journal. |
+| 42 | Every node commits its events at its end, in a fixed order. Parallel branches compute concurrently and commit in declared order. | A journal must be the same whether analysts ran in parallel or in series, or replay and resume break. Needs a kernel change (19.6). |
+| 43 | Every v2.2 capability is off by default in code. `insightcrew.toml` may switch them on only in WP38, on the owner's word. | Invariant 17 extended: with everything off, a run writes what version 2.1 writes. The 43 archived journals keep replaying. |
+| 44 | Inputs from outside the repository's data (the portfolio file, the decision log) are written to the board at intake, and replay supplies them from the journal. | A replay must not depend on files that change after the run. |
+| 45 | The risk debate runs before the audit and may change the proposal only through the trader. The three judges stay after the audit and may only veto. | Two different jobs: improve the plan, then check it. The judges' `conservative` and `aggressive` lenses overlap with the debate; the ablation in WP38 measures whether both earn their cost. |
+| 46 | Tools compute only through the indicator functions both paths already implement, at a declared range of windows. | Invariant 4 holds for tool facts with no new indicator code. |
+| 47 | Live-only sources (headline feeds, social, Polymarket) are archived by `fetch` and read from the archive. A window the archive does not cover is `unavailable`, with the reason "该窗口未覆盖". | Point-in-time. Keyless feeds hold hours to days of items (18.18); an archive is the only honest history. |
+| 48 | Macro values are facts with two paths (`domain/macro.py`, `domain/macro_sql.py`) and FRED vintages no later than the analysis date. Polymarket probabilities are source text, not facts. | A number the audit checks must have two paths; a market's quoted probability is a quotation. |
+| 49 | Settlement is code with two paths (`domain/memory.py`, `domain/memory_sql.py`); lessons are written by a model and cite outcome fields. | Outcome numbers reach the manager and the report; they follow invariant 4. |
+| 50 | Network access for new sources and real-model spending are asked for each time (HANDOFF section 4). Tests never use the network: a fixture in `tests/conftest.py` blocks it. | The owner's choice (2026-11-19). |
+
+### 19.3 The compatibility rule
+
+With every v2.2 capability off — `risk_rounds = 0`, `tools = false`, `memory = false`, no portfolio, and `channels` holding none of `news`, `sentiment`, `macro` — a run writes the artifacts, sends the views (the rendered `<artifact>` blocks) and appends the event types that version 2.1 does. Role instructions may gain paragraphs, as in WP16; views may not change. `parallel` may be on or off: the journal is the same except `ts` values and `run/usage.wall_ms`.
+
+The proof, run at the end of every v2.2 package:
+
+```bash
+uv run pytest -q
+uv run insightcrew scenarios                     # every pre-existing scenario still ✓ 相符
+for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew replay "$d"; done   # every one 一致
+```
+
+### 19.4 Adapting TradingAgents
+
+The only files of `../TradingAgents-main/` an implementer may open, and what may be taken from each. Anything else is read for ideas at most, and written fresh.
+
+| WP | Source in `TradingAgents-main/tradingagents/` | Target | What may be taken |
+|---|---|---|---|
+| 24 | `portfolio.py` | `domain/portfolio.py` | The three-state idea (not provided, flat, held) and the shape of a position |
+| 25 | `agents/risk_mgmt/aggressive_debator.py`, `conservative_debator.py`, `neutral_debator.py` | `roles/prompts/risk_aggressive.md`, `risk_conservative.md`, `risk_neutral.md` | Prompt substance, translated to Chinese and rewritten to the `RiskView` contract and to citing fact IDs |
+| 26 | `dataflows/date_window.py` | `flows/tools.py` | Date canonicalisation and clamping |
+| 27 | `agents/analysts/news_analyst.py`, `agents/analysts/sentiment_analyst.py`, `SentimentBand` in `agents/schemas.py` | `roles/prompts/news.md`, `sentiment.md`, `domain/social.py` | Prompt substance (translated, rewritten to the contracts), the six bands |
+| 29 | `memory/settlement.py`, `memory/reflection.py`, `memory/log.py`, `dataflows/files.py` | `domain/memory.py`, `roles/prompts/reflector.md`, `adapters/decision_log.py` | Return, alpha and holding-period conventions; benchmark by exchange suffix; the reflection prompt; atomic replace, file lock, idempotent entries |
+| 30 | `dataflows/router.py`, `dataflows/errors.py`, `dataflows/net.py`, `dataflows/vendors/fred.py`, `polymarket.py`, `stocktwits.py`, `reddit.py` | `adapters/vendors.py`, `adapters/fred.py`, `adapters/polymarket.py`, `adapters/stocktwits.py`, `adapters/reddit.py` | Ordered fallback with typed errors; key scrubbing; FRED aliases and vintage pinning; endpoint shapes |
+| 35 | `backtest.py` | `app/backtest.py` | Grid iteration, resumable progress, summary figures |
+
+Rules:
+
+1. A file that takes anything from that list starts with this line (Python) or this first line (Markdown prompt), exactly: `# Adapted from TradingAgents (Apache-2.0), modified.` / `<!-- Adapted from TradingAgents (Apache-2.0), modified. -->`. `roles/__init__.py`'s `_prompt` drops lines that start with `<!--` (WP31), so the model never sees it.
+2. No LangChain import, ever. Code is rewritten to this project's contracts, layers, Chinese comments and conventions.
+3. WP21 creates `THIRD_PARTY_NOTICES.md` with the Apache-2.0 text from `../TradingAgents-main/LICENSE` and its copyright line. WP39 fills its file list from `rg -l "Adapted from TradingAgents"`.
+
+### 19.5 The graph
+
+`flows/graph.py` (new) builds the graph; `flows/analyze.py` keeps `FlowConfig`, `call`, `Halt` handling and the entry point `analyze(run, request, deps, cfg=None) -> Outcome` with the same signature, and delegates to the graph. `tests/test_flow.py` (a reference test) passes unchanged; it monkeypatches `analyze.stages`, so the graph is built from the `stages` object `analyze` passes in: `build_graph(stages, cfg, deps) -> CompiledStateGraph`. Nodes never import `flows.stages` themselves.
+
+```mermaid
+flowchart LR
+    intake --> ledger --> evidence
+    evidence --> technical
+    evidence --> fundamentals
+    evidence --> disclosures
+    evidence --> news
+    evidence --> sentiment
+    technical --> join
+    fundamentals --> join
+    disclosures --> join
+    news --> join
+    sentiment --> join
+    join --> debate --> manager --> trader --> risk --> audit
+    audit -->|"findings: owner"| technical
+    audit -->|"findings: owner"| manager
+    audit -->|"findings: owner"| trader
+    audit -->|pass| judges
+    judges -->|"dissent: thesis"| manager
+    judges -->|"dissent: levels"| trader
+    judges --> outcome
+```
+
+1. **Nodes.** One node per stage of today's `PIPELINE`, plus `join`, `risk`, `news`, `sentiment`. A node for a capability that is off is not added (channels, `risk_rounds = 0`). `intake`, `ledger`, `evidence`, `audit`, `outcome` wrap the code stages; analyst and role nodes wrap `call(run, ROLE)`.
+2. **State.** A `TypedDict` with `audit_round: int`, `judge_round: int`, `last_findings: list[str]`, `route: str`, `halt: dict | None`. Nothing else. `Run` (board, journal, budget) and `deps` travel in the graph's `config["configurable"]`, never in state.
+3. **Edges.** The conditional edges reproduce `pass_audit` and `scrutinise` exactly: route to the earliest owner (`_ORDER`), rerun every later node, stop on stagnation (same findings twice), `audit_rounds`, `judge_rounds`, `quorum`, and degrade a `Halt` with `_degrade`. Each conditional edge is given an explicit path map listing every value its router can return; `tests/test_graph.py` walks every router and checks its values are keys of its map. The `route` events are written as today.
+4. **Parallel analysts.** With `FlowConfig.parallel = True` (new, default `True`) the analysts after `evidence` run concurrently, each in its own subgraph with its own message history. Each computes with `run_role_deferred` (19.6); `join` commits their results in this fixed order: `technical`, `fundamentals`, `disclosures`, `news`, `sentiment`. Budget admission for the whole group is made before any branch starts, in that order. With `parallel = False` they run in that order in series. The journals of the two are equal except `ts` and `run/usage.wall_ms` (invariant 19).
+5. **Wall time.** Each analyst node records start and end; `run/usage` gains `wall_ms: {node: ms}`. `run/usage` is written as today otherwise.
+6. **Checkpoint and resume.** The graph is compiled with a SQLite checkpointer at `<run dir>/checkpoints.sqlite` (`langgraph-checkpoint-sqlite`); tests and replay use an in-memory one. The thread ID is the first 16 hex characters of the SHA-256 of the run signature: ticker, analysis date, the whole `FlowConfig`, the portfolio fingerprint, the tier names. Because every node commits at its end (decision 42), the journal after a crash holds exactly the finished nodes. `insightcrew resume RUN_DIR` rebuilds `Run` from the journal, recomputes the signature, refuses with a Chinese message if it differs, and otherwise continues the graph from the checkpoint. Spend of a node interrupted mid-way is not in the journal; the session log of WP22 says so.
+7. **Libraries.** `langgraph` and `langgraph-checkpoint-sqlite` are added by WP22 with `uv add`, `exclude-newer` unchanged. Only `flows/graph.py` imports `langgraph`; only `app/wiring.py` and `app/resume.py` may import the SQLite checkpointer package. If no version resolves before the cutoff, WP22 stops; the fallback (HANDOFF section 4) is to keep the hand-written flow and add `parallel` and `resume` without LangGraph.
+
+### 19.6 Kernel changes
+
+The owner authorised exactly these changes to `insightcrew/kernel/runtime.py` (HANDOFF section 4). Everything else in the kernel stays frozen. New tests go in `tests/test_kernel_v22.py`; `tests/test_kernel.py` is not edited.
+
+1. **Deferred commit.** `async def run_role_deferred(run: Run, role: Role) -> Deferred` does everything `run_role` does except append to the journal and put on the board; `Deferred` (frozen dataclass) holds the output and the events. `def commit(run: Run, deferred: Deferred) -> Any` appends the events, records usage and puts the output, then returns it. `run_role` becomes `commit(run, await run_role_deferred(run, role))`, with identical events. Admission (`run.admit`) happens inside `run_role_deferred`, before the request.
+2. **Tools.** `Role` gains `tools: tuple[str, ...] = ()` and `max_tool_calls: int = 0`. `Run` gains `tools: Mapping[str, Callable[..., Any]]` (empty by default). For a role with tools, `run_role_deferred` passes the named functions from `run.tools` to the agent as Pydantic AI tools and caps requests at `max_tool_calls + 2`. The kernel knows no tool by name. `_agent`'s cache key uses the tool names. Behaviour the tool wrapper in the kernel adds:
+   - after `max_tool_calls` calls, every further call returns `已达到工具调用上限，请立即给出最终输出。` without running the tool;
+   - an identical repeated call (same name, same arguments) returns the earlier result without running the tool;
+   - `model.called` data gains `tool_calls` and `repeated_tool_calls` counts. Tool calls and results are already in `messages`.
+3. Read the installed Pydantic AI source under `.venv/lib/python3.12/site-packages/pydantic_ai/` for the tool and usage-limit API before writing it (rule 7).
+
+### 19.7 Contracts
+
+All frozen, closed, in Chinese descriptions where a model sees them. New modules own their contracts; `domain/types.py` changes only as WP21 and WP31 say.
+
+**WP21 widens two literals in `domain/types.py`** (no other change): `Finding.owner` gains `"news"`, `"sentiment"`, `"reflector"`; `ChannelStatus.channel` gains `"news"`, `"sentiment"`, `"macro"`.
+
+`domain/portfolio.py`:
+
+```python
+class Position(Contract):
+    ticker: str
+    quantity: FiniteFloat                  # 正数为多头；本版本不支持空头，负数在读取时拒绝
+    average_price: FiniteFloat
+
+class Portfolio(Contract):
+    currency: str
+    cash: FiniteFloat
+    equity: FiniteFloat                    # 总权益，> 0
+    positions: tuple[Position, ...]
+
+class PortfolioState(Contract):            # 板键 portfolio/state，由代码写
+    state: Literal["not_provided", "flat", "held", "unavailable"]
+    currency: str | None
+    quantity: float | None
+    position_pct: float | None             # 持仓市值 / 权益 × 100，按 ledger 的 close
+    cash_pct: float | None                 # 现金 / 权益 × 100
+    reason: str                            # 一句中文；held 与 flat 时为空
+
+def state_for(portfolio: Portfolio | None, ticker: str, close: float, currency: str) -> PortfolioState: ...
+def fingerprint(portfolio: Portfolio | None) -> str: ...   # SHA-256 前 16 位；None 时为 "none"
+```
+
+`unavailable` when the portfolio's currency differs from the instrument's (no conversion). Rules receive `position_pct` and `cash_pct` only for `flat` and `held`; otherwise `0.0` and `None`, as in version 2.1.
+
+`domain/risk.py`:
+
+```python
+class RiskView(Contract):
+    stance: Literal["aggressive", "neutral", "conservative"]
+    critique: str
+    size_pct: FiniteFloat | None = Field(description="建议的仓位百分比；不建议改动时为 null")
+    stop: FiniteFloat | None
+    target: FiniteFloat | None
+    cites: tuple[str, ...] = Field(description="支撑意见的事实 ID")
+    rebuttal: str = Field(description="对另外两位上一轮意见的回应；尚未发言时写空字符串")
+```
+
+`domain/news.py` (port shape copies `domain/disclosures.py`):
+
+```python
+class Headline(Contract):                  # 端口层
+    published: date
+    source: str
+    title: str
+    url: str
+
+class NewsSet(Contract):
+    source: str
+    items: tuple[Headline, ...]
+    dropped: int                           # 无日期而丢弃的条数
+
+class News(Protocol):
+    def headlines(self, ticker: str, start: date, as_of: date) -> NewsSet: ...   # NotCovered / SourceUnavailable
+
+class NewsEntry(Contract):                 # 板键 news/items 的元素
+    id: str                                # "N1"……
+    published: str
+    source: str
+    title: str
+    url: str
+
+class NewsCard(Contract):                  # 板键 news/card
+    source: str
+    window_from: str
+    window_to: str
+    items: int
+    dropped: int
+    truncated: int
+
+class NewsSignal(Contract):
+    item: str = Field(description="被解读的新闻（N 加数字）或预测市场（P 加数字）条目 ID")
+    direction: Literal["positive", "negative", "neutral"]
+    reading: str
+
+class NewsAnalysis(Contract):              # 板键 news/analysis
+    signals: tuple[NewsSignal, ...]
+    claims: tuple[Claim, ...] = Field(description="对宏观事实的引用；没有宏观事实时为空")
+    stance: Literal["positive", "mixed", "neutral", "negative"]
+    confidence: Literal["low", "medium", "high"]
+    narrative: str
+
+def news_findings(entries: list[NewsEntry], markets: list["MarketEntry"], macro: list[Fact],
+                  analysis: NewsAnalysis) -> list[Finding]: ...   # owner "news"
+```
+
+`domain/social.py`:
+
+```python
+class Post(Contract):                      # 端口层
+    published: date
+    source: str                            # "stocktwits" | "reddit" | "合成数据"
+    text: str                              # 截断到 280 字
+    url: str
+    tag: Literal["bullish", "bearish", "none"]   # 来源自带的标签；没有时为 none
+
+class SocialSet(Contract):
+    source: str
+    posts: tuple[Post, ...]
+    dropped: int
+
+class Social(Protocol):
+    def posts(self, ticker: str, start: date, as_of: date) -> SocialSet: ...
+
+class PostEntry(Contract):                 # 板键 sentiment/posts 的元素
+    id: str                                # "S1"……
+    published: str
+    source: str
+    text: str
+    tag: str
+
+class SocialCard(Contract):                # 板键 sentiment/card：与 NewsCard 同形
+    source: str
+    window_from: str
+    window_to: str
+    items: int
+    dropped: int
+    truncated: int
+
+Band = Literal["bullish", "mildly_bullish", "neutral", "mixed", "mildly_bearish", "bearish"]
+
+class SentimentSignal(Contract):
+    post: str = Field(description="被解读的帖子 ID（S 加数字）")
+    direction: Literal["positive", "negative", "neutral"]
+    reading: str
+
+class SentimentAnalysis(Contract):         # 板键 sentiment/analysis
+    band: Band
+    score: float = Field(ge=0, le=10, description="0 最看空，10 最看多")
+    confidence: Literal["low", "medium", "high"]
+    signals: tuple[SentimentSignal, ...]
+    narrative: str
+
+BAND_RANGES: dict[str, tuple[float, float]] = {
+    "bearish": (0, 2), "mildly_bearish": (2, 4), "neutral": (4, 6),
+    "mixed": (4, 6), "mildly_bullish": (6, 8), "bullish": (8, 10)}
+
+def sentiment_findings(entries: list[PostEntry], analysis: SentimentAnalysis) -> list[Finding]: ...   # owner "sentiment"
+```
+
+`domain/macro.py` (path 1; `domain/macro_sql.py` is path 2, standard library only, sharing no code):
+
+```python
+class Observation(Contract):               # 端口层：一个观测值的一个版本
+    date: date                             # 观测期
+    value: FiniteFloat
+    realtime_start: date                   # 这个版本开始生效的日期（FRED vintage）
+
+class Series(Contract):
+    alias: str                             # data/macro.toml 的表名，例如 "fed_funds"
+    source: str
+    observations: tuple[Observation, ...]
+
+class Macro(Protocol):
+    def series(self, alias: str, as_of: date) -> Series: ...   # NotCovered / SourceUnavailable / NotConfigured
+
+class MacroSpec(Contract):                 # data/macro.toml 一张表；adapters/declarations_macro.py 读入
+    alias: str
+    fred_id: str
+    label: str
+    unit: Literal["pct", "index", "level"]
+    transforms: tuple[Literal["level", "chg_3m", "yoy"], ...]
+
+class MarketEntry(Contract):               # 板键 macro/markets 的元素；来源原文，不是事实
+    id: str                                # "P1"……
+    question: str
+    probability: float                     # 来源给的隐含概率，0 到 1，照录不核
+    volume: float
+    end_date: str
+    fetched_on: str
+
+def build_macro(series: list[Series], specs: list[MacroSpec], as_of: date) -> tuple[list[Fact], list[Unavailable]]: ...
+```
+
+Macro fact IDs are `macro_<alias>` for `level`, `macro_<alias>_chg_3m`, `macro_<alias>_yoy`. Only observations whose `realtime_start` is not after the analysis date count; per observation date, the latest such vintage is used.
+
+`domain/memory.py` (path 1; `domain/memory_sql.py` is path 2):
+
+```python
+class DecisionRecord(Contract):
+    kind: Literal["decision"]
+    run_id: str
+    ticker: str
+    as_of: str
+    rating: Rating
+    action: Action
+    entry: float | None
+    stop: float | None
+    target: float | None
+    size_pct: float
+    horizon_days: int
+
+class OutcomeRecord(Contract):
+    kind: Literal["outcome"]
+    run_id: str
+    ticker: str
+    as_of: str
+    known_on: str                          # 持有期最后一根 K 线的日期；结果自此可知
+    holding_days: int
+    return_pct: float                      # 分析日后第一根收盘到持有期末收盘
+    benchmark: str                         # 基准的文件名词干，例如 "SPY"、"_HSI"
+    benchmark_return_pct: float | None
+    alpha_pct: float | None
+    hit: Literal["stop", "target", "neither", "n/a"]   # 持有期内先触及谁；Hold 为 n/a
+    lesson: str | None                     # reflector 写；未写时为 null
+
+class Lesson(Contract):                    # reflector 的输出
+    text: str = Field(description="一条可迁移的经验，一到两句，不要包含数字")
+    cites: tuple[Literal["return_pct", "alpha_pct", "hit", "rating", "action"], ...]
+
+class LessonEntry(Contract):               # 板键 memory/lessons 的元素
+    ticker: str
+    as_of: str
+    known_on: str
+    rating: str
+    return_pct: float
+    alpha_pct: float | None
+    hit: str
+    lesson: str
+
+def settle(decision: DecisionRecord, bars: tuple[Bar, ...], benchmark_bars: tuple[Bar, ...],
+           holding_days: int, known_by: date) -> OutcomeRecord | None: ...   # None = 尚未走完持有期
+def select_lessons(records: list[DecisionRecord | OutcomeRecord], ticker: str, as_of: date,
+                   same: int = 5, other: int = 3) -> tuple[LessonEntry, ...]: ...
+def benchmark_for(ticker: str) -> str: ...   # ".HK" → "_HSI"；其余 → "SPY"
+def lesson_findings(outcome: OutcomeRecord, lesson: Lesson) -> list[Finding]: ...   # owner "reflector"
+```
+
+`select_lessons` keeps only outcomes with `known_on <= as_of` and a non-null lesson: the newest `same` for the ticker, then the newest `other` for other tickers.
+
+### 19.8 Ports, errors and point-in-time rules
+
+1. Errors: the existing `NotCovered` and `SourceUnavailable` (`domain/market.py`), plus `NotConfigured(Exception)` in `domain/market.py` (added by WP21) for a source whose key is absent.
+2. Every window is inclusive at both ends, `start = as_of - window_days`. Undated items are dropped and counted. An item dated after `as_of` never passes a port.
+3. Archive files written by `fetch` (`data/market/real/`, ignored by git) and synthetic files (`data/market/synthetic/`, committed):
+
+   | Kind | Path | Shape |
+   |---|---|---|
+   | News | `<universe>/news/<file_stem>.json` | `{"source", "covers_from", "covers_to", "items": [{"published", "source", "title", "url"}]}` |
+   | Social | `<universe>/social/<file_stem>.json` | `{"source", "covers_from", "covers_to", "posts": [{"published", "source", "text", "url", "tag"}]}` |
+   | Macro | `<universe>/macro/<alias>.json` | `{"source", "alias", "fred_id", "observations": [{"date", "value", "realtime_start"}]}` |
+   | Markets | `<universe>/markets/<YYYY-MM-DD>.json` | `{"source", "fetched_on", "markets": [{"question", "probability", "volume", "end_date"}]}` |
+
+   `published` is an ISO date or `null`. A window not inside `[covers_from, covers_to]` raises `NotCovered`. `fetch` appends to news and social archives, de-duplicating by `url`, and moves `covers_to`; `covers_from` is the first day the archive was written (decision 47). Markets are read only when `fetched_on == as_of`; any other analysis date is `NotCovered`.
+4. Explicit absence. Every board key a v2.2 capability writes carries a state when there is nothing to show: `portfolio/state.state`, the `*/status` channel states, and `memory/lessons` written as an empty tuple with `memory/status` `{"state": "none_known" | "available", "reason"}`. Prompts of new roles say how to read each state. A capability that is off writes no key at all (19.3).
+5. Tool dates (WP26): a tool never takes a date; the analysis date is bound when the tool is built.
+
+### 19.9 Portfolio
+
+- `adapters/portfolio_json.py`: `load_portfolio(path: Path) -> Portfolio`; a malformed file, unknown field, non-positive equity or negative quantity raises `ValueError` with a Chinese message naming the file. Examples: `data/portfolios/flat_usd.json`, `held_acme.json`, `low_cash_usd.json`.
+- Where it comes from: `analyze --portfolio PATH`, else `[portfolio] path` in `insightcrew.toml`, else none.
+- `flows/stage_portfolio.py`: `portfolio(run, deps)` runs after `ledger`. It writes `portfolio/input` (the `Portfolio`, only when one was given) and `portfolio/state`. In replay, `deps.portfolio` is a recorded port that returns the journaled `portfolio/input` (decision 44).
+- `stages.audit` passes `position_pct` and `cash_pct` from `portfolio/state` to `rules.evaluate` (19.7).
+- Scenarios: `portfolio_flat_sell` (flat, a Sell, refused by `sell_requires_position`), `portfolio_held_sell` (held, a Sell, delivered), `portfolio_low_cash` (a Buy failing `cash_sufficient`, routed to the trader, revised, delivered).
+
+### 19.10 Risk debate
+
+- Roles `risk.aggressive`, `risk.neutral`, `risk.conservative`, tier `quick`, output `RiskView`, writes `risk/aggressive`, `risk/neutral`, `risk/conservative`. Reads: `ledger/instrument`, `ledger/facts`, `manager/thesis`, `trader/proposal`, `portfolio/state`, `rules/limits`, and the other two `risk/*` keys.
+- Node `risk` (only when `risk_rounds > 0`): for each round, call aggressive, conservative, neutral in that order; then call `TRADER` once more. `TRADER.reads` gains the three `risk/*` keys (absent when off, so its view is unchanged).
+- The audit checks only `trader/proposal`; findings owned by `trader` route to `trader`, and `risk` reruns after it, within `audit_rounds`.
+- Judges do not read `risk/*` (added to `tests/test_architecture.py`).
+- Scenarios: `risk_shrinks_size` (the conservative view cuts size; the revised proposal is delivered), `risk_off_same` (`risk_rounds = 0` gives the board of `clean`).
+
+### 19.11 Analyst tools
+
+- `data/tool_indicators.toml`: one table per tool family, `fn` naming a function both paths implement, `inputs`, the argument name and its allowed range, `unit`, `label` with `{n}`. Families: `sma` (n 2–250), `ema` (n 2–250), `rsi` (n 2–60), `atr` (n 2–60), `ret_pct` (n 1–250), `highest` (n 2–252), `lowest` (n 2–252). Read by `adapters/declarations_tools.py`.
+- `flows/tools.py`: `build_tools(run: Run, deps: Deps, specs) -> dict[str, Callable]` returns one tool, `indicator(name: str, n: int) -> dict`. It checks the family and range (an error string otherwise, ending `数据不可用，不要编造。`), computes with `domain/indicators.py` and with `domain/recompute.py` on the bars up to the analysis date, halts the run on disagreement as the ledger does, and returns `{"id": "<name>_<n>", "value", "unit", "as_of"}`. Each new fact is collected; when the role's node commits, the node writes `tools/facts` (all tool facts so far, in call order) by `tools`.
+- `TECHNICAL` gains `tools=("indicator",)` and `max_tool_calls=[tools] max_tool_calls` only when `FlowConfig.tools` is true (the role is declared both ways in `roles/__init__.py`; the flow picks one).
+- The audit looks claims up in `ledger/facts` ∪ `tools/facts`.
+- `adapters/scripted.py` learns to replay a scripted tool call: a reply may be `{"tool": "indicator", "args": {...}}` before the final output. Replay of a real run replays the recorded tool calls; the tools run again and must give the same facts.
+- Scenarios: `tools_clean` (one tool call, a claim citing `sma_30`, delivered), `tools_out_of_range` (an `n` outside its range; the error string goes back; the analyst then answers without it).
+
+### 19.12 News, macro, sentiment, and the source chain
+
+- Channels: `FlowConfig.channels` accepts `news`, `sentiment`, `macro`. `macro` requires `news` (a `ValueError` at `prepare` otherwise). Evidence for each is gathered in `evidence` by `flows/stage_news.py` (`news`, `macro`) and `flows/stage_sentiment.py`, which `stages.evidence` calls for those channels.
+- Board keys: `news/items`, `news/card`, `news/status`, `news/analysis`; `macro/facts`, `macro/card` (a `DataCard`-like record: source, series read, unavailable), `macro/markets`, `macro/status`; `sentiment/posts`, `sentiment/card`, `sentiment/status`, `sentiment/analysis`.
+- Roles: `news` (quick, `NewsAnalysis`, reads `ledger/instrument`, `news/items`, `news/card`, `news/status`, `macro/facts`, `macro/markets`, `macro/status`, `audit/news`); `sentiment` (quick, `SentimentAnalysis`, reads `ledger/instrument`, `sentiment/posts`, `sentiment/card`, `sentiment/status`, `audit/sentiment`). The sentiment role has no tools; its evidence is fetched before the call.
+- `_CHANNELS_BRIEF` in `roles/__init__.py` gains `news/status`, `news/analysis`, `sentiment/status`, `sentiment/analysis`, so bull, bear, manager and the judges see them when present.
+- Audit additions, called from `domain/audit.py` with keyword parameters `news=` and `sentiment=`: `news_has_signals` (items or markets exist and no signal), `news_signal_cites_known_item`, the existing `claim_cites_known_fact` and `claim_value_matches_fact` over `macro/facts` with owner `news`, `sentiment_has_signals`, `sentiment_signal_cites_known_post`, `sentiment_score_matches_band` (score outside `BAND_RANGES[band]`). `point_cites_claimed_fact` accepts `N`, `P` and `S` IDs that an analyst's signals cited.
+- Synthetic data: `data/make_news.py`, `data/make_social.py`, `data/make_macro.py`, deterministic, writing for `ACME` (news and social) and four macro aliases (`fed_funds`, `cpi`, `unemployment`, `us10y`).
+- **The source chain**, `adapters/vendors.py`: `first_ok(chain: Sequence[tuple[str, Callable[[], T]]]) -> tuple[str, T]` tries each in order. `NoData` or `NotCovered` from one vendor moves on; `SourceUnavailable` moves on and is remembered; `NotConfigured` moves on. When all fail it raises `SourceUnavailable` whose message lists each vendor and its reason, passed through `scrub(text) -> str`, which removes query parameters named like `key`, `token`, `api_key` and any value of an environment variable whose name ends in `KEY` or `TOKEN`.
+- `[sources]` in `insightcrew.toml`: `bars = ["yahoo", "eastmoney"]` (today's order), `announcements = ["sec", "eastmoney"]`, `news = ["google_rss", "yahoo_rss"]`, `social = ["stocktwits", "reddit"]`, `macro = ["fred"]`, `markets = ["polymarket"]`. `app/fetch.py` uses the chain for every kind. `fetch` gains `--news`, `--social`, `--macro`, `--markets` (default: bars and evidence as today).
+- `adapters/fred.py` needs `IC_FRED_API_KEY` (in `.env`; `.env.example` gains a commented line). Without it the macro source is `NotConfigured` and `fetch --macro` says so.
+- Live adapters are functions on an `httpx2.Client` (as 18.12): `adapters/news_rss.py` (Google News RSS and Yahoo RSS), `adapters/stocktwits.py`, `adapters/reddit.py`, `adapters/fred.py`, `adapters/polymarket.py`. Each has tests over saved fixtures in `tests/fixtures/<name>/`. A fixture is saved from one live request only after the owner says yes (HANDOFF section 4).
+
+### 19.13 Memory, settlement, backtest
+
+- `adapters/decision_log.py`: `DecisionLog(path)` with `append(record)`, `records() -> list[...]`, `pending() -> list[DecisionRecord]`, `resolve(outcome)`. Writes go through a temporary file and `os.replace`, under a cross-process lock (`fcntl.flock`; `msvcrt.locking` on Windows). A second `decision` for the same `(as_of, ticker)` is ignored. `[memory] max_entries` (0 = no limit) drops the oldest settled pairs only; a pending decision is never dropped.
+- `flows/stage_memory.py`: `lessons(run, deps)` runs at intake when `memory` is on and writes `memory/lessons` and `memory/status` from `select_lessons`. `record(run, deps)` runs after the outcome and appends a `DecisionRecord` only for `delivered` runs. In replay, the log is a recorded port returning the journaled lessons, and `record` writes nothing.
+- `flows/settle.py`: `settle(deps, log, known_by: date) -> list[OutcomeRecord]` settles every pending decision whose holding window has traded by `known_by`, with both paths agreeing (a disagreement leaves the decision pending and is reported). For each new outcome it opens a small run (`runs/memory/settle/<id>/journal.jsonl`), calls the role `reflector` (quick, `Lesson`, reads `settle/decision`, `settle/outcome`), audits it with `lesson_findings`, and on a pass stores the lesson.
+- Commands: `insightcrew settle [--known-by D]`; `insightcrew backtest TICKER... --from D --to D --every N [--run-id ID] [--yes]`. The backtest walks the grid of trading days; on each date it first settles with `known_by` = that date, then analyses with memory on, so no lesson from after that date is visible (invariant 20). Progress is in `runs/backtest/<run_id>/progress.json` (atomic); a rerun with the same `--run-id` skips finished cells; its own log is `runs/backtest/<run_id>/decisions.jsonl`. It stops at `budget.batch_*`. With a real model configured it refuses without `--yes`. The summary prints, per rating: count, mean return, mean alpha, stop and target hit counts.
+- Scenarios: `memory_lessons` (a log fixture with one lesson known before and one after the date; only the first reaches `memory/lessons`), `memory_record` (a delivered run appends one decision; a review run appends none).
+
+### 19.14 Roles
+
+| Role | Tier | Output | Writes | New in |
+|---|---|---|---|---|
+| `risk.aggressive`, `risk.neutral`, `risk.conservative` | quick | `RiskView` | `risk/<stance>` | WP25 prompts, WP31 declared |
+| `news` | quick | `NewsAnalysis` | `news/analysis` | WP27 prompt, WP31 declared |
+| `sentiment` | quick | `SentimentAnalysis` | `sentiment/analysis` | WP27 prompt, WP31 declared |
+| `reflector` | quick | `Lesson` | `settle/lesson` | WP29 prompt, WP31 declared |
+
+Existing prompts gain paragraphs, all written by WP31 so that no two packages edit one prompt: `trader.md` (reading `portfolio/state` by state; reading the three risk views and revising once), `manager.md` (reading `memory/lessons` and `memory/status`), `technical.md` (when tools are offered: when to call `indicator`, never to quote a number not returned), `bull.md`, `bear.md`, `manager.md`, `judge.md` (reading news and sentiment analyses and their statuses). Every paragraph tells the model what an `unavailable`, `not_provided` or `none_known` state means and that it must not assume a default.
+
+### 19.15 Settings, commands, report, page
+
+- `app/settings.py` and `insightcrew.toml` (WP31), every default off: `[portfolio] path = ""`; `[memory] enabled = false`, `path = "runs/memory/decisions.jsonl"`, `same_ticker = 5`, `other_ticker = 3`, `holding_days = 5`, `max_entries = 0`; `[news] window_days = 7`, `max_items = 20`; `[sentiment] window_days = 7`, `max_posts = 30`; `[macro] series = ["fed_funds", "cpi", "unemployment", "us10y"]`, `max_rows = 40`; `[tools] max_tool_calls = 6`; `[sources]` as 19.12. `FlowConfig` gains `parallel` (WP22), `risk_rounds = 0`, `tools = False`, `memory = False` (WP31).
+- `analyze` gains `--portfolio PATH`, `--risk-rounds N`, `--tools`, `--memory`, `--serial`; `--channels` accepts the three new names. New commands: `resume`, `settle`, `backtest`. `scenarios` files may carry `portfolio` (inline JSON) and `memory` (inline records) (WP31 extends `evals/scenarios.py`).
+- Report (WP36): sections for the portfolio state, the risk views (stance and critique only; the levels shown are those of the audited proposal), tool facts (in the facts table, marked 工具), news items and macro facts and markets (markets under the "source's wording, unverified" heading), sentiment band with posts, lessons used, and per-analyst wall time. Every number still comes from a fact or an audited proposal (invariant 3).
+- Page (WP36): analyst chips drawn side by side with wall time; chips for `news`, `sentiment`, `risk`; `risk.*`, `news`, `sentiment` mapped in `ACTOR_STAGE`; sections as in the report; a resumed run is marked. Text stays text (invariant 15).
+- `serve` (WP36): the form gains portfolio file, risk rounds, tools, memory, and the new channels.
+
+### 19.16 Tests, scenarios, evaluations
+
+- `tests/conftest.py` (WP21): an autouse fixture that makes `socket.socket.connect` and `socket.getaddrinfo` raise unless the test is marked `integration`; `pyproject.toml` registers the marker and `addopts = "-m 'not integration'"`. Every existing test must pass under it.
+- Each core package's tests are offline and cover its acceptance numbers (19.18). Integration packages add the scenarios named in 19.9 to 19.13; each scenario's numbers come from `insightcrew facts`.
+- `tests/test_graph.py` (WP22): the path-map walk; parallel versus serial journals equal; a run interrupted after `manager` resumes to the same final board as an uninterrupted run (scripted model).
+- Evaluations (WP37): `pit` covers news, social, macro vintages, markets, lessons and tool facts; `consistency` sweeps tool families and macro transforms over both paths; `inject` gains mutations for the portfolio rules, news and sentiment citations, and a sentiment score outside its band. `eval all` prints the new lines and exits 0.
+- WP38's real-model cells: `ACME` (synthetic, every capability) and `AAPL`, `0700.HK` (real bars): risk on and off, tools on and off, parallel against serial wall time, one run with a portfolio and one with lessons. Spending only after the owner says yes, at the cap they give.
+
+### 19.17 Invariants
+
+Changes to section 16 and 18.16, agreed by the owner in choosing the capabilities on 2026-11-19 (HANDOFF section 4). No other invariant changes without asking.
+
+| # | Change |
+|---|---|
+| 3 | Extended: numbers in a report may also come from `tools/facts`, `macro/facts`, `portfolio/state` and settled outcomes, all computed by code. Market probabilities and headlines are printed only as source wording, unverified. |
+| 4 | Extended: tool facts use the existing two paths; `macro.py`/`macro_sql.py` and `memory.py`/`memory_sql.py` are two more pairs, each sharing no code and using only the standard library. |
+| 6 | Extended: no headline, post, macro vintage, market, lesson or tool result dated after the analysis date reaches any stage. |
+| 12 | Amended: `flows/graph.py` may import `langgraph`; `app/wiring.py` and `app/resume.py` may import the SQLite checkpointer; nothing else in `flows/` or `roles/` imports a third-party package. |
+| 17 | Amended to 19.3. |
+| 18 | Extended to `news`, `sentiment`, `macro`, the portfolio and lessons. |
+| 19, new | Parallel and serial runs append the same journal, except `ts` and `run/usage.wall_ms`. Enforced by `test_graph`. |
+| 20, new | No lesson whose outcome became known after the analysis date reaches any role, in `analyze` or `backtest`. Enforced by `test_memory`, `eval pit`, the scenario `memory_lessons`. |
+| 21, new | A tool computes only through the indicator functions of both paths, on bars up to the analysis date, within declared ranges. Enforced by `test_tools`, `eval consistency`, `eval pit`. |
+
+### 19.18 Work packages
+
+Hours are the author's estimates, not measured. Every package ends with the three checks and the proof in 19.3. Labels continue from 20.
+
+| WP | Result | Est. | Needs |
+|---|---|---|---|
+| 21 | Tag `v2.1`, branch `v2.2`; no-network fixture; the two literals; `NotConfigured`; `THIRD_PARTY_NOTICES.md` | 1 h | The owner's go-ahead |
+| 22 | LangGraph: dependency, `flows/graph.py`, `analyze` delegating, parallel analysts, wall time, checkpointer, `resume` | 7 h | WP21; WP23 before its parallel step |
+| 23 | Kernel: deferred commit, tools | 3 h | WP21 |
+| 24 | Portfolio core: contracts, `state_for`, the JSON adapter, example files | 2 h | WP21 |
+| 25 | Risk core: `RiskView`, three prompts | 1.5 h | WP21 |
+| 26 | Tools core: `tool_indicators.toml`, its loader, `flows/tools.py` | 3 h | WP21 |
+| 27 | News and sentiment core: ports, contracts, findings, JSON adapters, generators, synthetic files, two prompts | 4 h | WP21 |
+| 28 | Macro core: contracts, both paths, `macro.toml`, its loader, JSON adapter, generator, synthetic files | 3 h | WP21 |
+| 29 | Memory core: contracts, both paths for settlement, `select_lessons`, `benchmark_for`, the decision log, the reflector prompt | 4 h | WP21 |
+| 30 | Source chain and live adapters, `fetch` | 4 h | WP21; formats from 19.8 |
+| 31 | Integration points: every shared-file change of v2.2 at once, with stubs | 4 h | WP22, WP23, WP24 to WP29 |
+| 32 | Portfolio and risk in the flow; five scenarios | 3 h | WP31 |
+| 33 | Tools in the flow; scripted tool calls; two scenarios | 3 h | WP31 |
+| 34 | News, macro, sentiment in the flow; four scenarios | 4 h | WP31, WP30 for real data (not for scenarios) |
+| 35 | Memory in the flow; `settle`, `backtest`; two scenarios | 4 h | WP31 |
+| 36 | Report, page, `serve` | 5 h | WP31 (works from the board keys); final check after WP32 to WP35 |
+| 37 | Evaluations extended | 3 h | WP31; final run after WP32 to WP35 |
+| 38 | Real-model runs, prompt fixes, ablation | 4 h | WP32 to WP37, the owner's yes on spending |
+| 39 | Documents, notices, packaging | 3 h | Everything else done or cut |
+
+Total about 65 hours of agent work. The chain that cannot be made parallel is WP21, 22, 31, 35 (or 34), 38, 39: about 23 hours.
+
+**WP21: Preparation.** Read: 19.1 to 19.4, 19.7 (the first paragraph), 19.8 item 1, 19.16 (first bullet). Runs alone.
+
+1. `git tag v2.1` on the head of `v2.1`, then `git switch -c v2.2`. Commit this section and the HANDOFF changes alone as `Plan: version 2.2` if they are not yet committed.
+2. `domain/types.py`: the two literals of 19.7, nothing else. `domain/market.py`: `NotConfigured`.
+3. `tests/conftest.py` and the `pyproject.toml` marker lines of 19.16. No dependency change.
+4. `THIRD_PARTY_NOTICES.md` (19.4 rule 3), with an empty file list headed "Files adapted (filled at packaging)".
+
+Accept: the three checks; the proof in 19.3; a test that opens a socket fails with the fixture's message unless marked `integration`; `git tag -l` lists `v2.1`.
+
+**WP22: LangGraph.** Read: 19.5, 19.6 (item 1), sections 8.1 to 8.5. Create `flows/graph.py`, `app/resume.py`, `tests/test_graph.py`; edit `pyproject.toml`, `uv.lock` (by `uv add` only), `flows/analyze.py`, `app/cli.py` (`resume`, `--serial`), `app/wiring.py` (checkpointer path, signature), `tests/test_architecture.py` (invariant 12 as amended, nothing wider).
+
+Order: add the dependencies (stop on failure); build the graph serially with the semantics of today's flow until `tests/test_flow.py` and every scenario pass unchanged; then, once WP23 is done, the parallel step with `run_role_deferred` and `commit`; then checkpoint and `resume`.
+
+Accept: the three checks; the proof in 19.3; `test_flow.py` unchanged and green; `test_graph.py` green; `uv run insightcrew analyze --no-open` then the same with `--serial` give boards equal except `run/usage.wall_ms`; a scripted run stopped after `manager` and then `resume`d ends with the board of an uninterrupted run.
+
+**WP23: Kernel.** Read: 19.6, section 5. Edit `kernel/runtime.py`; create `tests/test_kernel_v22.py`.
+
+Accept: the three checks; the proof in 19.3; `tests/test_kernel.py` untouched and green; new tests: `run_role` events identical before and after; deferred then commit equals `run_role`; two deferred calls committed in reverse order of completion appear in commit order; a role with a tool calls it through a Pydantic AI `FunctionModel`, the cap returns the cap message, a repeated call is counted and not re-run.
+
+**WP24: Portfolio core.** Read: 19.7, 19.9, 19.4. Create `domain/portfolio.py`, `adapters/portfolio_json.py`, `data/portfolios/*.json`, `tests/test_portfolio.py`.
+
+Accept: the three checks; `state_for` gives `not_provided`, `flat`, `held`, `unavailable` in the four obvious cases; `held_acme.json` at an `ACME` close of 100 gives the `position_pct` the file implies; bad files raise with the file named.
+
+**WP25: Risk core.** Read: 19.7, 19.10, 19.4. Create `domain/risk.py`, `roles/prompts/risk_aggressive.md`, `risk_neutral.md`, `risk_conservative.md`, `tests/test_risk.py` (the contract only).
+
+Accept: the three checks; each prompt starts with the attribution line, is in Chinese, names the reads of 19.10 and the meaning of each `portfolio/state` state.
+
+**WP26: Tools core.** Read: 19.11, 6.4, 19.4. Create `data/tool_indicators.toml`, `adapters/declarations_tools.py`, `flows/tools.py`, `tests/test_tools.py`.
+
+Accept: the three checks; for `ACME` on its last bar, `indicator("sma", 20)` equals the ledger's `sma_20`; every family at its range ends agrees across paths; out-of-range and unknown names give the error string; a bar after the analysis date never affects a result.
+
+**WP27: News and sentiment core.** Read: 19.7, 19.8, 19.12, 18.5, 18.7, 19.4. Create `domain/news.py`, `domain/social.py`, `adapters/news_json.py`, `adapters/social_json.py`, `data/make_news.py`, `data/make_social.py`, `data/market/synthetic/news/ACME.json`, `data/market/synthetic/social/ACME.json`, `roles/prompts/news.md`, `roles/prompts/sentiment.md`, `tests/test_news.py`, `tests/test_social.py`.
+
+Accept: the three checks; generators deterministic; window edges inclusive; undated dropped and counted; an uncovered window raises `NotCovered`; `news_findings` and `sentiment_findings` cover each check of 19.12 with hand-built inputs.
+
+**WP28: Macro core.** Read: 19.7, 19.8, 19.12, 18.6 (for the two-path pattern). Create `domain/macro.py`, `domain/macro_sql.py`, `data/macro.toml`, `adapters/declarations_macro.py`, `adapters/macro_json.py`, `data/make_macro.py`, `data/market/synthetic/macro/*.json`, `tests/test_macro.py`. The independence of the two paths (each imports only the standard library or `pydantic`, neither imports the other) is asserted inside `tests/test_macro.py`, not in `tests/test_architecture.py`, which WP22 is editing at the same time.
+
+Accept: the three checks; both paths agree on every synthetic series at every month-end; a vintage after the analysis date is never used; a series revised later shows the earlier value on an earlier date.
+
+**WP29: Memory core.** Read: 19.7, 19.13, 19.4. Create `domain/memory.py`, `domain/memory_sql.py`, `adapters/decision_log.py`, `roles/prompts/reflector.md`, `tests/test_memory.py`, `tests/test_decision_log.py`. The independence of `memory.py` and `memory_sql.py` is asserted inside `tests/test_memory.py`, as WP28 does.
+
+Accept: the three checks; `settle` returns `None` until the holding window has traded by `known_by`; both paths agree; `hit` correct for stop-first, target-first, neither, Hold; `select_lessons` never returns an outcome known after `as_of`; the log survives two processes appending at once (a test with `multiprocessing`), ignores a duplicate decision, never drops a pending one.
+
+**WP30: Source chain and live adapters.** Read: 19.8, 19.12, 18.12, 19.4. Create `adapters/vendors.py`, `adapters/news_rss.py`, `adapters/stocktwits.py`, `adapters/reddit.py`, `adapters/fred.py`, `adapters/polymarket.py`, their tests and fixtures; edit `app/fetch.py`. The new kinds are keyword parameters of the `fetch` function, off by default, and the chain order is a parameter defaulting to 19.12's; WP31 adds the command-line flags and the `[sources]` settings. WP30 edits neither `app/cli.py` nor `app/settings.py`.
+
+Before any live request, ask the owner, naming the endpoint; save the response as a fixture; if refused, build the fixture by hand from the source's public documentation and say so. Accept: the three checks; `first_ok` order, error aggregation and `scrub` tested; each adapter writes exactly the archive shape of 19.8 from its fixture; `fetch` with the default flags behaves as today (its existing tests pass unchanged).
+
+**WP31: Integration points.** Read: all of 19. Runs alone. Edit, and nobody else in v2.2 edits them except as HANDOFF 5.5 lists: `domain/types.py` (nothing beyond WP21, unless a gap is found), `domain/audit.py` (keyword parameters `news=`, `sentiment=`, tool facts union; calls the core packages' findings functions), `roles/__init__.py` (all new roles, `TRADER` and `_CHANNELS_BRIEF` reads, `_prompt` drops `<!--` lines, `TECHNICAL` with and without tools), the existing prompts (19.14 paragraphs), `flows/analyze.py` (`FlowConfig` fields), `flows/graph.py` (nodes and edges for every capability, calling stub functions), `flows/stages.py` (`evidence` and `audit` call the new modules; intake calls `stage_portfolio` and `stage_memory`), `flows/deps.py` (fields `portfolio`, `news`, `social`, `macro`, `decision_log`, `tool_specs`, `macro_specs`, window settings, all defaulted), `app/settings.py`, `insightcrew.toml`, `.env.example`, `app/wiring.py` (every port, recorded ports for replay), `app/cli.py` (the `analyze` options, `fetch`'s `--news`, `--social`, `--macro`, `--markets` passed to WP30's `fetch` function, and the `settle` and `backtest` commands calling stubs), `app/wiring.py` also fills `run.tools` from `flows/tools.py` when `FlowConfig.tools` is on, `evals/scenarios.py` (`portfolio`, `memory` fields), `tests/fake_stages.py` (doubles), `tests/test_architecture.py` (role-read rules: `risk.*` may read `portfolio/state`; judges read no `risk/*`). Create the stubs `flows/stage_portfolio.py`, `flows/stage_risk.py`, `flows/stage_news.py`, `flows/stage_sentiment.py`, `flows/stage_memory.py`, `flows/settle.py`, `app/settle.py`, `app/backtest.py`, each with the final signature and a body that writes the capability's `unavailable` state or raises `NotImplementedError` from a command, and `tests/test_v22_switches.py` (every capability off: 19.3; each one on: its stub's state appears).
+
+Accept: the three checks; the proof in 19.3; `test_v22_switches.py` green.
+
+**WP32: Portfolio and risk.** Fill `flows/stage_portfolio.py`, `flows/stage_risk.py`; create the five scenario files of 19.9 and 19.10 and `tests/test_stage_portfolio_risk.py`.
+
+Accept: the three checks; the proof in 19.3; the five scenarios match.
+
+**WP33: Tools in the flow.** Edit `adapters/scripted.py` (scripted tool calls; `evals/scenarios.py` already accepts them after WP31), create the two scenarios of 19.11 and `tests/test_tools_flow.py`. The tool registry is already wired by WP31; a change it needs in a shared file is a request, not an edit (HANDOFF 5.5).
+
+Accept: the three checks; the proof in 19.3; both scenarios match; a recorded run with a tool call replays `一致`.
+
+**WP34: News, macro, sentiment in the flow.** Fill `flows/stage_news.py`, `flows/stage_sentiment.py`; create scenarios `news_clean`, `news_uncovered` (news `unavailable`, analysts told so), `sentiment_clean`, `macro_clean`; create `tests/test_stage_news.py`.
+
+Accept: the three checks; the proof in 19.3; the four scenarios match; with real archives present (after WP30, only if the owner allowed the downloads), `insightcrew facts AAPL --universe real --channels news,macro` prints items and macro facts dated no later than the date.
+
+**WP35: Memory.** Fill `flows/stage_memory.py`, `flows/settle.py`, `app/settle.py`, `app/backtest.py`; create the two scenarios of 19.13 and `tests/test_memory_flow.py`, `tests/test_backtest.py` (scripted, a three-date grid, resume after the second date).
+
+Accept: the three checks; the proof in 19.3; both scenarios match; a scripted backtest over three dates writes three decisions, settles what has traded, and a rerun with the same `--run-id` does nothing new.
+
+**WP36: Report, page, serve.** Edit `app/report.py`, `app/assets/page.html`, `app/replay_html.py`, `app/server.py`, `tests/test_report.py`, `tests/test_run_page.py`, `tests/test_server.py`.
+
+Accept: the three checks; the proof in 19.3; the report and page of each new scenario show its sections; `demo` looks as before; checked in a browser.
+
+**WP37: Evaluations.** Edit `evals/inject.py`, `evals/consistency.py`, `evals/pit.py`, `evals/run.py`.
+
+Accept: the three checks; `eval all` prints the new lines with every mutation detected and no false alarm, and exits 0.
+
+**WP38: Real-model runs.** As WP19: one pilot, read the journal, fix prompts one at a time tied to a journal, then the cells of 19.16 as `eval v22` (create `evals/v22.py`; edit `evals/run.py`, the `eval` command). Archive every journal. Decide with the owner which capabilities `insightcrew.toml` switches on.
+
+Accept: the three checks; every archived journal replays `一致`; the results table in the session log; spending within what the owner allowed.
+
+**WP39: Documents and packaging.** As WP20, and: fill `THIRD_PARTY_NOTICES.md`'s file list; check every adapted file has its header line; update counts, commands, invariants; rebuild `../InsightCrew.zip` and verify it in an empty directory.
+
+Accept: as WP20.
+
+### 19.19 Schedule and the stop rule
+
+| Date | Work | True by the end of the day |
+|---|---|---|
+| 11-20 | WP21; WP22 to WP30 in parallel; WP31 started if they are done | WP22 green; the cores green |
+| 11-21 | WP31; WP32 to WP37 in parallel | Most new scenarios match |
+| 11-22 | WP32 to WP37 finished; WP38 | Real-model runs archived |
+| 11-23 | WP39 by mid-afternoon; nothing else | A fresh unzip installs and runs |
+
+The owner chose not to cut anything in advance. The rule instead:
+
+1. Every package leaves the system shippable: the three checks and the proof in 19.3 pass at its end, and its capability is off unless switched on.
+2. **At 12:00 on 11-22**, a package of WP32 to WP37 that is not done stops. Its capability stays off, its stub stays, and the gap is recorded in HANDOFF section 7; WP39 moves it into `docs/ROADMAP.md`. WP38 runs on what is done.
+3. **At 12:00 on 11-23**, WP39 starts whatever state WP38 is in.
+4. If WP22 is not green by the end of 11-20, take the fallback of 19.5 item 7 and tell the owner.
+5. The tag `v2.1` and the 2.1 package are a complete submission at every moment.
+
+### 19.20 What must not be claimed
+
+In addition to 12.4 and 18.17:
+
+- **That any capability improves decisions.** The cells of WP38 measure mechanisms and cost.
+- **That headlines, posts or market probabilities are verified.** Code checks that an item exists and its date, not what it says.
+- **That sentiment from StockTwits or Reddit represents the market,** or that an archive started on 11-20 covers anything earlier.
+- **That a backtest on a handful of dates says anything about returns.**
+- **That the analysts run "in parallel" saves a given amount** beyond what WP38 measured.
+
+### 19.21 What has been verified
+
+| Item | Status |
+|---|---|
+| The design in this section | **Not built, not tested.** Written from reading the code and the reference. Gaps are likely; an implementer who finds one stops and records it (HANDOFF 7). |
+| `tests/test_flow.py` calls `analyze(run, request, None, cfg)` and monkeypatches `analyze.stages` | Read on 2026-11-19 |
+| TradingAgents runs analysts in parallel as subgraphs with private message histories, keys checkpoints by a run signature, and gives every conditional edge a path map | Read in `../TradingAgents-main/tradingagents/graph/setup.py`, `trading_graph.py`, `checkpointer.py` on 2026-11-19 |
+| That `langgraph` and `langgraph-checkpoint-sqlite` resolve under `exclude-newer = 2026-11-15` | **Not tried.** WP22's first step. |
+| Any live endpoint of 19.12 | **Not tried** for this version, except the RSS feeds in 18.18. |
 | Effort estimates | The author's. Not measured. |
