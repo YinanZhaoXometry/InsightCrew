@@ -47,7 +47,11 @@ class CsvMarket:
             raise NoData(f"{ticker} 在 {as_of}（含）之前没有已结算的 bar")
         return tuple(bars)
 
-    # ---- 数据卡用的额外信息 ----
+    # ---- 端口之外：数据集的清单，与数据卡用的额外信息 ----
+
+    def tickers(self) -> tuple[str, ...]:
+        """这个宇宙里的全部代码，按 universe.toml 里出现的顺序。"""
+        return tuple(self._instruments)
 
     def dropped_rows(self, ticker: str) -> int:
         """整个文件里 close 为空、被丢弃的行数（含序列末尾的未结算交易日）。"""

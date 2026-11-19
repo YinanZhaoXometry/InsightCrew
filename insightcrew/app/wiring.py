@@ -1,12 +1,22 @@
 """装配：把设置、行情适配器、声明、模型来源、预算与日志接成一次运行。
 
-这是唯一构造适配器的地方。模型来源按 BLUEPRINT 10.2 的顺序选：回放 > 场景 > 真实模型
-（不被强制离线且两个档位都可用）> 无代码的演示场景 > 无回复的剧本。
-回退绝不静默：失败原因打印一次，不含密钥。这里不得引入 pydantic_ai：模型构造的失败
-（库的 UserError 是 RuntimeError 的子类）按 (RuntimeError, ValueError) 接住即可。
+这是唯一构造适配器的地方，也是唯一读"今天"的地方。分两步：
+
+    prepare   把用户敲进来的东西（代码、日期、场景名、流程开关）变成一份确定的任务。
+              命令行与网页共用它，所以两个入口对同样的输入给同样的结果。
+              任务不成立（日期无法解析、场景不存在、没有代码）在这里就以 BadRequest 拒绝。
+    open_run  为一份请求建运行目录、选模型来源、建预算与日志，写下 run.started。
+              不修改传入的 request。
+
+模型来源按 BLUEPRINT 10.2 的顺序选：回放 > 场景 > 真实模型（未被强制离线且两个档位都能构造）
+> 没有回复的剧本。"没有代码时改跑演示场景"这一行在 prepare 里：它决定的是跑什么，不是用什么跑。
+本模块不打印；回退到离线的原因由 describe_models 交给调用方去说。
+本层不得引入 pydantic_ai：模型构造的失败（库的 UserError 是 RuntimeError 的子类）
+按 (RuntimeError, ValueError) 接住即可。
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -19,141 +29,227 @@ from ..adapters.models import Tiers, build
 from ..adapters.scripted import Replay, Script
 from ..adapters.store_fs import new_run_dir
 from ..domain import symbols
-from ..evals.scenarios import load_one
+from ..domain.market import InvalidTicker, MarketData, NoData, SourceUnavailable, UnknownTicker
+from ..domain.types import Scope
+from ..evals.scenarios import Scenario, load_one
 from ..flows.analyze import FlowConfig
 from ..flows.deps import Deps
 from ..kernel.board import Board
 from ..kernel.budget import Budget, Ceiling
 from ..kernel.events import Event, Journal
 from ..kernel.runtime import Limits, Models, Run
-from . import report
+from . import replay_html, report
 from .settings import Settings
 
 ROOT = Path(__file__).resolve().parent.parent.parent      # 仓库根：insightcrew.toml、data/、runs/
+RUNS = ROOT / "runs"
+
+_SCRIPTED = {"quick": "scripted", "deep": "scripted"}
+_INVALID = "INVALID"          # 代码不合规时运行目录名里的占位：用户原文不进路径
+_PAGE_BARS = 250              # 运行页面的价格图最多画多少根
 
 
-def open_run(settings: Settings, request: dict[str, Any], *, scenario: Any = None,
-             replay: tuple[Event, ...] | None = None, flow: FlowConfig | None = None,
-             batch: Budget | None = None) -> tuple[Run, Deps]:
-    """开一次运行：建运行目录、装配依赖、选模型来源、写 run.started。返回 Run 与代码阶段的 Deps。
+class BadRequest(ValueError):
+    """请求在开运行之前就不成立。由命令行与网页在边界上报给用户，不进入流程。"""
 
-    scenario 是已装载的场景对象（evals.scenarios.load_one 的结果），请求里缺的代码与日期由场景补上；
-    flow 是调用方将要使用的 FlowConfig（默认 settings.flow），随 run.started 记入日志，回放才能复原
-    当时的流程配置；batch 是批次层预算（消融实验用），作为本次运行预算的父层。
-    """
+
+@dataclass(frozen=True, slots=True)
+class Job:
+    """一份确定的任务：请求、它用的场景（没有则为 None）、流程配置。"""
+
+    request: dict[str, str]
+    scenario: Scenario | None
+    flow: FlowConfig
+
+
+# ---- 时钟与适配器 ----
+
+def today(settings: Settings) -> date:
+    """今天。全系统只有这里读系统日期；IC_TODAY 可以钉住它。"""
+    return settings.today or date.today()
+
+
+def market_for(universe: str) -> CsvMarket:
+    """一个数据集的行情适配器。数据集不存在时抛 OSError。"""
+    return CsvMarket(ROOT / "data" / "market", universe)
+
+
+def build_deps(settings: Settings) -> Deps:
+    """只装配代码阶段的依赖，不开运行。facts 命令用：没有模型，没有运行目录。"""
+    return Deps(market=market_for(settings.run.universe),
+                indicators=load_indicators(ROOT / "data" / "indicators.toml"),
+                rules=load_rules(ROOT / "data" / "rules.toml"),
+                today=today(settings), universe=settings.run.universe)
+
+
+# ---- 模型来源 ----
+
+def _tiers(settings: Settings) -> tuple[Tiers | None, str]:
+    """真实模型的两个档位；构造不出来时返回 None 与原因（原因里没有密钥）。不发任何请求。"""
+    if settings.force_offline:
+        return None, "已设置 IC_FORCE_OFFLINE"
+    key = settings.api_key.get_secret_value() if settings.api_key else None
+    try:
+        return Tiers(build(settings.tiers.quick, base_url=settings.base_url, api_key=key),
+                     build(settings.tiers.deep, base_url=settings.base_url, api_key=key)), ""
+    except (RuntimeError, ValueError) as e:               # 缺密钥、缺端点
+        return None, " ".join(str(e).split()).rstrip("。. ")   # 库的原话，去掉句末标点，由调用方接句子
+
+
+def describe_models(settings: Settings) -> tuple[str, dict[str, str], str]:
+    """不带场景的运行会用哪类模型：("model" 或 "scripted", 各档位的名字, 不能用真实模型的原因)。"""
+    tiers, reason = _tiers(settings)
+    if tiers is None:
+        return "scripted", dict(_SCRIPTED), reason
+    return "model", tiers.names(), ""
+
+
+def _models(settings: Settings, scenario: Scenario | None,
+            replay: tuple[Event, ...] | None) -> tuple[Models, str, dict[str, str]]:
+    if replay is not None:
+        recorded = next((e.data.get("models") or {} for e in replay if e.type == "run.started"), {})
+        return Replay(replay), "replay", {tier: recorded.get(tier, "replay") for tier in _SCRIPTED}
     if scenario is not None:
-        for key, value in scenario.request.items():
-            request.setdefault(key, value)
+        return Script(scenario.replies), "scripted", dict(_SCRIPTED)
+    tiers, _ = _tiers(settings)
+    if tiers is not None:
+        return tiers, "model", tiers.names()
+    return Script({}), "scripted", dict(_SCRIPTED)        # 没有回复的剧本：第一次模型调用就以 model_unavailable 停下
 
-    root = ROOT
-    today = settings.today or date.today()
-    cfg = flow or settings.flow
 
-    market, indicators, rules = _declarations(root, settings.run.universe)
+# ---- 第一步：把用户输入变成任务 ----
 
-    models, mode, names = _choose_models(settings, request, scenario, replay)
-    ticker = symbols.normalize(request["ticker"])
-    as_of = request.get("as_of") or today.isoformat()
-    run_dir = new_run_dir(root / "runs", ticker, as_of, datetime.now())
+def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: str = "",
+            judges: bool | None = None, debate_rounds: int | None = None) -> Job:
+    """命令行与网页的共同入口。空字符串与 None 表示"没有给"。
 
+    请求：场景自带的请求打底，用户给的代码与日期覆盖它。
+    没有代码也没有场景时：没有可用的真实模型就跑演示场景 demo，有则拒绝（真实模型需要一个代码）。
+    流程配置：有场景用场景自己的（场景是一次完整的脚本化运行），否则用设置里的；
+    judges 与 debate_rounds 是用户在这一次运行上的显式覆盖。
+    """
+    chosen = _load_scenario(scenario) if scenario else None
+    request = dict(chosen.request) if chosen else {}
+    if ticker.strip():
+        request["ticker"] = ticker.strip()
+    if as_of.strip():
+        request["as_of"] = _iso_date(as_of.strip())
+    if "ticker" not in request:
+        mode, _, _ = describe_models(settings)
+        if mode == "model":
+            raise BadRequest("没有给出代码。真实模型的运行需要一个代码，例如 ACME 或 0700.HK；"
+                             "离线场景用 --scenario 指定。")
+        chosen = _load_scenario("demo")
+        request = {**chosen.request, **request}
+
+    base = chosen.config.flow if chosen else settings.flow
+    overrides = {key: value for key, value in (("judges", judges), ("debate_rounds", debate_rounds))
+                 if value is not None}
+    return Job(request=request, scenario=chosen,
+               flow=FlowConfig.model_validate({**base.model_dump(), **overrides}))
+
+
+def _load_scenario(name: str) -> Scenario:
+    try:
+        return load_one(name)
+    except FileNotFoundError as e:
+        raise BadRequest(str(e)) from e
+
+
+def _iso_date(text: str) -> str:
+    try:
+        return date.fromisoformat(text).isoformat()
+    except ValueError:
+        raise BadRequest(f"日期 {text!r} 无法解析：请写成 YYYY-MM-DD，例如 2026-09-30") from None
+
+
+# ---- 第二步：开一次运行 ----
+
+def open_run(settings: Settings, request: dict[str, Any], *, scenario: Scenario | None = None,
+             replay: tuple[Event, ...] | None = None, flow: FlowConfig | None = None,
+             batch: Budget | None = None, runs_dir: Path | None = None) -> tuple[Run, Deps]:
+    """建运行目录、装配依赖、选模型来源、写 run.started。返回 Run 与代码阶段的 Deps。
+
+    request 至少有 "ticker"，可以有 "as_of"（ISO 日期）；不成立时抛 BadRequest，此时什么都没有创建。
+    scenario 给出预先写好的回复，并可以收紧预算；replay 是一份日志里的事件，模型回复从中取回。
+    flow 是调用方将要交给 analyze 的流程配置，随 run.started 记入日志，回放据此复原。
+    batch 是批次层预算，作为本次运行预算的父层。runs_dir 缺省为仓库的 runs/。
+    """
+    request = dict(request)
+    if not request.get("ticker"):
+        raise BadRequest("请求里没有代码")
+    if request.get("as_of"):
+        request["as_of"] = _iso_date(str(request["as_of"]))
+
+    deps = build_deps(settings)
+    models, mode, names = _models(settings, scenario, replay)
+
+    # 实际生效的预算上限：场景可以收紧它（预算用尽的两个场景靠这个）。记进 run.started，回放才能复原。
     tokens = settings.budget.run_tokens or None
     cost = settings.budget.run_cost or None
     groups = dict(settings.budget.roles)
-    if scenario is not None:                      # 场景可以收紧预算（预算用尽的场景靠它）
-        spec = scenario.config.budget
-        tokens = spec.run_tokens or tokens
-        if spec.roles:
-            groups = dict(spec.roles)
-    budget = Budget(Ceiling(tokens=tokens, cost=cost), groups=groups, parent=batch, name="run")
+    if scenario is not None:
+        tokens = scenario.config.budget.run_tokens or tokens
+        groups = dict(scenario.config.budget.roles) or groups
+    limits = Limits(max_requests=settings.limits.max_requests, max_seconds=settings.limits.max_seconds,
+                    request_timeout_s=settings.limits.request_timeout_s)
+    cfg = flow or settings.flow
+
+    run_dir = new_run_dir(runs_dir or RUNS, *_dir_labels(request, deps), datetime.now())
     journal = Journal(run_dir / "journal.jsonl",
                       now=lambda: datetime.now(UTC).isoformat(timespec="seconds"))
-    run = Run(id=run_dir.name, journal=journal, board=Board(journal), models=models, budget=budget,
-              limits=Limits(max_requests=settings.limits.max_requests,
-                            max_seconds=settings.limits.max_seconds,
-                            request_timeout_s=settings.limits.request_timeout_s),
-              output_mode=settings.run.output_mode)
-
+    run = Run(id=run_dir.name, journal=journal, board=Board(journal), models=models,
+              budget=Budget(Ceiling(tokens=tokens, cost=cost), groups=groups, parent=batch, name="run"),
+              limits=limits, output_mode=settings.run.output_mode)
     journal.append("run.started", actor="app", data={
         "request": request,
         "version": __version__,
         "mode": mode,
         "models": names,
         "output_mode": settings.run.output_mode,
-        "flow": cfg.model_dump(),
+        "flow": cfg.model_dump(mode="json"),
         "universe": settings.run.universe,
-        "ceilings": {"run_tokens": settings.budget.run_tokens or None,
-                     "run_cost": settings.budget.run_cost or None},
-        "limits": {"max_requests": settings.limits.max_requests,
-                   "max_seconds": settings.limits.max_seconds,
-                   "request_timeout_s": settings.limits.request_timeout_s},
+        "ceilings": {"run_tokens": tokens, "run_cost": cost, "roles": groups},
+        "limits": {"max_requests": limits.max_requests, "max_seconds": limits.max_seconds,
+                   "request_timeout_s": limits.request_timeout_s},
     })
-
-    deps = Deps(market=market, indicators=indicators, rules=rules, today=today,
-                universe=settings.run.universe, out_dir=run_dir,
-                render=lambda snap: report.render(snap, journal.events, run_id=run.id))
-    return run, deps
+    return run, Deps(market=deps.market, indicators=deps.indicators, rules=deps.rules, today=deps.today,
+                     universe=deps.universe, out_dir=run_dir,
+                     render=lambda snapshot: report.render(snapshot, journal.events, run_id=run.id))
 
 
-def _choose_models(settings: Settings, request: dict[str, Any], scenario: Any,
-                   replay: tuple[Event, ...] | None) -> tuple[Models, str, dict[str, str]]:
-    """按 10.2 的顺序选模型来源。回退到演示场景时，把它的请求补进 request（调用方传给 analyze 的就是它）。"""
-    if replay is not None:
-        return Replay(replay), "replay", _replay_names(replay)
-    if scenario is not None:
-        return Script(scenario.replies), "scripted", {"quick": "scripted", "deep": "scripted"}
-    if not settings.force_offline:
-        try:
-            tiers = Tiers(_build(settings, settings.tiers.quick), _build(settings, settings.tiers.deep))
-            return tiers, "model", tiers.names()
-        except (RuntimeError, ValueError) as e:               # 缺密钥、缺端点：库的 UserError 或 ValueError
-            print(f"未使用真实模型：{e}")
-    if not request.get("ticker"):
-        demo = load_one("demo")
-        for key, value in demo.request.items():
-            request.setdefault(key, value)
-        return Script(demo.replies), "scripted", {"quick": "scripted", "deep": "scripted"}
-    return Script({}), "scripted", {"quick": "scripted", "deep": "scripted"}
-
-
-def _build(settings: Settings, name: str) -> Any:
-    """把配置里的模型名变成模型。裸名字需要 IC_BASE_URL 与 IC_API_KEY。"""
-    return build(name, base_url=settings.base_url,
-                 api_key=settings.api_key.get_secret_value() if settings.api_key else None)
-
-
-def describe_models(settings: Settings) -> tuple[str, dict[str, str], str]:
-    """当前会话用哪类模型：("model" | "scripted", 各档位的名字, 不能用真实模型时的原因)。
-
-    只做构造尝试，不打印、不发请求；网页表单与 check 命令用它说明现状。
-    """
-    if settings.force_offline:
-        return "scripted", {"quick": "scripted", "deep": "scripted"}, "已设置 IC_FORCE_OFFLINE"
+def _dir_labels(request: dict[str, Any], deps: Deps) -> tuple[str, str]:
+    """运行目录名里的代码与分析日。两者都不含用户原文：代码先规范化（不合规就用占位），
+    日期已是 ISO；没给日期时取准入将会采用的那一天，取不到（代码不在数据集里等）就用今天。"""
     try:
-        tiers = Tiers(_build(settings, settings.tiers.quick), _build(settings, settings.tiers.deep))
-        return "model", tiers.names(), ""
-    except (RuntimeError, ValueError) as e:
-        return "scripted", {"quick": "scripted", "deep": "scripted"}, str(e)
+        ticker = symbols.normalize(str(request["ticker"]))
+    except InvalidTicker:
+        return _INVALID, request.get("as_of") or deps.today.isoformat()
+    if request.get("as_of"):
+        return ticker, request["as_of"]
+    try:
+        return ticker, deps.market.history(ticker, deps.today)[-1].date.isoformat()
+    except (UnknownTicker, NoData, SourceUnavailable):
+        return ticker, deps.today.isoformat()
 
 
-def _replay_names(events: tuple[Event, ...]) -> dict[str, str]:
-    """回放时沿用原运行的模型名：从原 run.started 里取。"""
-    for event in events:
-        if event.type == "run.started":
-            names = event.data.get("models") or {}
-            return {tier: names.get(tier, "replay") for tier in ("quick", "deep")}
-    return {"quick": "replay", "deep": "replay"}
+# ---- 运行结束之后：运行页面 ----
+
+def closes(market: MarketData, ticker: str, as_of: date) -> list[dict[str, Any]]:
+    """运行页面价格图用的收盘价：分析日（含）之前最近的若干根。读不到就是空列表。"""
+    try:
+        bars = market.history(ticker, as_of)
+    except (UnknownTicker, NoData, SourceUnavailable):
+        return []
+    return [{"date": bar.date.isoformat(), "close": bar.close} for bar in bars[-_PAGE_BARS:]]
 
 
-def _declarations(root: Path, universe: str) -> tuple[CsvMarket, Any, Any]:
-    """行情适配器与两份声明。这是适配器唯一的构造处。"""
-    return (CsvMarket(root / "data" / "market", universe),
-            load_indicators(root / "data" / "indicators.toml"),
-            load_rules(root / "data" / "rules.toml"))
-
-
-def build_deps(settings: Settings) -> Deps:
-    """只装配依赖，不开运行。facts 命令与测试用：没有模型，没有运行目录。"""
-    today = settings.today or date.today()
-    market, indicators, rules = _declarations(ROOT, settings.run.universe)
-    return Deps(market=market, indicators=indicators, rules=rules, today=today,
-                universe=settings.run.universe)
+def write_page(run: Run, deps: Deps) -> Path | None:
+    """把运行页面（replay.html）写进运行目录。准入通过的运行带上价格序列。"""
+    if deps.out_dir is None:
+        return None
+    bars = None
+    if run.board.has("request/scope"):
+        scope = run.board.get("request/scope", Scope)
+        bars = closes(deps.market, scope.ticker, date.fromisoformat(scope.as_of)) or None
+    return replay_html.write(deps.out_dir, run.journal.events, bars)

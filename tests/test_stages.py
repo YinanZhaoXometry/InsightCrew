@@ -1,4 +1,5 @@
-"""真实代码阶段的测试：每次准入拒绝都不产生模型调用；两条路径的分歧让运行停止。"""
+"""真实代码阶段的测试：每次准入拒绝都不产生模型调用；两条路径的分歧让运行停止；
+闸门每次检查都在日志里留下一条带明细的事件，拦下运行时也一样。"""
 from __future__ import annotations
 
 import dataclasses
@@ -60,8 +61,12 @@ def test_intake_accepts_acme_without_model_call() -> None:
     stages.intake(run, {"ticker": "ACME", "as_of": "2026-09-30"}, deps)
     scope = run.board.get("request/scope")
     assert scope["ticker"] == "ACME" and scope["as_of"] == "2026-09-30" and scope["requested"] == "ACME"
-    assert [e.actor for e in run.journal.events if e.type == "gate.checked"] == ["intake"]
+    assert _gates(run) == [{"gate": "intake", "findings": 0, "detail": []}]
     _no_model_call(run)
+
+
+def _gates(run: Run) -> list[dict]:
+    return [e.data for e in run.journal.events if e.type == "gate.checked"]
 
 
 def test_intake_thin_is_refused() -> None:
@@ -69,6 +74,15 @@ def test_intake_thin_is_refused() -> None:
     assert halt.reason == "insufficient_history"
     assert not run.board.has("request/scope")
     _no_model_call(run)
+
+
+def test_refusal_is_recorded_in_the_journal_with_its_explanation() -> None:
+    """拦下运行的闸门先记一条事件再停：原因的细节在日志里，不只是一个代号。"""
+    run, halt = _refused("THIN", "2026-09-30")
+    (gate,) = _gates(run)
+    assert gate["gate"] == "intake" and gate["findings"] == 1
+    assert gate["detail"] == [{"check": "insufficient_history", "subject": "request", "message": halt.detail}]
+    assert "60" in halt.detail                      # 说明里有规则的下限
 
 
 def test_intake_stale_is_refused() -> None:
@@ -138,6 +152,11 @@ def test_planted_disagreement_stops_the_run(monkeypatch: pytest.MonkeyPatch) -> 
     with pytest.raises(Halt) as halt:
         stages.ledger(run, deps)
     assert halt.value.reason == "ledger_inconsistent"
+    assert not run.board.has("ledger/facts")        # 不一致的账本不上黑板
+    gate = _gates(run)[-1]
+    assert gate["gate"] == "ledger" and gate["findings"] == 29
+    assert {item["check"] for item in gate["detail"]} == {"ledger_inconsistent"}
+    assert "rsi_14" in {item["subject"] for item in gate["detail"]}
 
 
 def _fill_pipeline(run: Run, deps: Deps) -> None:
@@ -169,6 +188,23 @@ def test_audit_passes_a_consistent_case() -> None:
     assert findings == []
     assert run.board.get("audit/status")["verdict"] == "pass"
     assert all(r["status"] in ("pass", "n/a") for r in run.board.get("audit/rules"))
+    assert _gates(run)[-1] == {"gate": "audit", "findings": 0, "detail": []}
+
+
+def test_audit_gate_event_carries_each_finding() -> None:
+    """审计的闸门事件带着每条发现：运行页面点开审计就能看到是什么问题、该谁改。"""
+    deps = _deps()
+    run = _run(deps)
+    _fill_pipeline(run, deps)
+    proposal = run.board.get("trader/proposal", Proposal)
+    run.board.put("trader/proposal", proposal.model_copy(update={"size_pct": 60.0}), by="trader")
+    findings = stages.audit(run, deps)
+    gate = _gates(run)[-1]
+    assert gate["findings"] == len(findings) > 0
+    assert [(item["check"], item["subject"], item["owner"]) for item in gate["detail"]] == [
+        (f.check, f.subject, f.owner) for f in findings]
+    assert "max_risk_per_trade_pct" in {item["check"] for item in gate["detail"]}
+    assert run.board.get("audit/status")["verdict"] == "revise"
 
 
 def test_audited_current_follows_the_versions() -> None:

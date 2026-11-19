@@ -4,17 +4,20 @@
 
 做法（BLUEPRINT 13 WP6）：Journal.load 读日志；请求与设置取自 run.started 事件——
 流程配置按日志复原（open_run 的 flow 参数就是为此准备的），output_mode、universe、
-limits 与运行层预算上限这些 run.started 里记录了的也一并复原，日志里没记录的
-（档位名、批次预算、角色组上限、IC_TODAY）沿用当前设置。然后 open_run 以 replay=事件
+limits 与实际生效的预算上限（运行层与角色组）这些 run.started 里记录了的也一并复原，
+日志里没记录的（档位名、批次预算、IC_TODAY）沿用当前设置。然后 open_run 以 replay=事件
 装配（Replay 模型按次序原样奉还当时的回复，不联网），analyze 用 asyncio.run 跑完，
 把结果四项（status、reason、facts_and_rules、judgment）与黑板快照同原运行
 （Board.fold 折叠原日志）逐一比较：一致打印"一致"退出 0，否则打印差异摘要退出 1。
 
-重放这次运行由 open_run 另开一个新的运行目录（runs/ 下），这是装配的固有行为，属正常。
+重放跑在一个临时目录里，核对完就删除：它是一次检查，不是一次新的运行，不进 runs/。
+原运行没有写明分析日时，重放用原运行准入时定下的那一天（request/scope），
+所以数据集后来多了新的 K 线也不改变重放的输入。
 """
 from __future__ import annotations
 
 import asyncio
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +29,7 @@ from ..flows.analyze import analyze as run_flow
 from ..kernel.board import Board
 from ..kernel.events import Journal
 from .settings import LimitsSection, RunSection, Settings
-from .wiring import ROOT, open_run
+from .wiring import ROOT, BadRequest, open_run
 
 _FIELDS = ("status", "reason", "facts_and_rules", "judgment")
 
@@ -48,7 +51,10 @@ def run(settings: Settings, run_dir: str) -> int:
         print(f"运行日志 {path} 里没有 run.started 事件，无法重放")
         return 1
 
+    original = Board.fold(events).snapshot()
     request = dict(started.data.get("request") or {})
+    if not request.get("as_of") and "request/scope" in original:
+        request["as_of"] = original["request/scope"]["as_of"]
     try:
         flow = FlowConfig(**(started.data.get("flow") or {}))
         replayed_settings = _restored(started.data, settings)
@@ -56,10 +62,16 @@ def run(settings: Settings, run_dir: str) -> int:
         print(f"run.started 里记录的设置无法复原：{_one_line(str(e))}")
         return 1
 
-    run, deps = open_run(replayed_settings, request, replay=events, flow=flow)
-    outcome = asyncio.run(run_flow(run, request, deps, flow))
+    with tempfile.TemporaryDirectory() as scratch:
+        try:
+            run, deps = open_run(replayed_settings, request, replay=events, flow=flow,
+                                 runs_dir=Path(scratch))
+        except BadRequest as e:
+            print(f"run.started 里记录的请求无法重放：{e}")
+            return 1
+        outcome = asyncio.run(run_flow(run, request, deps, flow))
+        problems = _diff(original, run.board.snapshot(), outcome)
 
-    problems = _diff(Board.fold(events).snapshot(), run.board.snapshot(), outcome)
     if problems:
         print("不一致：")
         for problem in problems:
@@ -67,7 +79,6 @@ def run(settings: Settings, run_dir: str) -> int:
     else:
         print(f"一致：结果（{outcome.status}，原因 {outcome.reason}，判断 {outcome.judgment}）"
               f"与黑板快照完全相同")
-    print(f"重放运行目录：{deps.out_dir}")
     return 1 if problems else 0
 
 
@@ -93,7 +104,8 @@ def _restored(data: dict[str, Any], settings: Settings) -> Settings:
     ceilings = data.get("ceilings") or {}
     updates["budget"] = settings.budget.model_copy(update={
         "run_tokens": ceilings.get("run_tokens") or 0,
-        "run_cost": ceilings.get("run_cost") or 0.0})
+        "run_cost": ceilings.get("run_cost") or 0.0,
+        "roles": dict(ceilings.get("roles") or {})})
     return settings.model_copy(update=updates)
 
 

@@ -1,680 +1,931 @@
 <!doctype html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:">
-<title>InsightCrew 运行回放</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InsightCrew</title>
 <style>
-  :root { --ink:#1c2330; --muted:#6b7686; --line:#dde3ec; --bg:#f5f7fa; --card:#ffffff;
-          --accent:#2563eb; --good:#15803d; --bad:#b91c1c; --warn:#a16207; --lane:#eef2f7; }
-  * { box-sizing: border-box; }
-  body { margin:0; padding:24px; font:14px/1.55 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
-         color:var(--ink); background:var(--bg); }
-  h1 { font-size:20px; margin:0 0 4px; }
-  h2 { font-size:15px; margin:20px 0 8px; color:var(--ink); }
-  header, section, main { max-width:1060px; margin:0 auto; }
+  :root {
+    --ink:#18202c; --soft:#4a5565; --muted:#7a8496; --line:#e2e7ee; --bg:#f4f6f9; --card:#ffffff; --lane:#f7f9fc;
+    --accent:#3451d1; --accent-bg:#eaeefc; --good:#18794e; --good-bg:#e6f4ec; --bad:#b42318; --bad-bg:#fdecea;
+    --warn:#96600c; --warn-bg:#fdf3df; --code:#0f7b8a; --code-bg:#e4f4f6; --radius:10px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:28px 24px 64px; background:var(--bg); color:var(--ink);
+         font:14px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { font-size:22px; line-height:1.3; margin:0; letter-spacing:.2px; }
+  h2 { font-size:14px; margin:0 0 10px; color:var(--soft); font-weight:600; letter-spacing:.3px; }
+  h3 { font-size:13px; margin:16px 0 6px; color:var(--soft); font-weight:600; }
+  [hidden] { display:none !important; }
   .muted { color:var(--muted); }
-  .badge { display:inline-block; padding:2px 10px; border-radius:12px; font-size:12px;
-           background:#e8edf7; color:var(--accent); border:1px solid #c6d4f0; }
-  .disclaimer { color:var(--muted); font-size:12px; margin-top:4px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:8px 0; }
-  /* 流水线条 */
-  #pipeline { display:flex; gap:6px; flex-wrap:wrap; margin-top:14px; }
-  .stage { padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:#fff;
-           font-size:12px; color:var(--muted); }
-  .stage.done { background:#e7f4ec; color:var(--good); border-color:#bfe3cb; }
-  .stage.running { background:#e8edf7; color:var(--accent); border-color:#c6d4f0; }
-  .stage.revised { background:#fdf3e3; color:var(--warn); border-color:#ecd9b0; }
-  .stage.halted { background:#fbe9e9; color:var(--bad); border-color:#efc4c4; }
-  /* 播放条 */
-  #playbar { display:flex; align-items:center; gap:10px; margin-top:14px; }
-  #playbar button { padding:3px 12px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
-  #playbar input[type=range] { flex:1; }
-  #playbar .speed { display:flex; gap:4px; }
-  #playbar .speed button.on { background:#e8edf7; color:var(--accent); border-color:#c6d4f0; }
-  /* 结果 */
-  #result .verdict { font-size:18px; font-weight:600; }
-  #result .review { color:var(--bad); }
-  #result table, #evidence table, #usage table { border-collapse:collapse; width:100%; font-size:13px; }
-  #result th, #result td, #evidence th, #evidence td, #usage th, #usage td {
-    border:1px solid var(--line); padding:4px 8px; text-align:left; }
-  th { background:var(--lane); }
-  .pass { color:var(--good); } .fail { color:var(--bad); } .na { color:var(--muted); }
-  /* 时间线 */
-  .lane { display:flex; gap:8px; margin:6px 0; align-items:flex-start; }
-  .lane .who { width:130px; flex:none; padding:4px 8px; background:var(--lane); border-radius:6px;
-               font-size:12px; color:var(--muted); }
-  .lane .cards { display:flex; flex-wrap:wrap; gap:6px; }
-  .ev { padding:4px 9px; border-radius:6px; border:1px solid var(--line); background:#fff;
-        font-size:12px; cursor:pointer; }
-  .ev:hover { border-color:var(--accent); }
-  .ev.model { border-color:#c6d4f0; background:#f6f8fe; }
-  .ev.gate { border-color:#bfe3cb; background:#f4faf6; }
-  .ev.route { border-color:#ecd9b0; background:#fffaf0; color:var(--warn); }
-  .ev.artifact { color:var(--muted); background:var(--lane); }
-  .ev.finished { border-color:#efc4c4; background:#fdf3f3; }
-  .ev.hiddencount { color:var(--muted); }
-  #detail { display:none; position:fixed; inset:0; background:rgba(20,26,36,.45); z-index:10; }
-  #detail .sheet { position:absolute; top:6%; left:50%; transform:translateX(-50%); width:min(860px, 92vw);
-                   max-height:86vh; overflow:auto; background:#fff; border-radius:10px; padding:16px 20px; }
-  #detail pre { white-space:pre-wrap; word-break:break-word; background:var(--lane);
-                padding:10px; border-radius:6px; font-size:12px; max-height:320px; overflow:auto; }
-  #detail .close { float:right; cursor:pointer; color:var(--muted); }
-  svg { background:#fff; border:1px solid var(--line); border-radius:8px; }
-  /* 实时模式：表单与过去的运行 */
-  #live { display:none; }
-  #live form { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
-  #live label { display:flex; flex-direction:column; font-size:12px; color:var(--muted); gap:2px; }
-  #live input, #live select { padding:5px 8px; border:1px solid var(--line); border-radius:6px; font:inherit; }
-  #live button { padding:6px 16px; border:1px solid var(--accent); background:var(--accent);
-                 color:#fff; border-radius:6px; cursor:pointer; }
-  #live .notice { color:var(--warn); font-size:12px; min-height:16px; }
-  #runlist table { border-collapse:collapse; width:100%; font-size:13px; }
-  #runlist td, #runlist th { border:1px solid var(--line); padding:4px 8px; text-align:left; }
-  #runlist a { color:var(--accent); text-decoration:none; cursor:pointer; }
+  .mono { font-family:var(--mono); font-size:12.5px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; }
+  section { margin-top:16px; }
+  button { font:inherit; color:inherit; }
+
+  /* 页头 */
+  .top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+  .brand { font-size:12px; font-weight:700; letter-spacing:1.6px; color:var(--accent); text-transform:uppercase; }
+  #subtitle { color:var(--muted); font-size:13px; margin-top:2px; }
+  .badge { flex:none; padding:5px 12px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap;
+           border:1px solid var(--line); background:var(--card); color:var(--soft); }
+  .badge.scripted { background:var(--warn-bg); border-color:#edd9ac; color:var(--warn); }
+  .badge.model { background:var(--accent-bg); border-color:#c9d3f7; color:var(--accent); }
+  .badge.replay { background:var(--code-bg); border-color:#bfe1e6; color:var(--code); }
+  .disclaimer { margin:10px 0 0; font-size:12px; color:var(--muted); }
+  .banner { margin-top:16px; padding:10px 14px; border-radius:var(--radius); background:var(--bad-bg);
+            border:1px solid #f4c7c1; color:var(--bad); }
+
+  /* 发起运行（实时模式） */
+  #form { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+  #form label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+  #form label.inline { flex-direction:row; align-items:center; gap:6px; padding-bottom:7px; color:var(--soft); }
+  #form input, #form select { font:inherit; color:var(--ink); padding:6px 9px; border:1px solid var(--line);
+                              border-radius:7px; background:#fff; min-height:34px; }
+  #form input:disabled, #form select:disabled { background:var(--lane); color:var(--muted); }
+  #f-scenario { min-width:230px; } #f-ticker { width:130px; } #f-rounds { width:70px; }
+  .primary { padding:7px 20px; min-height:34px; border-radius:7px; border:1px solid var(--accent);
+             background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+  .primary:hover { filter:brightness(1.08); }
+  .linkish { border:0; background:none; padding:0; color:var(--accent); cursor:pointer; text-decoration:underline; }
+  .note { margin:10px 0 0; font-size:12.5px; color:var(--soft); }
+  .error { margin:10px 0 0; font-size:12.5px; color:var(--bad); }
+  details { margin-top:12px; } summary { cursor:pointer; color:var(--soft); font-size:13px; }
+  #history-body { max-height:340px; overflow:auto; }
+
+  /* 表格 */
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-weight:600; color:var(--soft); background:var(--lane); white-space:nowrap; }
+  tr:last-child td { border-bottom:0; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  tr.total td { font-weight:600; background:var(--lane); }
+  .pass { color:var(--good); font-weight:600; } .fail { color:var(--bad); font-weight:600; } .na { color:var(--muted); }
+
+  /* 流水线 */
+  #pipeline { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .stage { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; font-size:12.5px;
+           border:1px solid var(--line); background:var(--card); color:var(--muted); }
+  .stage .kind { font-size:10px; padding:0 5px; border-radius:4px; border:1px solid currentColor; opacity:.75; }
+  .stage.done { background:var(--good-bg); border-color:#bfe0cd; color:var(--good); }
+  .stage.running { background:var(--accent-bg); border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .stage.revised { background:var(--warn-bg); border-color:#edd9ac; color:var(--warn); }
+  .stage.halted { background:var(--bad-bg); border-color:#f4c7c1; color:var(--bad); font-weight:600; }
+  .arrow { color:var(--line); font-size:12px; }
+
+  /* 回放控制 */
+  #playbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; }
+  .ctl { padding:5px 12px; min-height:30px; border:1px solid var(--line); background:#fff; border-radius:7px; cursor:pointer; }
+  .ctl:hover { border-color:var(--accent); }
+  .ctl.on { background:var(--accent-bg); border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .speed { display:flex; gap:4px; align-items:center; }
+  #slider { flex:1; min-width:160px; accent-color:var(--accent); }
+  #progress { font-variant-numeric:tabular-nums; min-width:64px; text-align:right; }
+
+  /* 结果与价格图 */
+  .two { display:grid; grid-template-columns:minmax(0, 5fr) minmax(0, 6fr); gap:16px; }
+  @media (max-width:860px) { .two { grid-template-columns:1fr; } }
+  .verdict { font-size:24px; font-weight:700; line-height:1.25; }
+  .verdict.review { color:var(--bad); }
+  .verdict small { font-size:13px; font-weight:500; color:var(--muted); margin-left:8px; }
+  .levels { display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:8px; margin:14px 0; }
+  .level { border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--lane); }
+  .level b { display:block; font-size:16px; font-variant-numeric:tabular-nums; }
+  .level span { font-size:11.5px; color:var(--muted); }
+  .confidence { margin:12px 0 0; padding:0; list-style:none; font-size:13px; }
+  .confidence li { padding:6px 0; border-top:1px solid var(--line); display:grid; grid-template-columns:84px 1fr; gap:8px; }
+  .confidence b { color:var(--soft); }
+  svg { display:block; width:100%; height:auto; }
+
+  /* 时间线：每个角色一条泳道，角色的每次出场一栏，从左到右就是发生的顺序 */
+  #lanes { overflow:auto; max-height:560px; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); }
+  .grid { display:grid; grid-template-columns:136px; grid-auto-columns:150px; gap:4px; padding:10px; min-width:max-content; }
+  .cell { display:flex; flex-direction:column; gap:3px; min-width:0; z-index:1; padding:3px 0; }
+  .lane-bg { grid-column:1 / -1; background:var(--lane); border-radius:6px; }
+  .lane-name { grid-column:1; position:sticky; left:0; z-index:2; display:flex; align-items:center; gap:6px;
+               padding:4px 8px; font-size:12px; color:var(--soft); background:var(--lane); border-radius:6px; min-height:42px; }
+  .tag { font-size:10px; padding:0 5px; border-radius:4px; border:1px solid; flex:none; }
+  .tag.model { color:var(--accent); border-color:#c9d3f7; background:var(--accent-bg); }
+  .tag.code { color:var(--code); border-color:#bfe1e6; background:var(--code-bg); }
+  .tick { font-size:10px; color:var(--muted); text-align:center; font-variant-numeric:tabular-nums;
+          position:sticky; top:0; z-index:3; background:var(--card); padding:2px 0; }
+  .ev { text-align:left; padding:3px 8px; border-radius:6px; border:1px solid var(--line); background:#fff;
+        cursor:pointer; font-size:11.5px; line-height:1.35; overflow:hidden; width:100%; }
+  .ev b { display:block; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ev span { display:block; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ev:hover, .ev.selected { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bg); }
+  .ev.model { background:var(--accent-bg); border-color:#c9d3f7; }
+  .ev.good { background:var(--good-bg); border-color:#bfe0cd; }
+  .ev.bad { background:var(--bad-bg); border-color:#f4c7c1; }
+  .ev.route, .ev.return { background:var(--warn-bg); border-color:#edd9ac; }
+  .ev.return { border-style:dashed; }
+  .ev.artifact { background:#fff; display:flex; gap:6px; align-items:baseline; }   /* 产物只占一行：键名 + 版本 */
+  .ev.artifact b { flex:1; min-width:0; font-weight:500; } .ev.artifact span { flex:none; }
+  .ev.old b { text-decoration:line-through; color:var(--muted); }
+  .ev.latest { animation:arrive .5s ease-out; }
+  @keyframes arrive { from { transform:scale(.9); opacity:.2; } to { transform:none; opacity:1; } }
+
+  /* 详情抽屉 */
+  #detail { position:fixed; top:0; right:0; bottom:0; width:min(600px, 94vw); z-index:20; overflow:auto;
+            background:var(--card); border-left:1px solid var(--line); box-shadow:-12px 0 32px rgba(24,32,44,.12);
+            padding:18px 20px 40px; }
+  #detail .close { float:right; }
+  pre { margin:0; padding:10px 12px; background:var(--lane); border:1px solid var(--line); border-radius:8px;
+        font:12px/1.55 var(--mono); white-space:pre-wrap; word-break:break-word; max-height:340px; overflow:auto; }
+  .kv { display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; font-size:13px; margin:8px 0; }
+  .kv dt { color:var(--muted); } .kv dd { margin:0; }
+  .findings { margin:6px 0; padding-left:18px; } .findings li { margin:4px 0; }
+
+  .meter { height:8px; border-radius:999px; background:var(--lane); border:1px solid var(--line); overflow:hidden; margin-top:6px; }
+  .meter i { display:block; height:100%; background:var(--accent); }
+  .meter.over i { background:var(--bad); }
 </style>
 </head>
 <body>
-<header>
-  <h1 id="head-title">InsightCrew</h1>
-  <div><span class="badge" id="mode-badge"></span> <span class="muted" id="head-meta"></span></div>
-  <div class="disclaimer">本页面由课程项目自动生成，不构成投资建议；系统不执行、不路由、也不模拟任何订单。脚本化运行的回复是预先写好的。</div>
-</header>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="brand">InsightCrew</div>
+      <h1 id="title">多智能体交易辅助系统</h1>
+      <div id="subtitle">数字由代码计算并复算，方案由代码按规则审计，模型只负责判断。</div>
+    </div>
+    <span class="badge" id="badge" hidden></span>
+  </header>
+  <p class="disclaimer">本页面由课程项目自动生成，不构成投资建议；系统不执行、不路由、也不模拟任何订单。</p>
+  <div class="banner" id="banner" hidden></div>
 
-<section id="pipeline" aria-label="流水线"></section>
+  <section class="card" id="launch" hidden>
+    <h2>发起一次运行</h2>
+    <form id="form">
+      <label>离线场景 <select id="f-scenario"></select></label>
+      <label>代码 <input id="f-ticker" maxlength="32" placeholder="ACME / 0700.HK" list="tickers" autocomplete="off"></label>
+      <datalist id="tickers"></datalist>
+      <label>分析日 <input id="f-date" type="date"></label>
+      <label class="inline"><input id="f-judges" type="checkbox"> 模型评审</label>
+      <label>辩论轮数 <input id="f-rounds" type="number" min="0" max="10"></label>
+      <button class="primary" type="submit">开始</button>
+    </form>
+    <p class="note" id="mode-note"></p>
+    <p class="note" id="scenario-note" hidden></p>
+    <p class="error" id="form-error" hidden></p>
+    <details id="history"><summary>过去的运行</summary><div id="history-body" class="muted">（加载中）</div></details>
+  </section>
 
-<section id="live" class="card" aria-label="发起运行">
-  <h2>发起一次运行</h2>
-  <form id="run-form">
-    <label>代码 <input id="f-ticker" maxlength="32" placeholder="ACME 或 0700.HK"></label>
-    <label>分析日 <input id="f-asof" maxlength="10" placeholder="YYYY-MM-DD"></label>
-    <label>离线场景 <select id="f-scenario"></select></label>
-    <label>评审 <select id="f-judges"><option value="true">开</option><option value="false">关</option></select></label>
-    <label>辩论轮数 <input id="f-rounds" type="number" min="0" max="10" style="width:64px"></label>
-    <button type="submit">开始</button>
-  </form>
-  <div class="notice" id="live-notice"></div>
-</section>
+  <main id="run" hidden>
+    <section id="pipeline" aria-label="流水线"></section>
 
-<section id="runlist" aria-label="过去的运行">
-  <h2>过去的运行</h2>
-  <div id="runlist-body" class="muted"></div>
-</section>
+    <section class="card" id="playbar" aria-label="回放控制">
+      <button class="ctl" id="btn-play" type="button">播放</button>
+      <button class="ctl" id="btn-step" type="button">单步</button>
+      <span class="speed" id="speeds"><span class="muted">速度</span>
+        <button class="ctl" type="button" data-speed="slow">慢</button>
+        <button class="ctl" type="button" data-speed="normal">正常</button>
+        <button class="ctl" type="button" data-speed="fast">快</button>
+        <button class="ctl" type="button" data-speed="instant">瞬间</button>
+      </span>
+      <input id="slider" type="range" min="0" max="0" value="0" aria-label="回放位置">
+      <span class="muted" id="progress"></span>
+    </section>
 
-<section id="playbar" aria-label="回放控制">
-  <button id="btn-play">▶ 播放</button>
-  <button id="btn-step">单步</button>
-  <span class="speed" id="speed-box">
-    <button data-speed="0.5">慢</button><button data-speed="1" class="on">正常</button>
-    <button data-speed="3">快</button><button data-speed="0">瞬间</button>
-  </span>
-  <input id="slider" type="range" min="0" max="100" value="0">
-  <span class="muted" id="progress-text"></span>
-</section>
+    <section class="two">
+      <div class="card" id="result"></div>
+      <div class="card" id="chart"></div>
+    </section>
 
-<main>
-  <section class="card" id="result"></section>
-  <section id="chart-wrap"><h2>收盘价（截至分析日）</h2><div id="chart"></div></section>
-  <section id="evidence"><h2>证据</h2><div id="evidence-body"></div></section>
-  <section id="usage"><h2>用量与成本</h2><div id="usage-body"></div></section>
-  <section id="timeline"><h2>过程记录（被否决的方案不是结论）</h2><div id="lanes"></div></section>
-</main>
+    <section>
+      <h2>过程记录（被否决的方案不是结论）</h2>
+      <div id="lanes"></div>
+      <p class="note">每条事件一张卡片，一栏是一个角色的一次出场，从左到右是发生的顺序；点卡片看它的内容。带删除线的是后来被新版本取代的产物。</p>
+    </section>
 
-<div id="detail"><div class="sheet"><span class="close" id="detail-close">关闭 ✕</span>
-  <div id="detail-body"></div></div></div>
+    <section class="card" id="evidence"></section>
+    <section class="card" id="usage"></section>
+  </main>
+</div>
+
+<aside id="detail" hidden aria-label="事件详情"></aside>
 
 <script type="application/json" id="embedded">null</script>
 <script>
+/* 运行页面。它的全部输入是一串事件：静态模式下嵌在 #embedded 里，实时模式下来自本地服务的事件流。
+   页面自己折叠黑板，只做展示。它显示的每个价格、价位、比率与规则数值都是事件里现成的值；
+   唯一的求和是模型用量（token 与调用成本）的累计。运行数据一律作为文本插入。 */
+(() => {
 "use strict";
-/* 运行页面：一切内容都来自事件。页面自己折叠黑板，只做展示与 token 求和，不算任何行情数字。
-   静态模式：#embedded 里是 {"events": [...], "bars": [...]|null}；实时模式：null，经服务器的事件流取事件。 */
-(function () {
-  var STAGES = ["intake", "ledger", "technical", "debate", "manager", "trader", "audit", "judges", "report"];
-  var STAGE_NAME = { intake: "范围闸门", ledger: "事实账本", technical: "技术分析", debate: "多空辩论",
-                     manager: "研究主管", trader: "交易员", audit: "审计", judges: "评审", report: "报告" };
-  var ACTOR_STAGE = { technical: "technical", bull: "debate", bear: "debate", manager: "manager",
-                      trader: "trader" };
-  var MODE_TEXT = { scripted: "离线演示 · 脚本化模型（回复为预先编写）", replay: "回放 · ", model: "真实模型 · " };
-  var REVIEW_REASON = { invalid_ticker: "代码格式不正确", unknown_ticker: "代码不在数据集里", no_data: "该日期之前没有已收盘的行情",
-    future_date: "分析日期晚于今天", stale_data: "数据过旧", insufficient_history: "历史数据不足",
-    source_unavailable: "行情数据源不可用", ledger_inconsistent: "两条计算路径的结果不一致",
-    malformed_output: "模型输出两次都不合契约", stagnation: "同样的问题连续两次未被修正",
-    audit_failed: "多次打回后审计仍未通过", contested: "评审多数反对，未达成共识",
-    budget_exhausted: "token 预算已用尽", time_exhausted: "时间预算已用尽",
-    calls_exhausted: "模型请求次数已用尽", model_unavailable: "模型不可用" };
-  var JUDGE_NAME = { evidence: "证据评审", conservative: "保守评审", aggressive: "进取评审" };
 
-  var allEvents = [];          // 完整事件列表（静态内嵌，或实时累积）
-  var bars = null;
-  var revealed = 0;            // 已揭示的事件数（播放进度）
-  var speed = 1;
-  var playing = false;
-  var timer = null;
+const SVG_NS = "http://www.w3.org/2000/svg";
+const STAGES = [["intake", "范围闸门", "code"], ["ledger", "事实账本", "code"], ["technical", "技术分析", "model"],
+                ["debate", "多空辩论", "model"], ["manager", "研究主管", "model"], ["trader", "交易员", "model"],
+                ["audit", "审计", "code"], ["judges", "评审", "model"], ["report", "报告", "code"]];
+const STAGE_NAME = Object.fromEntries(STAGES.map(([key, name]) => [key, name]));
+const STAGE_ORDER = STAGES.map(([key]) => key);
+const ACTOR_STAGE = { intake: "intake", ledger: "ledger", technical: "technical", bull: "debate", bear: "debate",
+                      manager: "manager", trader: "trader", audit: "audit" };
+const STAGE_LANE = { technical: "technical", debate: "bull", manager: "manager", trader: "trader" };
+const LANES = [["app", "系统", "code"], ["intake", "范围闸门", "code"], ["ledger", "事实账本", "code"],
+               ["technical", "技术分析师", "model"], ["bull", "多方研究员", "model"], ["bear", "空方研究员", "model"],
+               ["manager", "研究主管", "model"], ["trader", "交易员", "model"], ["audit", "审计", "code"],
+               ["judge.evidence", "证据评审", "model"], ["judge.conservative", "保守评审", "model"],
+               ["judge.aggressive", "进取评审", "model"], ["flow", "流程", "code"]];
+const GROUP_NAME = { technical: "技术分析师", bull: "多方研究员", bear: "空方研究员", manager: "研究主管",
+                     trader: "交易员", judge: "评审（三个视角）" };
+const JUDGES = [["evidence", "证据评审"], ["conservative", "保守评审"], ["aggressive", "进取评审"]];
+const REASON = {
+  invalid_ticker: "代码格式不正确", unknown_ticker: "代码不在数据集里", no_data: "该日期之前没有已收盘的行情",
+  future_date: "分析日期晚于今天", stale_data: "数据过旧", insufficient_history: "历史数据不足",
+  source_unavailable: "行情数据源不可用", ledger_inconsistent: "两条计算路径的结果不一致",
+  malformed_output: "模型输出两次都不合契约", stagnation: "同样的问题连续两次未被修正",
+  audit_failed: "多次打回后审计仍未通过", contested: "评审多数反对，未达成共识",
+  budget_exhausted: "token 预算已用尽", time_exhausted: "时间预算已用尽",
+  calls_exhausted: "模型请求次数已用尽", model_unavailable: "模型不可用" };
+const STATUS_TEXT = { delivered: "交付", review: "REVIEW", running: "进行中", incomplete: "未正常结束" };
+const MODE_TEXT = { scripted: "脚本化", model: "真实模型", replay: "回放" };
+const PACE = { slow: 1500, normal: 700, fast: 220 };
 
-  function fold(events, upto) {
-    /* 黑板折叠：取每个键最新版本。upto 之后的事件不参与（播放时逐个揭示）。 */
-    var board = {};
-    for (var i = 0; i < Math.min(upto, events.length); i++) {
-      var e = events[i];
-      if (e.type === "artifact.written") board[e.data.key] = e.data.value;
-    }
-    return board;
+const state = {
+  live: false,        // 实时模式（由本地服务提供页面）还是静态模式（事件嵌在页面里）
+  meta: null,         // 实时模式下表单需要的信息
+  runId: "",
+  events: [],         // 收到的全部事件，按 seq
+  shown: 0,           // 已揭示的条数：回放的位置
+  ended: true,        // 事件是否已经到齐
+  error: null,        // 事件流以 error 收尾时的说明
+  bars: null, currency: "", barsAsked: false,
+  playing: false, speed: "normal", timer: null,
+  source: null,
+  selected: 0,        // 详情里打开的事件的 seq
+  follow: true,       // 时间线是否跟着最新一条滚动
+};
+
+/* ---------- 小工具 ---------- */
+
+const $ = (id) => document.getElementById(id);
+
+function el(tag, props, ...kids) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props || {})) {
+    if (value === null || value === undefined || value === false) continue;
+    if (key === "class") node.className = value;
+    else if (key === "on") for (const [name, fn] of Object.entries(value)) node.addEventListener(name, fn);
+    else node.setAttribute(key, value === true ? "" : String(value));
   }
-
-  function el(tag, cls, text) {
-    var node = document.createElement(tag);
-    if (cls) node.className = cls;
-    if (text !== undefined && text !== null) node.textContent = String(text);
-    return node;
+  for (const kid of kids.flat(Infinity)) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    node.append(kid instanceof Node ? kid : String(kid));       // 字符串成为文本节点，不会被当作标记
   }
+  return node;
+}
 
-  function num(v) {
-    if (v === null || v === undefined) return "—";
-    var s = Number(v).toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
-    return s === "" || s === "-" ? "0" : s;
-  }
+function svg(tag, attrs, text) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs || {})) node.setAttribute(key, String(value));
+  if (text !== undefined) node.textContent = String(text);
+  return node;
+}
 
-  /* ---- 头部与徽标 ---- */
-  function started() {
-    for (var i = 0; i < allEvents.length; i++) if (allEvents[i].type === "run.started") return allEvents[i];
-    return null;
-  }
+function fill(node, ...kids) {
+  node.replaceChildren(...kids.flat(Infinity).filter((kid) => kid !== null && kid !== undefined && kid !== false));
+}
 
-  function renderHeader() {
-    var s = started();
-    var head = document.getElementById("head-title");
-    head.textContent = "InsightCrew 运行回放";
-    var badge = document.getElementById("mode-badge");
-    var meta = document.getElementById("head-meta");
-    badge.textContent = "";
-    meta.textContent = "";
-    if (!s) return;
-    var mode = s.data.mode;
-    var names = s.data.models || {};
-    var label = MODE_TEXT[mode] || mode;
-    if (mode === "model") label += names.quick + " / " + names.deep;
-    if (mode === "replay") label += names.quick + " / " + names.deep;
-    badge.textContent = label;
-    var req = s.data.request || {};
-    var board = fold(allEvents, revealed);
-    var scope = board["request/scope"] || {};
-    meta.textContent = (scope.ticker || req.ticker || "") + " "
-      + (scope.universe !== undefined ? "（数据集 " + scope.universe + "）" : "")
-      + " · 分析日 " + (scope.as_of || req.as_of || "最近交易日");
-  }
+function num(value, places = 4) {                 // 展示格式：至多 places 位小数，去掉多余的零
+  if (value === null || value === undefined) return "—";
+  const text = Number(value).toFixed(places).replace(/\.?0+$/, "");
+  return text === "" || text === "-" || text === "-0" ? "0" : text;
+}
+const count = (value) => Number(value || 0).toLocaleString("en-US");
+const reasonText = (reason) => REASON[reason] || reason || "";
+const withUnit = (value, unit) => value === undefined || value === null ? "—"
+  : num(value) + (unit === "%" ? "%" : unit ? " " + unit : "");
 
-  /* ---- 流水线条 ---- */
-  function stageOf(e) {
-    if (e.type === "gate.checked") return e.data.gate;
-    if (e.type === "run.finished") return "report";
-    if (e.type === "model.called" || e.type === "model.failed") {
-      return ACTOR_STAGE[e.actor] || (e.actor.indexOf("judge.") === 0 ? "judges" : null);
-    }
-    return null;
-  }
+function table(header, rows, numeric = []) {
+  const cell = (tag, value, i) => el(tag, { class: numeric.includes(i) ? "num" : null }, value);
+  return el("table", null,
+    el("thead", null, el("tr", null, header.map((h, i) => cell("th", h, i)))),
+    el("tbody", null, rows.map((row) => el("tr", { class: row.cls || null }, row.map((v, i) => cell("td", v, i))))));
+}
 
-  function renderPipeline() {
-    var box = document.getElementById("pipeline");
-    box.textContent = "";
-    var state = {};
-    var lastStage = null;
-    for (var i = 0; i < revealed && i < allEvents.length; i++) {
-      var e = allEvents[i], st = stageOf(e);
-      if (!st) continue;
-      if (e.type === "route") { state[e.data.to] = "revised"; continue; }
-      if (e.type === "run.finished" && e.data.status !== "delivered") { state.report = "halted"; continue; }
-      state[st] = "done";
-      lastStage = st;
-    }
-    if (lastStage) state[lastStage] = state[lastStage] === "revised" ? "revised" : "running";
-    STAGES.forEach(function (name) {
-      var s = state[name];
-      var node = el("span", "stage" + (s ? " " + s : ""), STAGE_NAME[name] + (s === "revised" ? " ↺" : ""));
-      box.appendChild(node);
-    });
-  }
+/* ---------- 从事件得到要显示的东西 ---------- */
 
-  /* ---- 结果 ---- */
-  function outcomeText(reason) { return REVIEW_REASON[reason] || reason; }
+const view = () => state.events.slice(0, state.shown);
+const startedData = () => (state.events[0] && state.events[0].type === "run.started" ? state.events[0].data : null);
 
-  function renderResult() {
-    var box = document.getElementById("result");
-    box.textContent = "";
-    var board = fold(allEvents, revealed);
-    var outcome = board["run/outcome"];
-    if (!outcome) { box.appendChild(el("div", "muted", "（等待运行结束……）")); return; }
-    if (outcome.status !== "delivered") {
-      box.appendChild(el("div", "verdict review", "REVIEW：未给出评级"));
-      box.appendChild(el("div", "muted", "原因：" + outcomeText(outcome.reason)));
-      box.appendChild(el("div", "", "核验：" + (outcome.facts_and_rules === "verified" ? "事实与规则已核验" : "未核验")
-        + "；判断：" + judgmentText(outcome.judgment)));
-      return;
-    }
-    var thesis = board["manager/thesis"] || {};
-    var proposal = board["trader/proposal"] || {};
-    var instrument = board["ledger/instrument"] || {};
-    box.appendChild(el("div", "verdict", "评级 " + thesis.rating + " · " + proposal.action
-      + "（" + (instrument.currency || "") + "）"));
-    var grid = el("table");
-    var row = el("tr");
-    [["入场价", num(proposal.entry)], ["止损价", num(proposal.stop)], ["目标价", num(proposal.target)],
-     ["仓位", num(proposal.size_pct) + "% 权益"], ["预期持有", proposal.horizon_days + " 个交易日"]]
-      .forEach(function (pair) { var th = el("th", "", pair[0]); var td = el("td", "", pair[1]); row.appendChild(th); row.appendChild(td); });
-    grid.appendChild(row);
-    box.appendChild(grid);
-    box.appendChild(el("div", "muted", "方案说明：" + (proposal.rationale || "")));
-    box.appendChild(el("div", "", "核验：" + (outcome.facts_and_rules === "verified" ? "事实与规则已核验" : "未核验")
-      + "；判断：" + judgmentText(outcome.judgment)));
-  }
+function fold(events) {                           // 黑板：每个键的最新值
+  const board = {};
+  for (const e of events) if (e.type === "artifact.written") board[e.data.key] = e.data.value;
+  return board;
+}
 
-  function judgmentText(j) {
-    if (!j) return "";
-    if (j.indexOf("accepted") === 0) return "评审接受（" + j.replace("accepted ", "") + "）";
-    if (j === "contested") return "评审相持";
-    if (j.indexOf("not reviewed") === 0) {
-      var reason = j.indexOf(":") >= 0 ? j.slice(j.indexOf(":") + 1).trim() : "";
-      return "未经评审" + (reason ? "（" + outcomeText(reason) + "）" : "");
-    }
-    return j;
-  }
+function stageOf(e) {
+  if (e.type === "gate.checked") return e.data.gate;
+  if (!["model.called", "model.failed", "budget.exceeded", "artifact.written"].includes(e.type)) return null;
+  const actor = e.actor || "";
+  if (actor.startsWith("judge.")) return "judges";
+  if (e.type === "artifact.written" && e.data.key.startsWith("judges/")) return "judges";
+  if (e.type === "artifact.written" && e.data.key.startsWith("run/")) return "report";
+  return ACTOR_STAGE[actor] || null;
+}
 
-  /* ---- 价格图 ---- */
-  function renderChart() {
-    var wrap = document.getElementById("chart");
-    wrap.textContent = "";
-    var board = fold(allEvents, revealed);
-    var outcome = board["run/outcome"];
-    if (!bars || !bars.length || !outcome || outcome.status !== "delivered") {
-      wrap.appendChild(el("div", "muted", bars && bars.length ? "（只有交付的方案才画价位线）" : "（没有价格序列）"));
-      return;
-    }
-    var proposal = board["trader/proposal"] || {};
-    var w = 1000, h = 260, pad = 44;
-    var closes = bars.map(function (b) { return b.close; });
-    var levels = [proposal.entry, proposal.stop, proposal.target].filter(function (v) { return v !== null && v !== undefined; });
-    var lo = Math.min.apply(null, closes.concat(levels)), hi = Math.max.apply(null, closes.concat(levels));
-    var span = (hi - lo) || 1;
-    function x(i) { return pad + (w - 2 * pad) * i / Math.max(1, closes.length - 1); }
-    function y(v) { return h - pad - (h - 2 * pad) * (v - lo) / span; }
-    var NS = "http://www.w3.org/2000/svg";
-    var svg = document.createElementNS(NS, "svg");
-    svg.setAttribute("viewBox", "0 0 " + w + " " + h);
-    svg.setAttribute("width", "100%");
-    var path = document.createElementNS(NS, "polyline");
-    path.setAttribute("fill", "none");
-    path.setAttribute("stroke", "#2563eb");
-    path.setAttribute("stroke-width", "1.5");
-    path.setAttribute("points", closes.map(function (c, i) { return x(i) + "," + y(c); }).join(" "));
-    svg.appendChild(path);
-    [["entry", proposal.entry, "#15803d", "入场"], ["stop", proposal.stop, "#b91c1c", "止损"],
-     ["target", proposal.target, "#a16207", "目标"]].forEach(function (lv) {
-      if (lv[1] === null || lv[1] === undefined) return;
-      var line = document.createElementNS(NS, "line");
-      line.setAttribute("x1", pad); line.setAttribute("x2", w - pad);
-      line.setAttribute("y1", y(lv[1])); line.setAttribute("y2", y(lv[1]));
-      line.setAttribute("stroke", lv[2]); line.setAttribute("stroke-dasharray", "5 4");
-      svg.appendChild(line);
-      var label = document.createElementNS(NS, "text");
-      label.setAttribute("x", pad + 4); label.setAttribute("y", y(lv[1]) - 4);
-      label.setAttribute("font-size", "12"); label.setAttribute("fill", lv[2]);
-      label.textContent = lv[3] + " " + num(lv[1]);
-      svg.appendChild(label);
-    });
-    var first = document.createElementNS(NS, "text");
-    first.setAttribute("x", pad); first.setAttribute("y", h - 10);
-    first.setAttribute("font-size", "11"); first.setAttribute("fill", "#6b7686");
-    first.textContent = bars[0].date;
-    var last = document.createElementNS(NS, "text");
-    last.setAttribute("x", w - pad - 60); last.setAttribute("y", h - 10);
-    last.setAttribute("font-size", "11"); last.setAttribute("fill", "#6b7686");
-    last.textContent = bars[bars.length - 1].date;
-    svg.appendChild(first); svg.appendChild(last);
-    wrap.appendChild(svg);
-  }
-
-  /* ---- 证据 ---- */
-  function renderEvidence() {
-    var body = document.getElementById("evidence-body");
-    body.textContent = "";
-    var board = fold(allEvents, revealed);
-    var analysis = board["technical/analysis"];
-    var facts = board["ledger/facts"] || [];
-    var byId = {};
-    facts.forEach(function (f) { byId[f.id] = f; });
-    if (analysis && analysis.claims && analysis.claims.length) {
-      body.appendChild(el("h2", "", "分析师引用的事实（数值取自账本）"));
-      var t = el("table"); var head = el("tr");
-      ["事实", "含义", "账本数值", "数据日", "分析师的解读"].forEach(function (h) { head.appendChild(el("th", "", h)); });
-      t.appendChild(head);
-      analysis.claims.forEach(function (c) {
-        var f = byId[c.fact] || {};
-        var tr = el("tr");
-        tr.appendChild(el("td", "", c.fact));
-        tr.appendChild(el("td", "", f.label || "（账本中无此事实）"));
-        tr.appendChild(el("td", "", f.value !== undefined ? num(f.value) + (f.unit === "%" ? "%" : (f.unit ? " " + f.unit : "")) : "—"));
-        tr.appendChild(el("td", "", f.as_of || "—"));
-        tr.appendChild(el("td", "", c.reading || ""));
-        t.appendChild(tr);
-      });
-      body.appendChild(t);
-    }
-    var rules = board["audit/rules"];
-    if (rules && rules.length) {
-      body.appendChild(el("h2", "", "风控检查"));
-      var rt = el("table"); var rh = el("tr");
-      ["规则", "上限", "计算值", "结论", "备注"].forEach(function (h) { rh.appendChild(el("th", "", h)); });
-      rt.appendChild(rh);
-      rules.forEach(function (r) {
-        var tr = el("tr");
-        tr.appendChild(el("td", "", r.key));
-        tr.appendChild(el("td", "", num(r.limit)));
-        tr.appendChild(el("td", "", num(r.actual)));
-        var cls = r.status === "pass" ? "pass" : (r.status === "fail" ? "fail" : "na");
-        var text = r.status === "pass" ? "通过" : (r.status === "fail" ? "不通过" : "不适用");
-        tr.appendChild(el("td", cls, text));
-        tr.appendChild(el("td", "", r.message || ""));
-        rt.appendChild(tr);
-      });
-      body.appendChild(rt);
-    }
-    var judges = board["judges/status"];
-    if (judges) {
-      body.appendChild(el("h2", "", "评审意见"));
-      body.appendChild(el("div", "muted", "汇总：" + judges));
-      ["evidence", "conservative", "aggressive"].forEach(function (lens) {
-        var v = board["judge." + lens + "/verdict"];
-        if (!v) { body.appendChild(el("div", "", JUDGE_NAME[lens] + "：未询问")); return; }
-        body.appendChild(el("div", "", JUDGE_NAME[lens] + "：" + (v.accept ? "接受" : "反对")
-          + (v.target && v.target !== "none" ? "（" + (v.target === "thesis" ? "论点" : "价位与仓位") + "）" : "")
-          + "。" + (v.critique || "")));
-      });
-    }
-    if (!body.childNodes.length) body.appendChild(el("div", "muted", "（还没有证据）"));
-  }
-
-  /* ---- 用量 ---- */
-  function renderUsage() {
-    var body = document.getElementById("usage-body");
-    body.textContent = "";
-    var board = fold(allEvents, revealed);
-    var rows = board["run/usage"];
-    if (!rows || !rows.length) { body.appendChild(el("div", "muted", "（还没有模型调用）")); return; }
-    var s = started();
-    var ceilings = (s && s.data.ceilings) || {};
-    var t = el("table"); var head = el("tr");
-    ["角色", "模型", "调用", "请求", "输入 token", "输出 token", "成本"].forEach(function (h) { head.appendChild(el("th", "", h)); });
-    t.appendChild(head);
-    var tokens = 0;
-    rows.forEach(function (r) {
-      var tr = el("tr");
-      tr.appendChild(el("td", "", r.role));
-      tr.appendChild(el("td", "", r.model));
-      tr.appendChild(el("td", "", r.calls));
-      tr.appendChild(el("td", "", r.requests));
-      tr.appendChild(el("td", "", r.input_tokens));
-      tr.appendChild(el("td", "", r.output_tokens));
-      tr.appendChild(el("td", "", r.cost === null || r.cost === undefined ? "未定价" : num(r.cost)));
-      tokens += (r.input_tokens || 0) + (r.output_tokens || 0);
-      t.appendChild(tr);
-    });
-    var total = el("tr");
-    total.appendChild(el("td", "", "合计"));
-    total.appendChild(el("td", "", "—"));
-    total.appendChild(el("td", "", rows.reduce(function (a, r) { return a + r.calls; }, 0)));
-    total.appendChild(el("td", "", rows.reduce(function (a, r) { return a + r.requests; }, 0)));
-    total.appendChild(el("td", "", tokens));
-    total.appendChild(el("td", "", "—"));
-    total.appendChild(el("td", "", "—"));
-    t.appendChild(total);
-    body.appendChild(t);
-    body.appendChild(el("div", "muted", "token 合计 " + tokens + "，上限 "
-      + (ceilings.run_tokens ? ceilings.run_tokens : "不设上限")));
-  }
-
-  /* ---- 时间线 ---- */
-  function evCard(e) {
-    var node = el("span", "ev", describe(e));
-    if (e.type === "model.called" || e.type === "model.failed") node.className += " model";
-    if (e.type === "gate.checked") node.className += " gate";
-    if (e.type === "route") node.className += " route";
-    if (e.type === "artifact.written") node.className += " artifact";
-    if (e.type === "run.finished") node.className += " finished";
-    node.addEventListener("click", function () { showDetail(e); });
-    return node;
-  }
-
-  function describe(e) {
-    switch (e.type) {
-      case "run.started": return "▶ 开始（" + (e.data.mode || "") + "）";
-      case "artifact.written": return e.data.key + " v" + e.data.version;
-      case "model.called": return e.actor + " ← " + (e.data.model || "");
-      case "model.failed": return e.actor + " 模型失败";
-      case "gate.checked": return "闸门 " + (STAGE_NAME[e.data.gate] || e.data.gate)
-        + (e.data.findings ? "：发现 " + e.data.findings + " 个问题" : "：通过");
-      case "route": return "⤺ 重跑 " + (STAGE_NAME[e.data.to] || e.data.to) + "（" + (e.data.why || "") + "）";
-      case "budget.exceeded": return "⚠ 预算超限：" + (e.data.scope || "");
-      case "run.finished": return (e.data.status === "delivered" ? "✔ 交付" : "✖ 停止：" + outcomeText(e.data.reason));
-      default: return e.type;
-    }
-  }
-
-  function renderTimeline() {
-    var lanes = document.getElementById("lanes");
-    lanes.textContent = "";
-    var order = [];
-    var byActor = {};
-    for (var i = 0; i < revealed && i < allEvents.length; i++) {
-      var e = allEvents[i];
-      var who = e.actor || "system";
-      if (!byActor[who]) { byActor[who] = []; order.push(who); }
-      byActor[who].push(e);
-    }
-    order.forEach(function (who) {
-      var lane = el("div", "lane");
-      lane.appendChild(el("div", "who", who));
-      var cards = el("div", "cards");
-      byActor[who].forEach(function (e) { cards.appendChild(evCard(e)); });
-      lane.appendChild(cards);
-      lanes.appendChild(lane);
-    });
-    if (!order.length) lanes.appendChild(el("div", "muted", "（按下播放，事件会按发生顺序出现）"));
-  }
-
-  function showDetail(e) {
-    var body = document.getElementById("detail-body");
-    body.textContent = "";
-    body.appendChild(el("h2", "", "#" + e.seq + " " + (e.step || e.actor) + " · " + e.type));
-    if (e.type === "model.called") {
-      body.appendChild(el("div", "", "模型 " + (e.data.model || "") + "；"
-        + "输入 " + e.data.usage.input_tokens + " + 输出 " + e.data.usage.output_tokens + " token；"
-        + (e.data.cost === null || e.data.cost === undefined ? "未定价" : "成本 " + num(e.data.cost))));
-      body.appendChild(el("h2", "", "提示词（原样）"));
-      var pre = el("pre", "", e.data.prompt);
-      body.appendChild(pre);
-      body.appendChild(el("h2", "", "回复（契约校验后的输出）"));
-      body.appendChild(el("pre", "", JSON.stringify(e.data.output, null, 2)));
-    } else if (e.type === "gate.checked") {
-      body.appendChild(el("div", "", "闸门 " + (STAGE_NAME[e.data.gate] || e.data.gate)
-        + "：发现 " + e.data.findings + " 个问题。"));
-      var detail = e.data.detail;
-      if (detail && detail.length) {
-        var list = el("ul");
-        detail.forEach(function (f) { list.appendChild(el("li", "", "[" + f.check + "] " + f.subject + "：" + f.message)); });
-        body.appendChild(list);
-      } else if (typeof detail === "string") {
-        body.appendChild(el("div", "muted", detail));
-      }
-    } else if (e.type === "artifact.written") {
-      body.appendChild(el("pre", "", JSON.stringify(e.data.value, null, 2)));
+function pipeline(events) {
+  /* 每一段的状态。被打回时，目标段与它之后的各段回到"未开始"，目标段记一次返工。
+     current 是正在进行的那一段：闸门通过后轮到下一段，被打回后轮到被点名的那一段。 */
+  const status = {}, redo = {};
+  let last = null, current = null, finished = null;
+  for (const e of events) {
+    if (e.type === "route") {
+      for (const stage of STAGE_ORDER.slice(STAGE_ORDER.indexOf(e.data.to))) delete status[stage];
+      redo[e.data.to] = (redo[e.data.to] || 0) + 1;
+      last = null; current = e.data.to;
+    } else if (e.type === "run.finished") {
+      finished = e;
     } else {
-      body.appendChild(el("pre", "", JSON.stringify(e.data, null, 2)));
+      const stage = stageOf(e);
+      if (!stage) continue;
+      if (stage !== "report") last = stage;
+      const stopped = e.type === "model.failed" || e.type === "budget.exceeded"
+        || (e.type === "gate.checked" && e.data.findings > 0)
+        || (e.type === "model.called" && e.data.output === null && stage !== "judges");
+      status[stage] = stopped ? "halted" : "done";
+      const passed = e.type === "gate.checked" && !stopped;
+      current = stopped ? null : passed ? STAGE_ORDER[STAGE_ORDER.indexOf(stage) + 1] || null : stage;
     }
-    document.getElementById("detail").style.display = "block";
   }
-
-  /* ---- 播放 ---- */
-  function renderAll() {
-    renderHeader(); renderPipeline(); renderResult(); renderChart();
-    renderEvidence(); renderUsage(); renderTimeline();
-    var slider = document.getElementById("slider");
-    slider.value = allEvents.length ? Math.round(100 * revealed / allEvents.length) : 0;
-    document.getElementById("progress-text").textContent = revealed + " / " + allEvents.length;
+  if (finished) {
+    status.report = "done";
+    if (finished.data.status !== "delivered" && last && status[last] === "done") status[last] = "halted";
+  } else if (current) {
+    status[current] = "running";
   }
+  return { status, redo };
+}
 
-  function step() {
-    if (revealed < allEvents.length) { revealed += 1; renderAll(); }
-    if (revealed >= allEvents.length) stop();
-  }
-
-  function play() {
-    if (revealed >= allEvents.length) revealed = 0;
-    playing = true;
-    document.getElementById("btn-play").textContent = "⏸ 暂停";
-    schedule();
-  }
-
-  function schedule() {
-    if (timer) { clearTimeout(timer); timer = null; }
-    if (!playing || speed === 0) return;
-    timer = setTimeout(function () { step(); if (playing) schedule(); }, 900 / speed);
-  }
-
-  function stop() {
-    playing = false;
-    document.getElementById("btn-play").textContent = "▶ 播放";
-    if (timer) { clearTimeout(timer); timer = null; }
-  }
-
-  document.getElementById("btn-play").addEventListener("click", function () { playing ? stop() : play(); });
-  document.getElementById("btn-step").addEventListener("click", function () { stop(); step(); });
-  Array.prototype.forEach.call(document.querySelectorAll("#speed-box button"), function (b) {
-    b.addEventListener("click", function () {
-      speed = Number(b.getAttribute("data-speed"));
-      Array.prototype.forEach.call(document.querySelectorAll("#speed-box button"), function (o) { o.className = ""; });
-      b.className = "on";
-      if (speed === 0) { stop(); revealed = allEvents.length; renderAll(); }
-      else if (playing) schedule();
-    });
-  });
-  document.getElementById("slider").addEventListener("input", function (ev) {
-    stop();
-    revealed = Math.round(allEvents.length * Number(ev.target.value) / 100);
-    renderAll();
-  });
-  document.getElementById("detail-close").addEventListener("click", function () {
-    document.getElementById("detail").style.display = "none";
-  });
-  document.getElementById("detail").addEventListener("click", function (ev) {
-    if (ev.target.id === "detail") document.getElementById("detail").style.display = "none";
-  });
-
-  /* ---- 取事件：静态内嵌，或实时事件流 ---- */
-  function boot() {
-    var raw = document.getElementById("embedded").textContent.trim();
-    if (raw !== "null") {
-      var parsed = JSON.parse(raw);
-      allEvents = parsed.events;
-      bars = parsed.bars;
-      revealed = allEvents.length;            // 静态页面默认整段已就绪，可用播放条重放
-      document.getElementById("runlist").style.display = "none";   // 过去的运行只在实时模式有意义
-      renderAll();
-      return;
+function usage(events) {                          // 页面唯一的求和：模型用量的累计
+  const groups = new Map();
+  const total = { calls: 0, requests: 0, input: 0, output: 0, cost: 0, unpriced: 0 };
+  for (const e of events) {
+    if (e.type !== "model.called") continue;
+    const key = e.actor.split(".")[0];
+    if (!groups.has(key)) groups.set(key, { calls: 0, requests: 0, input: 0, output: 0, cost: 0, unpriced: 0 });
+    for (const row of [groups.get(key), total]) {
+      row.calls += 1;
+      row.requests += e.data.usage.requests;
+      row.input += e.data.usage.input_tokens;
+      row.output += e.data.usage.output_tokens;
+      if (e.data.cost === null || e.data.cost === undefined) row.unpriced += 1; else row.cost += e.data.cost;
     }
-    /* 实时模式：事件流。浏览器断线重连时自己带上 Last-Event-ID，收尾消息 event: end。 */
-    var params = new URLSearchParams(window.location.search);
-    var runId = params.get("run") || "";
-    document.getElementById("live").style.display = "block";
-    fetch("/api/meta").then(function (r) { return r.json(); }).then(function (meta) {
-      var select = document.getElementById("f-scenario");
-      var blank = document.createElement("option");
-      blank.value = ""; blank.textContent = "（不用场景）";
-      select.appendChild(blank);
-      meta.scenarios.forEach(function (s) {
-        var option = document.createElement("option");
-        option.value = s.name;
-        option.textContent = s.name + "（" + s.ticker + " @ " + s.as_of + "）";
-        select.appendChild(option);
-      });
-      document.getElementById("f-judges").value = String(meta.defaults.judges);
-      document.getElementById("f-rounds").value = meta.defaults.debate_rounds;
-      if (meta.mode !== "model") {
-        document.getElementById("live-notice").textContent =
-          "没有可用的真实模型（原因见下）。可以选一个离线场景；不带场景的运行会在需要模型时以 REVIEW 结束。";
+  }
+  return { groups, total };
+}
+
+const costText = (row) => row.unpriced === row.calls ? "未定价"
+  : num(row.cost, 6) + (row.unpriced ? "（另有未定价）" : "");
+
+/* ---------- 页头 ---------- */
+
+function renderHeader() {
+  const started = startedData();
+  const badge = $("badge");
+  if (!started) {
+    $("title").textContent = "多智能体交易辅助系统";
+    $("subtitle").textContent = "数字由代码计算并复算，方案由代码按规则审计，模型只负责判断。";
+    document.title = "InsightCrew";
+    if (state.meta) {
+      badge.hidden = false;
+      badge.className = "badge " + state.meta.mode;
+      badge.textContent = state.meta.mode === "model"
+        ? "真实模型 · " + state.meta.models.quick + " / " + state.meta.models.deep
+        : "离线演示 · 脚本化模型（回复为预先编写）";
+    }
+    return;
+  }
+  const board = fold(state.events), request = started.request || {};
+  const scope = board["request/scope"] || {}, instrument = board["ledger/instrument"] || {};
+  const ticker = instrument.ticker || scope.ticker || request.ticker || "";
+  $("title").textContent = ticker + (instrument.name ? " · " + instrument.name : "");
+  $("subtitle").textContent = "分析日 " + (scope.as_of || request.as_of || "最近交易日")
+    + " · 数据集 " + (started.universe || "") + (state.runId ? " · 运行 " + state.runId : "");
+  document.title = ticker + " · InsightCrew";
+  const names = started.models || {};
+  badge.hidden = false;
+  badge.className = "badge " + started.mode;
+  badge.textContent = started.mode === "scripted" ? "离线演示 · 脚本化模型（回复为预先编写）"
+    : (started.mode === "replay" ? "回放 · " : "真实模型 · ") + names.quick + " / " + names.deep;
+}
+
+/* ---------- 流水线 ---------- */
+
+function renderPipeline(events) {
+  const { status, redo } = pipeline(events);
+  const chips = [];
+  STAGES.forEach(([key, name, kind], i) => {
+    let cls = status[key] || "idle";
+    if (cls === "done" && redo[key]) cls = "revised";
+    if (i) chips.push(el("span", { class: "arrow" }, "→"));
+    chips.push(el("span", { class: "stage " + cls, title: kind === "model" ? "由模型完成" : "由代码完成" },
+      name, el("span", { class: "kind" }, kind === "model" ? "模型" : "代码"),
+      redo[key] ? "↺" + redo[key] : null));
+  });
+  fill($("pipeline"), chips);
+}
+
+/* ---------- 结果 ---------- */
+
+function judgmentText(judgment) {
+  if (!judgment) return "—";
+  if (judgment.startsWith("accepted")) return "评审接受（" + judgment.slice("accepted".length).trim() + "）。评审只能否决，不能证明方案正确。";
+  if (judgment === "contested") return "评审相持：多数评审反对。";
+  if (judgment.startsWith("not reviewed")) {
+    const why = judgment.includes(":") ? judgment.slice(judgment.indexOf(":") + 1).trim() : "";
+    return "未经评审" + (why ? "（" + (why === "judges disabled" ? "评审已关闭" : reasonText(why)) + "）" : "") + "。";
+  }
+  return judgment;
+}
+
+function confidence(outcome) {
+  return el("ul", { class: "confidence" },
+    el("li", null, el("b", null, "事实与规则"), outcome.facts_and_rules === "verified"
+      ? "已核验：数字由代码计算并复算，规则由代码逐条检查。" : "未核验：审计没有确认当前版本。"),
+    el("li", null, el("b", null, "模型判断"), judgmentText(outcome.judgment)));
+}
+
+function renderResult(events) {
+  const board = fold(events), outcome = board["run/outcome"], box = $("result");
+  if (!outcome) {
+    fill(box, el("h2", null, "结果"),
+      el("div", { class: "muted" }, state.ended && state.shown >= state.events.length
+        ? "这次运行没有留下结果。" : "运行尚未结束。结果在最后一步写出。"));
+    return;
+  }
+  if (outcome.status !== "delivered") {         // REVIEW：这一块不出现任何评级与价位
+    const kids = [el("h2", null, "结果"), el("div", { class: "verdict review" }, "REVIEW：未给出评级"),
+      el("p", null, "原因：" + reasonText(outcome.reason) + "。")];
+    const started = startedData();
+    if (outcome.reason === "model_unavailable" && started && started.mode === "scripted") {
+      kids.push(el("p", { class: "muted" }, "没有可用的真实模型；脚本化模型只能回答场景里写好的内容。"
+        + (state.meta ? "可以选的离线场景：" + state.meta.scenarios.map((s) => s.name).join("、") + "。" : "")));
+    }
+    kids.push(confidence(outcome));
+    fill(box, kids);
+    return;
+  }
+  const thesis = board["manager/thesis"] || {}, proposal = board["trader/proposal"] || {};
+  const currency = (board["ledger/instrument"] || {}).currency || "";
+  const level = (label, value) => el("div", { class: "level" }, el("b", null, value), el("span", null, label));
+  fill(box, el("h2", null, "结果"),
+    el("div", { class: "verdict" }, "评级 " + thesis.rating + " · 操作 " + proposal.action, el("small", null, currency)),
+    el("div", { class: "levels" },
+      level("入场价", num(proposal.entry)), level("止损价", num(proposal.stop)), level("目标价", num(proposal.target)),
+      level("仓位（占权益）", num(proposal.size_pct) + "%"), level("持有（交易日）", proposal.horizon_days)),
+    proposal.rationale ? el("p", { class: "muted" }, "方案说明：" + proposal.rationale) : null,
+    confidence(outcome));
+}
+
+/* ---------- 价格图 ---------- */
+
+function renderChart(events) {
+  const box = $("chart"), bars = state.bars;
+  if (!bars || !bars.length) {
+    const why = state.live && !state.ended ? "准入通过后加载。"
+      : "这次运行没有通过准入，或数据集里读不到这个代码，所以没有价格序列。";
+    fill(box, el("h2", null, "收盘价（截至分析日）"), el("div", { class: "muted" }, why));
+    return;
+  }
+  const board = fold(events), outcome = board["run/outcome"];
+  const proposal = outcome && outcome.status === "delivered" ? board["trader/proposal"] || {} : {};
+  const levels = [["入场", proposal.entry, "#18794e"], ["止损", proposal.stop, "#b42318"], ["目标", proposal.target, "#96600c"]]
+    .filter(([, value]) => value !== null && value !== undefined);
+  const closes = bars.map((bar) => bar.close);
+  const low = Math.min(...closes), high = Math.max(...closes);
+  const bottom = Math.min(low, ...levels.map(([, v]) => v)), top = Math.max(high, ...levels.map(([, v]) => v));
+  const W = 640, H = 250, L = 52, R = 78, T = 14, B = 26;                 // 以下只是把数值换成画布坐标
+  const x = (i) => L + (W - L - R) * i / Math.max(1, closes.length - 1);
+  const y = (v) => T + (H - T - B) * (top - v) / ((top - bottom) || 1);
+  const chart = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "收盘价走势" });
+  for (const value of [high, low]) {
+    chart.append(svg("line", { x1: L, x2: W - R, y1: y(value), y2: y(value), stroke: "#e2e7ee" }),
+      svg("text", { x: L - 6, y: y(value) + 4, "text-anchor": "end", "font-size": 11, fill: "#7a8496" }, num(value, 2)));
+  }
+  chart.append(svg("polyline", { fill: "none", stroke: "#3451d1", "stroke-width": 1.6, "stroke-linejoin": "round",
+    points: closes.map((c, i) => x(i).toFixed(1) + "," + y(c).toFixed(1)).join(" ") }));
+  chart.append(svg("circle", { cx: x(closes.length - 1), cy: y(closes[closes.length - 1]), r: 3, fill: "#3451d1" }));
+  const tags = levels.map(([label, value, color]) => ({ label, value, color, at: y(value) })).sort((a, b) => a.at - b.at);
+  for (let i = 1; i < tags.length; i++) tags[i].at = Math.max(tags[i].at, tags[i - 1].at + 13);   // 价位挨得近时把标签错开
+  for (const tag of tags) {
+    chart.append(svg("line", { x1: L, x2: W - R, y1: y(tag.value), y2: y(tag.value), stroke: tag.color, "stroke-dasharray": "5 4" }),
+      svg("text", { x: W - R + 6, y: tag.at + 4, "font-size": 11, fill: tag.color }, tag.label + " " + num(tag.value, 2)));
+  }
+  chart.append(svg("text", { x: L, y: H - 8, "font-size": 11, fill: "#7a8496" }, bars[0].date),
+    svg("text", { x: W - R, y: H - 8, "text-anchor": "end", "font-size": 11, fill: "#7a8496" }, bars[bars.length - 1].date));
+  const currency = state.currency || (board["ledger/instrument"] || {}).currency || "";
+  fill(box, el("h2", null, "收盘价（截至分析日，" + bars.length + " 根" + (currency ? "，" + currency : "") + "）"), chart,
+    levels.length ? null : el("p", { class: "note" }, outcome && outcome.status !== "delivered"
+      ? "没有交付方案，所以图上没有价位线。" : "方案交付后，图上会画出入场、止损与目标价。"));
+}
+
+/* ---------- 时间线 ---------- */
+
+function describe(e) {
+  const d = e.data;
+  switch (e.type) {
+    case "run.started": return ["开始", MODE_TEXT[d.mode] || d.mode, ""];
+    case "artifact.written": return [d.key, "v" + d.version, "artifact"];
+    case "model.called":
+      return [d.output === null ? "输出不合契约" : "模型作答",
+              count(d.usage.input_tokens) + "+" + count(d.usage.output_tokens) + " token" + (d.usage.requests > 1 ? " · 重试" : ""),
+              d.output === null ? "bad" : "model"];
+    case "model.failed": return ["模型调用失败", d.model || "", "bad"];
+    case "gate.checked":
+      return d.findings ? ["发现 " + d.findings + " 个问题", ((d.detail || [])[0] || {}).check || "", "bad"] : ["通过", "", "good"];
+    case "route": return ["⤺ 打回", "从" + (STAGE_NAME[d.to] || d.to) + "重跑", "route"];
+    case "budget.exceeded": return ["预算超限", d.scope || "", "bad"];
+    case "run.finished":
+      return d.status === "delivered" ? ["交付", d.reason === "ok" ? "" : reasonText(d.reason), "good"]
+                                      : ["REVIEW", reasonText(d.reason), "bad"];
+    default: return [e.type, "", ""];
+  }
+}
+
+function renderTimeline(events) {
+  const holder = $("lanes");
+  const known = LANES.map(([key]) => key);
+  const present = new Set(state.events.map((e) => e.actor || "app"));
+  const lanes = LANES.filter(([key]) => present.has(key))
+    .concat([...present].filter((key) => !known.includes(key)).map((key) => [key, key, "code"]));
+  const rowOf = Object.fromEntries(lanes.map(([key], i) => [key, i + 2]));
+  const newest = {};                              // 每个键最新的版本号：更早的版本画上删除线
+  for (const e of events) if (e.type === "artifact.written") newest[e.data.key] = e.data.version;
+
+  const turns = [];                               // 同一个角色连续写下的事件并成一栏：一栏就是它的一次出场
+  for (const e of events) {
+    const actor = e.actor || "app", last = turns[turns.length - 1];
+    if (last && last.actor === actor) last.events.push(e); else turns.push({ actor, events: [e] });
+  }
+  const latest = state.playing && events.length ? events[events.length - 1].seq : 0;
+
+  const grid = el("div", { class: "grid" });
+  const place = (node, row, column) => { node.style.gridRow = String(row); node.style.gridColumn = String(column); return node; };
+  lanes.forEach(([key, name, kind]) => {
+    const band = el("div", { class: "lane-bg" });
+    band.style.gridRow = String(rowOf[key]);
+    band.style.gridColumn = "1 / span " + (turns.length + 1);
+    grid.append(band, place(el("div", { class: "lane-name" },
+      el("span", { class: "tag " + kind }, kind === "model" ? "模型" : "代码"), name), rowOf[key], 1));
+  });
+  turns.forEach((turn, i) => {
+    const column = i + 2, first = turn.events[0].seq, last = turn.events[turn.events.length - 1].seq;
+    grid.append(place(el("div", { class: "tick" }, first === last ? "#" + first : "#" + first + "–" + last), 1, column));
+    const cell = el("div", { class: "cell" });
+    for (const e of turn.events) {
+      const [title, sub, kind] = describe(e);
+      const old = e.type === "artifact.written" && newest[e.data.key] !== e.data.version;
+      cell.append(el("button", { type: "button", title: title + (sub ? " · " + sub : ""),
+        class: "ev " + kind + (old ? " old" : "") + (e.seq === state.selected ? " selected" : "")
+          + (e.seq === latest ? " latest" : ""),
+        on: { click: () => openDetail(e.seq) } }, el("b", null, title), el("span", null, sub)));
+      if (e.type === "route" && rowOf[STAGE_LANE[e.data.to]]) {   // 打回画成回到它点名的那一段
+        grid.append(place(el("div", { class: "cell" }, el("button", { type: "button", class: "ev return",
+          title: e.data.why || "", on: { click: () => openDetail(e.seq) } },
+          el("b", null, "↩ 从这里重跑"), el("span", null, e.data.why || ""))), rowOf[STAGE_LANE[e.data.to]], column));
       }
-      renderRunList();
-    });
-    document.getElementById("run-form").addEventListener("submit", function (ev) {
-      ev.preventDefault();
-      var notice = document.getElementById("live-notice");
-      notice.textContent = "";
-      var body = {
-        ticker: document.getElementById("f-ticker").value.trim(),
-        as_of: document.getElementById("f-asof").value.trim(),
-        scenario: document.getElementById("f-scenario").value,
-        judges: document.getElementById("f-judges").value === "true",
-        debate_rounds: Number(document.getElementById("f-rounds").value)
-      };
-      fetch("/api/runs", { method: "POST", headers: { "Content-Type": "application/json" },
-                           body: JSON.stringify(body) }).then(function (r) {
-        return r.json().then(function (data) { return { ok: r.status === 202, data: data }; });
-      }).then(function (result) {
-        if (!result.ok) {
-          notice.textContent = "服务器拒绝了这次启动：" + (result.data.error || "未知原因");
-          return;
-        }
-        window.location.search = "?run=" + encodeURIComponent(result.data.run_id);
-      });
-    });
-    renderAll();
-    if (runId) {
-      var source = new EventSource("/api/runs/" + encodeURIComponent(runId) + "/events");
-      source.addEventListener("journal", function (msg) {
-        allEvents.push(JSON.parse(msg.data));
-        if (!playing) { revealed = allEvents.length; renderAll(); }
-      });
-      source.addEventListener("end", function () {
-        source.close();
-        revealed = allEvents.length;
-        renderAll();
-        fetch("/api/runs/" + encodeURIComponent(runId) + "/bars")
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (data.bars && data.bars.length) { bars = data.bars; renderAll(); }
-          });
-      });
     }
+    grid.append(place(cell, rowOf[turn.actor], column));
+  });
+  const left = holder.scrollLeft, top = holder.scrollTop;
+  fill(holder, events.length ? grid : el("div", { class: "muted", style: "padding:14px" }, "还没有事件。按“播放”逐条揭示。"));
+  holder.scrollLeft = left; holder.scrollTop = top;
+  const cards = holder.querySelectorAll(".cell .ev:not(.return)");
+  if (state.follow && cards.length) {              // 跟随：把最新一张卡片移到框的中间。只滚这个框，不动整页
+    const box = holder.getBoundingClientRect(), card = cards[cards.length - 1].getBoundingClientRect();
+    holder.scrollLeft += card.left + card.width / 2 - (box.left + box.width / 2);
+    holder.scrollTop += card.top + card.height / 2 - (box.top + box.height / 2);
   }
+}
 
-  function renderRunList() {
-    var body = document.getElementById("runlist-body");
-    fetch("/api/runs").then(function (r) { return r.json(); }).then(function (data) {
-      body.textContent = "";
-      if (!data.runs.length) { body.textContent = "（还没有运行）"; return; }
-      var table = document.createElement("table");
-      var head = document.createElement("tr");
-      ["时间", "代码", "分析日", "结果", "原因", ""].forEach(function (h) {
-        var th = document.createElement("th"); th.textContent = h; head.appendChild(th);
-      });
-      table.appendChild(head);
-      data.runs.forEach(function (r) {
-        var tr = document.createElement("tr");
-        [r.run_id.slice(0, 15), r.ticker, r.as_of, r.status, r.reason].forEach(function (v) {
-          var td = document.createElement("td"); td.textContent = v; tr.appendChild(td);
-        });
-        var link = document.createElement("td");
-        var a = document.createElement("a");
-        a.textContent = "查看";
-        a.addEventListener("click", function () {
-          window.location.search = "?run=" + encodeURIComponent(r.run_id);
-        });
-        link.appendChild(a); tr.appendChild(link);
-        table.appendChild(tr);
-      });
-      body.appendChild(table);
-    });
+/* ---------- 证据 ---------- */
+
+function renderEvidence(events) {
+  const board = fold(events), outcome = board["run/outcome"], kids = [el("h2", null, "证据")];
+  const analysis = board["technical/analysis"];
+  if (analysis && analysis.claims && analysis.claims.length) {
+    const facts = Object.fromEntries((board["ledger/facts"] || []).map((fact) => [fact.id, fact]));
+    kids.push(el("h3", null, "分析师引用的事实（数值取自事实账本，不取模型的转述）"),
+      table(["事实", "含义", "账本数值", "数据日", "分析师的解读"], analysis.claims.map((claim) => {
+        const fact = facts[claim.fact] || {};
+        return [el("span", { class: "mono" }, claim.fact), fact.label || "（账本中没有这个事实）",
+                withUnit(fact.value, fact.unit), fact.as_of || "—", claim.reading || ""];
+      }), [2]));
   }
+  const rules = board["audit/rules"];
+  if (rules && rules.length) {
+    const specs = Object.fromEntries((board["rules/limits"] || []).map((spec) => [spec.key, spec]));
+    const status = { pass: ["通过", "pass"], fail: ["不通过", "fail"], "n/a": ["不适用", "na"] };
+    kids.push(el("h3", null, "风控规则（计算值由代码算出）"),
+      table(["规则", "含义", "界限", "计算值", "结论"], rules.map((rule) => {
+        const [text, cls] = status[rule.status] || [rule.status, ""];
+        return [el("span", { class: "mono" }, rule.key), (specs[rule.key] || {}).desc || "",
+                num(rule.limit), num(rule.actual), el("span", { class: cls }, text)];
+      }), [2, 3]));
+  }
+  if (board["judges/status"]) {
+    const delivered = outcome && outcome.status === "delivered";
+    kids.push(el("h3", null, "评审（" + board["judges/status"] + "）"),
+      table(["评审", "结论", delivered ? "意见" : ""], JUDGES.map(([lens, name]) => {
+        const verdict = board["judge." + lens + "/verdict"];
+        if (!verdict) return [name, el("span", { class: "na" }, "未询问"), ""];
+        const target = verdict.target === "thesis" ? "（论点）" : verdict.target === "levels" ? "（价位与仓位）" : "";
+        return [name, el("span", { class: verdict.accept ? "pass" : "fail" }, (verdict.accept ? "接受" : "反对") + target),
+                delivered ? verdict.critique || "" : ""];
+      })));
+    if (outcome && !delivered) kids.push(el("p", { class: "note" }, "没有交付结论，评审意见的正文不在这里展示；点过程记录里评审的卡片可以看到。"));
+  }
+  if (kids.length === 1) kids.push(el("div", { class: "muted" }, "还没有证据。"));
+  fill($("evidence"), kids);
+}
 
-  boot();
+/* ---------- 用量 ---------- */
+
+function renderUsage(events) {
+  const { groups, total } = usage(events), kids = [el("h2", null, "用量与成本")];
+  if (!total.calls) { fill($("usage"), kids, el("div", { class: "muted" }, "还没有模型调用。")); return; }
+  const ceilings = (startedData() || {}).ceilings || {}, roleCaps = ceilings.roles || {};
+  const rows = [...groups].map(([key, row]) => [GROUP_NAME[key] || key, count(row.calls), count(row.requests),
+    count(row.input), count(row.output), count(row.input + row.output),
+    roleCaps[key] ? count(roleCaps[key]) : "—", costText(row)]);
+  const sum = ["合计", count(total.calls), count(total.requests), count(total.input), count(total.output),
+               count(total.input + total.output), ceilings.run_tokens ? count(ceilings.run_tokens) : "不设上限", costText(total)];
+  sum.cls = "total";
+  kids.push(table(["角色组", "调用", "请求", "输入 token", "输出 token", "token 合计", "token 上限", "成本"],
+                  [...rows, sum], [1, 2, 3, 4, 5, 6, 7]));
+  if (ceilings.run_tokens) {
+    const used = total.input + total.output, bar = el("i");
+    bar.style.width = Math.min(100, 100 * used / ceilings.run_tokens) + "%";
+    kids.push(el("div", { class: "meter" + (used > ceilings.run_tokens ? " over" : "") }, bar));
+  }
+  const notes = ["“请求”多于“调用”的部分是输出不合契约后的纠正重试。",
+                 "成本上限：" + (ceilings.run_cost ? num(ceilings.run_cost, 6) : "不设上限") + "。"];
+  const exceeded = events.find((e) => e.type === "budget.exceeded");
+  if (exceeded) notes.unshift("预算在第 " + exceeded.seq + " 条事件处超限（范围 " + exceeded.data.scope + "），此后不再发起模型调用。");
+  kids.push(el("p", { class: "note" }, notes.join(" ")));
+  fill($("usage"), kids);
+}
+
+/* ---------- 事件详情 ---------- */
+
+function openDetail(seq) { state.selected = seq; state.follow = false; render(); }
+function closeDetail() { state.selected = 0; render(); }
+
+function renderDetail() {
+  const box = $("detail"), e = state.events.find((event) => event.seq === state.selected);
+  box.hidden = !e;
+  if (!e) return;
+  const d = e.data, lane = LANES.find(([key]) => key === e.actor);
+  const pairs = [["事件", "#" + e.seq + " · " + e.type], ["执行者", (lane ? lane[1] : e.actor || "系统") + (e.step ? "（" + e.step + "）" : "")]];
+  if (e.ts) pairs.push(["时间", e.ts]);
+  if (e.caused_by && e.caused_by.length) pairs.push(["依据的事件", e.caused_by.map((seq) => "#" + seq).join(" ")]);
+  const kids = [el("button", { class: "ctl close", type: "button", on: { click: closeDetail } }, "关闭"),
+                el("h2", null, describe(e)[0])];
+  const json = (value) => el("pre", null, JSON.stringify(value, null, 2));
+
+  if (e.type === "model.called") {
+    pairs.push(["模型", d.model || "—"], ["请求次数", d.usage.requests + (d.usage.requests > 1 ? "（含纠正重试）" : "")],
+      ["token", "输入 " + count(d.usage.input_tokens) + "，输出 " + count(d.usage.output_tokens)],
+      ["成本", d.cost === null || d.cost === undefined ? "未定价" : num(d.cost, 6)]);
+    kids.push(el("dl", { class: "kv" }, pairs.map(([k, v]) => [el("dt", null, k), el("dd", null, v)])),
+      el("h3", null, "提示词：这个角色能看到的全部内容"), el("pre", null, d.prompt || ""),
+      el("h3", null, d.output === null ? "回复：纠正一次后仍不合契约，没有产物" : "回复：通过契约校验的输出"),
+      d.output === null ? null : json(d.output),
+      el("details", null, el("summary", null, "完整往来（模型库记录的每一条消息）"), json(d.messages)));
+  } else if (e.type === "gate.checked") {
+    pairs.push(["闸门", STAGE_NAME[d.gate] || d.gate], ["结论", d.findings ? "发现 " + d.findings + " 个问题" : "通过"]);
+    kids.push(el("dl", { class: "kv" }, pairs.map(([k, v]) => [el("dt", null, k), el("dd", null, v)])));
+    if (d.detail && d.detail.length) {
+      kids.push(el("ul", { class: "findings" }, d.detail.map((item) => el("li", null,
+        el("span", { class: "mono" }, "[" + item.check + "] " + (item.subject || "")),
+        item.owner ? "（修改人：" + (STAGE_NAME[item.owner] || item.owner) + "）" : "", el("br"), item.message || ""))));
+    }
+  } else if (e.type === "artifact.written") {
+    pairs.push(["黑板键", d.key], ["版本", "第 " + d.version + " 版"]);
+    kids.push(el("dl", { class: "kv" }, pairs.map(([k, v]) => [el("dt", null, k), el("dd", null, v)])), json(d.value));
+  } else {
+    if (e.type === "route") pairs.push(["重跑", "从" + (STAGE_NAME[d.to] || d.to) + "开始，以及它之后的每一段"], ["原因", d.why || ""]);
+    kids.push(el("dl", { class: "kv" }, pairs.map(([k, v]) => [el("dt", null, k), el("dd", null, v)])), json(d));
+  }
+  fill(box, kids);
+}
+
+/* ---------- 回放 ---------- */
+
+const complete = () => state.ended && state.shown >= state.events.length;
+
+function render() {
+  const events = view();
+  $("run").hidden = !(state.events.length || state.runId);
+  const banner = $("banner");
+  banner.hidden = !state.error;
+  banner.textContent = state.error ? "这次运行没有正常结束：" + state.error + "。这是程序的问题，不是分析结论。" : "";
+  renderHeader(); renderPipeline(events); renderResult(events); renderChart(events);
+  renderTimeline(events); renderEvidence(events); renderUsage(events); renderDetail();
+  $("btn-play").textContent = state.playing ? "暂停" : complete() ? "重新播放" : "播放";
+  $("btn-play").classList.toggle("on", state.playing);
+  for (const button of $("speeds").querySelectorAll("button")) button.classList.toggle("on", button.dataset.speed === state.speed);
+  $("slider").max = String(state.events.length);
+  $("slider").value = String(state.shown);
+  $("progress").textContent = state.shown + " / " + state.events.length + (state.ended ? "" : " …");
+}
+
+function schedule() {
+  clearTimeout(state.timer);
+  if (!state.playing) return;
+  if (state.speed === "instant") {                // 瞬间：到了就揭示
+    state.shown = state.events.length;
+    if (state.ended) state.playing = false;
+    render();
+    return;
+  }
+  state.timer = setTimeout(() => {
+    if (state.shown < state.events.length) state.shown += 1;
+    if (complete()) state.playing = false;
+    render();
+    schedule();
+  }, PACE[state.speed]);
+}
+
+function play() {
+  if (complete()) state.shown = 0;
+  state.playing = true; state.follow = true;
+  render(); schedule();
+}
+function pause() { state.playing = false; clearTimeout(state.timer); render(); }
+
+$("btn-play").addEventListener("click", () => (state.playing ? pause() : play()));
+$("btn-step").addEventListener("click", () => {
+  pause();
+  if (state.shown < state.events.length) { state.shown += 1; state.follow = true; render(); }
+});
+$("speeds").addEventListener("click", (ev) => {
+  const speed = ev.target.dataset && ev.target.dataset.speed;
+  if (!speed) return;
+  state.speed = speed;
+  if (speed === "instant" && !state.playing) { state.shown = state.events.length; state.follow = true; }
+  render(); schedule();
+});
+$("slider").addEventListener("input", (ev) => {
+  state.playing = false; clearTimeout(state.timer);
+  state.shown = Number(ev.target.value); state.follow = true;
+  render();
+});
+$("lanes").addEventListener("wheel", () => { state.follow = false; }, { passive: true });
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && state.selected) closeDetail(); });
+
+/* ---------- 实时模式：表单、过去的运行、事件流 ---------- */
+
+async function getJSON(path, options) {
+  const response = await fetch(path, options);
+  let data = null;
+  try { data = await response.json(); } catch (_) { data = null; }
+  return { status: response.status, data };
+}
+
+function resetRun(runId) {
+  if (state.source) state.source.close();
+  clearTimeout(state.timer);
+  Object.assign(state, { runId, events: [], shown: 0, ended: !runId, error: null, bars: null, currency: "",
+                         barsAsked: false, playing: false, source: null, selected: 0, follow: true });
+}
+
+function openRun(runId, watch) {
+  /* 打开一次运行并接上它的事件流。watch 为真时按阅读速度逐条揭示，否则到了就显示。 */
+  resetRun(runId);
+  const wanted = runId ? "?run=" + encodeURIComponent(runId) : window.location.pathname;
+  if (window.location.search !== (runId ? wanted : "")) window.history.pushState(null, "", wanted);
+  if (!runId) { $("history").open = true; render(); return; }
+  $("history").open = false;                        // 列表可能很长：看一次运行时收起来，别把运行挤到页面外
+  state.speed = watch ? "normal" : "instant";
+  state.follow = watch;                             // 看现场时跟着最新一栏走；翻看旧运行时从头看起
+  state.playing = true;
+  const source = new EventSource("/api/runs/" + encodeURIComponent(runId) + "/events");
+  state.source = source;
+  source.addEventListener("journal", (message) => {
+    const event = JSON.parse(message.data);
+    if (state.events.length && event.seq <= state.events[state.events.length - 1].seq) return;
+    state.events.push(event);
+    if (!state.barsAsked && event.type === "artifact.written" && event.data.key === "request/scope") loadBars(runId);
+    if (state.playing && state.speed === "instant") state.shown = state.events.length;
+    render();
+  });
+  source.addEventListener("end", (message) => {     // 收尾消息之后必须关闭，否则浏览器会重连一个已结束的运行
+    source.close();
+    state.ended = true;
+    state.error = JSON.parse(message.data).error;
+    if (state.playing && state.speed === "instant") { state.shown = state.events.length; state.playing = false; }
+    render();
+    loadHistory();
+  });
+  source.onerror = () => {
+    if (source.readyState !== EventSource.CLOSED || state.ended) return;      // 其余情况浏览器会自己重连
+    state.ended = true; state.playing = false;
+    state.error = state.events.length ? "与本地服务的连接中断" : "没有这个运行";
+    render();
+  };
+  render(); schedule();
+}
+
+async function loadBars(runId) {
+  state.barsAsked = true;
+  const { status, data } = await getJSON("/api/runs/" + encodeURIComponent(runId) + "/bars");
+  if (status !== 200 || state.runId !== runId || !data.bars.length) return;
+  state.bars = data.bars; state.currency = data.currency;
+  render();
+}
+
+async function loadHistory() {
+  const { status, data } = await getJSON("/api/runs");
+  const body = $("history-body");
+  if (status !== 200) { body.textContent = "读不到运行列表。"; return; }
+  if (!data.runs.length) { body.textContent = "还没有运行。"; return; }
+  const when = (id) => id.slice(0, 4) + "-" + id.slice(4, 6) + "-" + id.slice(6, 8) + " "
+    + id.slice(9, 11) + ":" + id.slice(11, 13) + ":" + id.slice(13, 15);
+  fill(body, table(["开始时间", "代码", "分析日", "模型", "结果", "原因", ""], data.runs.map((run) => [
+    when(run.run_id), run.ticker, run.as_of, MODE_TEXT[run.mode] || run.mode,
+    el("span", { class: run.status === "delivered" ? "pass" : run.status === "review" ? "fail" : "na" },
+       STATUS_TEXT[run.status] || run.status),
+    run.reason === "ok" ? "" : reasonText(run.reason),
+    el("button", { class: "linkish", type: "button", on: { click: () => { openRun(run.run_id, false); window.scrollTo(0, 0); } } }, "查看")])));
+}
+
+function applyScenario() {
+  const name = $("f-scenario").value;
+  const scenario = state.meta.scenarios.find((s) => s.name === name);
+  const note = $("scenario-note");
+  note.hidden = !scenario;
+  for (const id of ["f-judges", "f-rounds"]) $(id).disabled = Boolean(scenario);   // 场景自带流程配置
+  if (!scenario) return;
+  $("f-ticker").value = scenario.ticker;
+  $("f-date").value = scenario.as_of;
+  note.textContent = "场景 " + scenario.name + "：" + scenario.about + " 评审与辩论轮数用场景自己的配置。";
+}
+
+async function submitForm(ev) {
+  ev.preventDefault();
+  const error = $("form-error");
+  error.hidden = true;
+  const body = {}, scenario = $("f-scenario").value, ticker = $("f-ticker").value.trim(), day = $("f-date").value;
+  if (scenario) body.scenario = scenario;
+  if (ticker) body.ticker = ticker;
+  if (day) body.as_of = day;
+  if (!scenario) {
+    body.judges = $("f-judges").checked;
+    if ($("f-rounds").value !== "") body.debate_rounds = Number($("f-rounds").value);
+  }
+  const { status, data } = await getJSON("/api/runs", { method: "POST", headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify(body) });
+  if (status === 202) { openRun(data.run_id, true); return; }
+  error.hidden = false;
+  fill(error, "没有开始：" + ((data && data.error) || "请求不合格式（HTTP " + status + "）") + "。",
+    data && data.active_run ? el("button", { class: "linkish", type: "button",
+      on: { click: () => openRun(data.active_run, false) } }, "查看正在进行的运行") : null);
+}
+
+async function startLive() {
+  state.live = true;
+  $("launch").hidden = false;
+  const { status, data } = await getJSON("/api/meta");
+  if (status !== 200) { $("mode-note").textContent = "读不到本地服务的信息。"; return; }
+  state.meta = data;
+  const scripted = data.mode !== "model";
+  fill($("f-scenario"), el("option", { value: "" }, scripted ? "（不用场景）" : "（不用场景，调用真实模型）"),
+    data.scenarios.map((s) => el("option", { value: s.name }, s.name + " · " + s.ticker + " @ " + s.as_of)));
+  fill($("tickers"), data.instruments.map((i) => el("option", { value: i.ticker }, i.name)));
+  $("f-judges").checked = data.defaults.judges;
+  $("f-rounds").value = data.defaults.debate_rounds;
+  $("mode-note").textContent = scripted
+    ? "当前没有可用的真实模型，回复来自预先编写的场景。不选场景时，只有被准入拒绝的请求（例如 THIN、STALE）能走完，其余会在第一次模型调用处以 REVIEW 结束。"
+    : "真实模型：quick = " + data.models.quick + "，deep = " + data.models.deep + "。每次运行都会调用模型并产生费用。";
+  if (scripted && data.scenarios.some((s) => s.name === "demo")) $("f-scenario").value = "demo";
+  applyScenario();
+  $("f-scenario").addEventListener("change", applyScenario);
+  $("form").addEventListener("submit", submitForm);
+  window.addEventListener("popstate", () => openRun(new URLSearchParams(window.location.search).get("run") || "", false));
+  loadHistory();
+  const runId = new URLSearchParams(window.location.search).get("run") || "";
+  if (runId) openRun(runId, false); else { $("history").open = true; render(); }
+}
+
+/* ---------- 入口：静态内嵌，或实时 ---------- */
+
+const embedded = JSON.parse($("embedded").textContent);
+if (embedded) {
+  state.events = embedded.events;
+  state.bars = embedded.bars;
+  state.shown = state.events.length;              // 打开就是最终状态；按"重新播放"从头看一遍
+  state.speed = "normal";
+  state.follow = false;
+  render();
+} else {
+  startLive();
+}
 })();
 </script>
 </body>
