@@ -1,26 +1,30 @@
-"""时点评测（蓝图 12.3 的 `pit`）：加新 K 线不改变任何事实，也没有事实晚于分析日。
+"""时点评测（蓝图 12.3 的 `pit`，18.13 加了证据通道块）。
 
-对 ACME、0000.HK、GAPPY 三个标的，各在自己的序列上均匀取 6 个分析日（含首末两个
-交易日）：在同一点上，history(as_of) 建出的账本与把整段序列手工掐到 as_of 的账本，
-事实集合必须相同，事实取值必须完全相等（两份输入逐根相同，浮点直接 ==，不走容差）；
-同时两条账本里每条事实的 as_of 都不得晚于分析日。任何一处违规退出码 1，
-一处违规都没有才退出 0。
+行情块：加新 K 线不改变任何事实，也没有事实晚于分析日。
+通道块（18.13）：加更晚的申报与更晚的公告，不改变任何更早日期的基本面事实与条目列表；
+没有基本面事实的申报日晚于分析日，也没有条目发布晚于分析日。
+任何一处违规退出码 1，一处违规都没有才退出 0。
 """
 from __future__ import annotations
 
+import dataclasses
 import datetime
 from pathlib import Path
 
-from ..adapters.declarations import load_indicators
+from ..adapters.declarations import load_fundamentals, load_indicators
+from ..adapters.disclosures_json import JsonDisclosures
 from ..adapters.market_csv import CsvMarket
+from ..adapters.statements_json import JsonStatements
+from ..domain.fundamentals_ledger import build_fundamentals
 from ..domain.ledger import build_ledger
-from ..domain.market import Bar
+from ..domain.market import Bar, NotCovered
 from ..domain.types import Fact
 
 _UNIVERSE = "synthetic"
 _FAR_FUTURE = datetime.date(2099, 1, 1)   # 取整段序列用：晚于任何数据日期
 _TICKERS = ("ACME", "0000.HK", "GAPPY")   # 蓝图点名的三个标的
 _DATES = 6                                # 每个标的的分析日个数（含首末两个交易日）
+_WINDOW_DAYS = 90                         # 公告块的窗口长度，与运行的默认设置一致
 
 
 def _analysis_dates(full: tuple[Bar, ...]) -> list[datetime.date]:
@@ -74,7 +78,68 @@ def main(root: Path) -> int:
     verdict = ("加新 K 线不改变任何事实，也没有事实晚于分析日" if not problems
                else f"{len(problems)} 处违规")
     print(f"时点评测：{points} 个数据点，比对 {compared} 项事实：{verdict}")
+    _channel_block(root, market, problems)
     return 0 if not problems else 1
+
+
+def _channel_block(root: Path, market: CsvMarket, problems: list[str]) -> int:
+    """通道块（18.13）：更晚的申报与更晚的公告，不改变更早日期的基本面事实与条目列表。
+
+    无年报数据的标的（端口以 NotCovered 回答）自然不贡献点。
+    """
+    specs = load_fundamentals(root / "data" / "fundamentals.toml")
+    statements = JsonStatements(root / "data" / "market", _UNIVERSE)
+    disclosures = JsonDisclosures(root / "data" / "market", _UNIVERSE)
+    points = 0
+    for ticker in _TICKERS:
+        instrument = market.instrument(ticker)
+        full = market.history(ticker, _FAR_FUTURE)
+        for as_of in _analysis_dates(full):
+            close = market.history(ticker, as_of)[-1].close
+            point = as_of.isoformat()
+            try:
+                ss = statements.statements(ticker, as_of)
+                later = statements.statements(ticker, full[-1].date)
+            except NotCovered:                          # 没有年报数据：跳过基本面部分
+                pass
+            else:
+                later_cut = dataclasses.replace(
+                    later, rows=tuple(row for row in later.rows if row.filed <= as_of))
+                facts_now = build_fundamentals(instrument, ss, close, as_of, as_of, specs)[0]
+                now = {f.id: f.value for f in facts_now}
+                later_facts = {f.id: f.value for f in build_fundamentals(
+                    instrument, later_cut, close, as_of, as_of, specs)[0]}
+                points += 1
+                if tuple(now) != tuple(later_facts):
+                    problems.append(f"{ticker} 基本面 @ {point}：加入更晚的申报后事实集合改变")
+                else:
+                    for fact_id, value in now.items():
+                        if value != later_facts[fact_id]:
+                            problems.append(f"{ticker} 基本面 @ {point}：加入更晚的申报后"
+                                            f"事实 {fact_id} 的取值改变")
+                for fact in facts_now:
+                    if datetime.date.fromisoformat(fact.as_of) > as_of:
+                        problems.append(f"{ticker} 基本面 @ {point}：事实 {fact.id} 的 as_of"
+                                        f" {fact.as_of} 晚于分析日")
+            try:
+                window = disclosures.published(ticker, as_of - datetime.timedelta(days=_WINDOW_DAYS),
+                                               as_of)
+                later_items = disclosures.published(
+                    ticker, as_of - datetime.timedelta(days=_WINDOW_DAYS), full[-1].date)
+                later_cut_items = tuple(p for p in later_items.items if p.published <= as_of)
+            except NotCovered:
+                continue
+            points += 1
+            if tuple(window.items) != later_cut_items:
+                problems.append(f"{ticker} 公告 @ {point}：加入更晚的公告后窗口条目列表改变")
+    for line in problems:
+        if "基本面 @" in line or "公告 @" in line:
+            print(f"违规：{line}")
+    bad = [p for p in problems if "基本面 @" in p or "公告 @" in p]
+    verdict = ("加更晚的申报与公告不改变任何更早日期的事实或条目，也没有事实晚于分析日"
+               if not bad else f"{len(bad)} 处违规")
+    print(f"证据通道时点评测：{points} 个数据点：{verdict}")
+    return points
 
 
 if __name__ == "__main__":

@@ -1,0 +1,174 @@
+{
+  "name": "uncovered",
+  "about": "0000.HK：基本面通道没有数据文件（不可用，不调用分析师），公告通道可用；报告说明两者。",
+  "request": {
+    "ticker": "0000.HK",
+    "as_of": "2026-09-30"
+  },
+  "replies": {
+    "technical": [
+      {
+        "claims": [
+          {
+            "fact": "close",
+            "value": 39.61,
+            "reading": "收盘价位于主要均线之下，趋势偏弱"
+          },
+          {
+            "fact": "atr_14",
+            "value": 0.744485,
+            "reading": "日均真实波幅约 0.74 港元，波动不大"
+          },
+          {
+            "fact": "rsi_14",
+            "value": 39.1504,
+            "reading": "相对强弱 39.2，动能偏弱"
+          },
+          {
+            "fact": "sma_20",
+            "value": 40.813,
+            "reading": "价格低于 20 日均线，短期结构偏空"
+          }
+        ],
+        "narrative": "价格低于 20/50/200 日均线，RSI 偏弱，动能为负。波动不大。总体读数偏弱，但没有加速下跌的迹象。"
+      }
+    ],
+    "disclosures": [
+      {
+        "signals": [
+          {
+            "item": "D1",
+            "direction": "neutral",
+            "reading": "中期业绩属于常规披露，标题本身不给出方向"
+          }
+        ],
+        "stance": "neutral",
+        "confidence": "low",
+        "narrative": "窗口内只有一份中期业绩公告，属于常规披露，信息披露面对方向没有增量信息。"
+      }
+    ],
+    "bull": [
+      {
+        "points": [
+          {
+            "text": "回撤已深：价格接近 60 日与 252 日低点，继续下行空间可能有限",
+            "cites": [
+              "low_60",
+              "low_252"
+            ]
+          }
+        ],
+        "rebuttal": "空方指出的弱势是事实，但深回撤本身构成反弹的条件。"
+      }
+    ],
+    "bear": [
+      {
+        "points": [
+          {
+            "text": "价格低于全部主要均线，趋势仍向下",
+            "cites": [
+              "close",
+              "sma_20"
+            ]
+          },
+          {
+            "text": "RSI 偏弱且 MACD 为负，动能未见反转",
+            "cites": [
+              "rsi_14",
+              "macd_hist"
+            ]
+          }
+        ],
+        "rebuttal": "低点不是买入理由；没有基本面或公告支撑时，弱势会延续。"
+      }
+    ],
+    "manager": [
+      {
+        "rating": "Hold",
+        "horizon_days": 20,
+        "points": [
+          {
+            "text": "趋势与动能偏弱，但已接近区间低点，追空与做多依据都不足",
+            "cites": [
+              "close",
+              "rsi_14"
+            ]
+          },
+          {
+            "text": "窗口内只有常规中期业绩公告，信息披露面没有增量",
+            "cites": [
+              "D1"
+            ]
+          }
+        ],
+        "invalidation": [
+          "收盘站上 20 日均线",
+          "出现方向性公告或业绩指引"
+        ],
+        "summary": "技术面偏弱而公告面平静，证据不足以给出方向，持有观望。"
+      }
+    ],
+    "trader": [
+      {
+        "action": "Hold",
+        "entry": null,
+        "stop": null,
+        "target": null,
+        "size_pct": 0.0,
+        "horizon_days": 20,
+        "cites": [],
+        "rationale": "评级为 Hold，不动。"
+      }
+    ],
+    "judge.evidence": [
+      {
+        "accept": true,
+        "target": "none",
+        "critique": "引用与账本一致；基本面通道不可用不作为证据。",
+        "cites": []
+      }
+    ],
+    "judge.conservative": [
+      {
+        "accept": true,
+        "target": "none",
+        "critique": "Hold 方案无价位无仓位，无需风控检查。",
+        "cites": []
+      }
+    ]
+  },
+  "config": {
+    "flow": {
+      "debate_rounds": 1,
+      "audit": "on",
+      "judges": true,
+      "audit_rounds": 3,
+      "judge_rounds": 2,
+      "quorum": 2,
+      "channels": [
+        "fundamentals",
+        "disclosures"
+      ]
+    },
+    "budget": {
+      "run_tokens": 0,
+      "roles": {}
+    }
+  },
+  "expect": {
+    "status": "delivered",
+    "reason": "ok",
+    "facts_and_rules": "verified",
+    "judgment": "accepted 2/3",
+    "calls": [
+      "technical",
+      "disclosures",
+      "bull",
+      "bear",
+      "manager",
+      "trader",
+      "judge.evidence",
+      "judge.conservative"
+    ]
+  }
+}

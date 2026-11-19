@@ -123,6 +123,22 @@ def test_channel_analysts_read_only_their_own_evidence():
                 "technical/analysis"} & set(DISCLOSURES.reads), "公告分析师不看任何事实与别人的输出"
 
 
+def test_the_views_that_grew_with_channels():
+    """WP16 长出来的视图（18.9 的表）：研究员与主管读两个通道的分析，评审另读原始证据；
+    技术分析师与交易员一个通道键都不读。"""
+    from insightcrew.roles import BEAR, BULL, JUDGES, MANAGER, TECHNICAL, TRADER
+    brief = {"fundamentals/status", "fundamentals/analysis",
+             "disclosures/status", "disclosures/analysis"}
+    for role in (BULL, BEAR, MANAGER):
+        assert brief <= set(role.reads), f"{role.name} 要能看到两个通道的分析与状态"
+    for judge in JUDGES:
+        assert brief | {"fundamentals/facts", "disclosures/items"} <= set(judge.reads)
+        assert not {"bull/argument", "bear/argument"} & set(judge.reads), "评审仍然不看辩论"
+    for role in (TECHNICAL, TRADER):
+        assert not any(key.startswith(("fundamentals/", "disclosures/")) for key in role.reads), \
+            f"{role.name} 不读任何通道键（18.9）"
+
+
 def test_every_contract_is_frozen_and_closed():
     from insightcrew.domain import types
     from insightcrew.roles import ALL

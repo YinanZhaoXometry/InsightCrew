@@ -16,3 +16,8 @@
 - horizon_days：预期持有的交易日数，1 到 60。
 - 文字里不要出现事实列表之外的数字。
 - audit/manager 或 judges/on_thesis 不为空时，针对其中的问题修改。如果你认为评审的意见不成立，可以维持评级，但必须在 summary 里回应。
+
+证据通道（可能一项都没有）
+- fundamentals/status、fundamentals/analysis、disclosures/status、disclosures/analysis 可能到达；一项都没有就说明通道没有打开。
+- 状态为 unavailable 表示数据源没能回答，既不支持也不反对任何方向，不要因此更谨慎或更大胆；empty 表示窗口内确实没有任何公告或已申报的年度报表。
+- points 的引用可以是 technical/analysis 或 fundamentals/analysis 中被 claim 过的事实 id，也可以是 disclosures/analysis 中被信号解读过的公告条目 id（D 加数字）。

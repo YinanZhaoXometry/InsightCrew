@@ -16,12 +16,27 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import NamedTuple
 
-from ..adapters.declarations import load_indicators, load_rules
+from ..adapters.declarations import load_fundamentals, load_indicators, load_rules
 from ..adapters.market_csv import CsvMarket
 from ..domain import rules
 from ..domain.audit import audit
+from ..domain.fundamentals_ledger import build_fundamentals
 from ..domain.ledger import build_ledger
-from ..domain.types import Action, Analysis, Claim, Fact, Finding, Point, Proposal, Rating, RuleSpec, Thesis
+from ..domain.types import (
+    Action,
+    Analysis,
+    Claim,
+    DisclosureAnalysis,
+    Fact,
+    Finding,
+    Item,
+    Point,
+    Proposal,
+    Rating,
+    RuleSpec,
+    Signal,
+    Thesis,
+)
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
 _TICKER = "ACME"
@@ -256,7 +271,118 @@ def main() -> int:
 
     print(f"结论：故障 {len(mutations) - misses}/{len(mutations)} 被发现；"
           f"有效变体 {false_alarms}/{len(variants)} 误报")
-    return 0 if misses == 0 and false_alarms == 0 else 1
+    channel_ok = _channels_block(facts, values, specs)
+    return 0 if misses == 0 and false_alarms == 0 and channel_ok else 1
+
+
+# ---- 证据通道的第二块（BLUEPRINT 18.13）：双通道在场的注入与有效变体 ----
+
+
+def _channels_block(facts: list[Fact], values: dict[str, float],
+                    specs: tuple[RuleSpec, ...]) -> bool:
+    """两条通道都在场时，对 18.13 列出的六个故障与两个有效变体检审计。
+
+    基本面事实取真实的 ACME 年报（2026-09-30，重述后口径）；公告取窗口内三条中的前两条
+    作为信号（第三条在条目列表里但没有信号解读，专供论点引用检查使用）。
+    """
+    from ..adapters.disclosures_json import JsonDisclosures
+    from ..adapters.statements_json import JsonStatements
+
+    statements = JsonStatements(_ROOT / "data" / "market", "synthetic").statements(_TICKER, _AS_OF)
+    fund_facts, _card = build_fundamentals(
+        CsvMarket(_ROOT / "data" / "market", "synthetic").instrument(_TICKER),
+        statements, values["close"], _AS_OF, _AS_OF,
+        load_fundamentals(_ROOT / "data" / "fundamentals.toml"))
+    fund_values = {f.id: f.value for f in fund_facts}
+    fund_analysis = Analysis(claims=tuple(
+        Claim(fact=fact_id, value=fund_values[fact_id], reading=reading)
+        for fact_id, reading in (
+            ("revenue_fy", "重述后的最近财年收入过十亿美元，体量继续扩大"),
+            ("net_income_fy", "净利润保持增长，盈利质量一般"),
+            ("net_margin_pct", "净利率略高于百分之八"),
+        )), narrative="收入与利润都保持增长，年报经过一次重述，所用为最新口径。")
+
+    published = JsonDisclosures(_ROOT / "data" / "market", "synthetic").published(
+        _TICKER, _AS_OF - datetime.timedelta(days=90), _AS_OF)
+    ordered = sorted(published.items, key=lambda p: (-p.published.toordinal(), p.ref))
+    items = [Item(id=f"D{i}", published=p.published.isoformat(), source=published.source,
+                  kind=p.kind, title=p.title, ref=p.ref)
+             for i, p in enumerate(ordered, start=1)]
+    disclosure = DisclosureAnalysis(signals=(
+        Signal(item="D1", direction="positive", reading="回购通常被视为管理层认为股价偏低"),
+        Signal(item="D2", direction="negative", reading="年报更正下调收入与净利润，披露质量扣分"),
+    ), stance="mixed", confidence="medium", narrative="回购偏正面、更正偏负面。")
+
+    def evaluate(analysis: Analysis, thesis: Thesis, proposal: Proposal,
+                 fund: Analysis | None = None, disc: DisclosureAnalysis | None = None) -> list[Finding]:
+        rule_results = rules.evaluate(proposal, thesis, values, specs)
+        return audit(facts, analysis, thesis, proposal, rule_results,
+                     fundamentals=(fund_facts, fund or fund_analysis),
+                     disclosures=(items, disc or disclosure))
+
+    base_case = _build_case(values)
+    baseline = evaluate(base_case.analysis, base_case.thesis, base_case.proposal)
+    print("证据通道注入（基本面与公告都在场，基线案例应无任何发现）")
+    if baseline:
+        print(f"  基线案例不干净（{_checks(baseline)}）：先修案例再谈注入")
+        return False
+
+    # 六个故障（18.13）：一次只动一处。
+    bad_claim_value = fund_analysis.model_copy(update={"claims": tuple(
+        c.model_copy(update={"value": fund_values["revenue_fy"] * 1.03}) if c.fact == "revenue_fy" else c
+        for c in fund_analysis.claims)})
+    bad_claim_cite = fund_analysis.model_copy(update={"claims": tuple(
+        c.model_copy(update={"fact": "revenue_ttm"}) if c.fact == "revenue_fy" else c
+        for c in fund_analysis.claims)})
+    ghost = disclosure.model_copy(update={"signals": (
+        Signal(item="D1", direction="positive", reading="回购偏正面"),
+        Signal(item="D99", direction="negative", reading="引用了不存在的条目"),
+    )})
+    no_signals = disclosure.model_copy(update={"signals": ()})
+    point_citing_uncited_item = base_case.thesis.model_copy(update={"points": (
+        Point(text="刚发布的回购计划显示管理层信心", cites=("D3",)),)})
+    point_citing_uncited_fact = base_case.thesis.model_copy(update={"points": (
+        Point(text="每股收益创新高", cites=("eps_diluted_fy",)),)})
+
+    rows: list[tuple[str, str, list[Finding]]] = [
+        ("基本面 claim 的数值放大 3%", "claim_value_matches_fact",
+         evaluate(base_case.analysis, base_case.thesis, base_case.proposal, fund=bad_claim_value)),
+        ("基本面 claim 引用 revenue_ttm", "claim_cites_known_fact",
+         evaluate(base_case.analysis, base_case.thesis, base_case.proposal, fund=bad_claim_cite)),
+        ("信号引用不存在的 D99", "signal_cites_known_item",
+         evaluate(base_case.analysis, base_case.thesis, base_case.proposal, disc=ghost)),
+        ("信号全部删除", "disclosures_has_signals",
+         evaluate(base_case.analysis, base_case.thesis, base_case.proposal, disc=no_signals)),
+        ("论点引用没有信号解读的条目 D3", "point_cites_claimed_fact",
+         evaluate(base_case.analysis, point_citing_uncited_item, base_case.proposal)),
+        ("论点引用没有 claim 的基本面事实", "point_cites_claimed_fact",
+         evaluate(base_case.analysis, point_citing_uncited_fact, base_case.proposal)),
+    ]
+    misses = 0
+    for i, (label, check, findings) in enumerate(rows, start=1):
+        found = any(f.check == check for f in findings)
+        misses += not found
+        verdict = "发现" if found else f"漏报（实际触发：{_checks(findings) or '无'}）"
+        print(f"  {i:>2}  {label:<24} {check:<26} {verdict}")
+
+    valid_item = base_case.thesis.model_copy(update={"points": (
+        Point(text="回购计划公告支撑管理层信心", cites=("D1",)),)})
+    valid_fact = base_case.thesis.model_copy(update={"points": (
+        Point(text="收入保持两位数增长", cites=("revenue_fy",)),)})
+    variants: list[tuple[str, list[Finding]]] = [
+        ("论点只引用被信号解读的条目", evaluate(base_case.analysis, valid_item, base_case.proposal)),
+        ("论点只引用被 claim 的基本面事实", evaluate(base_case.analysis, valid_fact, base_case.proposal)),
+    ]
+    false_alarms = 0
+    for i, (label, findings) in enumerate(variants, start=1):
+        clean = not findings
+        false_alarms += not clean
+        verdict = "无发现" if clean else f"误报（{_checks(findings)}）"
+        print(f"  {i:>2}  {label:<24} {'':<26} {verdict}")
+
+    print(f"结论：证据通道故障 {len(rows) - misses}/{len(rows)} 被发现；"
+          f"有效变体 {false_alarms}/{len(variants)} 误报")
+    return misses == 0 and false_alarms == 0
 
 
 if __name__ == "__main__":

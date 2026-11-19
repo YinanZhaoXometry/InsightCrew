@@ -11,20 +11,31 @@ findings 是问题的条数，detail 是每个问题的 {check, subject, message
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Literal
 
 from ..domain import rules as rulebook
 from ..domain import symbols
 from ..domain.audit import audit as audit_numbers
+from ..domain.fundamentals_ledger import build_fundamentals, recompute_fundamentals
 from ..domain.ledger import build_ledger, disagreements, recompute_ledger
-from ..domain.market import Bar, Instrument, InvalidTicker, NoData, SourceUnavailable, UnknownTicker
+from ..domain.market import (
+    Bar,
+    Instrument,
+    InvalidTicker,
+    NoData,
+    NotCovered,
+    SourceUnavailable,
+    UnknownTicker,
+)
 from ..domain.types import (
     Analysis,
     AnalysisSeq,
     AuditStatus,
     ChannelStatus,
+    DataCard,
     DisclosureAnalysis,
+    DisclosureCard,
     Fact,
     Finding,
     Item,
@@ -37,7 +48,7 @@ from .deps import Deps
 
 _INTAKE_RULES = ("data_fresh", "min_history")
 _OWNERS = ("technical", "fundamentals", "disclosures", "manager", "trader")
-_CHANNELS = ("fundamentals", "disclosures")
+_CHANNELS: tuple[Literal["fundamentals", "disclosures"], ...] = ("fundamentals", "disclosures")
 
 
 def _gate(run: Run, gate: str, detail: list[dict[str, Any]]) -> None:
@@ -144,16 +155,101 @@ def ledger(run: Run, deps: Deps) -> None:
 
 
 def evidence(run: Run, deps: Deps, channels: tuple[Literal["fundamentals", "disclosures"], ...]) -> None:
-    """证据阶段。读取每个被点名的通道，写它的键，最后记一条 gate.checked（gate = "evidence"）。
+    """证据阶段。按 fundamentals、disclosures 的固定顺序读取每个被点名的通道，
+    写它的键，最后记一条 gate.checked（gate = "evidence"）。
 
-    WP13 的存根：还没有任何数据源接线（Deps.statements/disclosures 为 None，读取器也未建），
-    所以本包里被点名的通道一律记为不可用，此外不写任何键。WP16 接入真实的读取与两条路径。
+    通道读不到绝不停下运行（BLUEPRINT 决策 35）：不可用就写明原因，继续；
+    唯一的例外是基本面两条计算路径的分歧——那是代码的 bug，停机核对。
     """
-    for channel in channels:
-        run.board.put(f"{channel}/status",
-                      ChannelStatus(channel=channel, state="unavailable", reason="尚未接入数据源"),
-                      by="evidence")
+    scope = run.board.get("request/scope", Scope)
+    as_of = date.fromisoformat(scope.as_of)
+    instrument = run.board.get("ledger/instrument", Instrument)
+    card = run.board.get("ledger/card", DataCard)
+    ledger = {f.id: f for f in run.board.get("ledger/facts", list[Fact])}
+
+    for channel in _CHANNELS:                       # 固定顺序，与 channels 里的书写顺序无关
+        if channel not in channels:
+            continue
+        if channel == "fundamentals":
+            close = ledger["close"].value if "close" in ledger else None
+            close_date = date.fromisoformat(card.last_bar)
+            _fundamentals(run, deps, scope.ticker, instrument, close, close_date, as_of)
+        else:
+            _disclosures(run, deps, scope.ticker, as_of)
     _gate(run, "evidence", [])
+
+
+def _fundamentals(run: Run, deps: Deps, ticker: str, instrument: Instrument,
+                  close: float | None, close_date: date, as_of: date) -> None:
+    if deps.statements is None or not deps.fundamentals or close is None:
+        _channel_off(run, "fundamentals", "尚未接入年报数据源")
+        return
+    try:
+        ss = deps.statements.statements(ticker, as_of)
+    except (NotCovered, SourceUnavailable) as e:
+        _channel_off(run, "fundamentals", str(e))
+        return
+    if not ss.rows:
+        run.board.put("fundamentals/status",
+                      ChannelStatus(channel="fundamentals", state="empty",
+                                    reason="数据源已回答，分析日之前没有任何已申报的年度报表"),
+                      by="evidence")
+        return
+    facts, card = build_fundamentals(instrument, ss, close, close_date, as_of, deps.fundamentals)
+    if not facts:                                   # 有申报但一条事实也算不出（例如缺申报概念）
+        run.board.put("fundamentals/status",
+                      ChannelStatus(channel="fundamentals", state="empty",
+                                    reason="已申报的年度报表算不出任何基本面事实"),
+                      by="evidence")
+        return
+    # 申报货币与标的货币不同时，价格类声明（pe_fy）不参与复算：路径 1 本就不产出它
+    # （HANDOFF 问题 9 的答案），路径 2 也收到剔除后的声明，两条路径才能对上。
+    specs = deps.fundamentals
+    if ss.currency != instrument.currency:
+        specs = tuple(s for s in specs if s.fn != "price_multiple")
+    differing = disagreements(facts, recompute_fundamentals(ss, close, as_of, specs))
+    if differing:
+        _gate(run, "evidence", [{"check": "ledger_inconsistent", "subject": fact_id,
+                                 "message": "两条基本面计算路径给出的结果不一致"}
+                                for fact_id in differing])
+        raise Halt("ledger_inconsistent", "、".join(f"fundamentals/{f}" for f in differing))
+    run.board.put("fundamentals/facts", facts, by="evidence")
+    run.board.put("fundamentals/card", card, by="evidence")
+    run.board.put("fundamentals/status",
+                  ChannelStatus(channel="fundamentals", state="available", reason=""), by="evidence")
+
+
+def _disclosures(run: Run, deps: Deps, ticker: str, as_of: date) -> None:
+    if deps.disclosures is None:
+        _channel_off(run, "disclosures", "尚未接入公告数据源")
+        return
+    start = as_of - timedelta(days=deps.disclosure_window_days)
+    try:
+        ds = deps.disclosures.published(ticker, start, as_of)
+    except (NotCovered, SourceUnavailable) as e:
+        _channel_off(run, "disclosures", str(e))
+        return
+    ordered = sorted(ds.items, key=lambda p: (-p.published.toordinal(), p.ref))
+    kept = ordered[:deps.disclosure_max_items]
+    items = [Item(id=f"D{i}", published=p.published.isoformat(), source=ds.source,
+                  kind=p.kind, title=p.title, ref=p.ref)
+             for i, p in enumerate(kept, start=1)]
+    run.board.put("disclosures/items", items, by="evidence")
+    run.board.put("disclosures/card", DisclosureCard(
+        source=ds.source, window_from=start.isoformat(), window_to=as_of.isoformat(),
+        items=len(items), dropped=ds.dropped,
+        truncated=max(0, len(ordered) - len(kept))), by="evidence")
+    run.board.put("disclosures/status",
+                  ChannelStatus(channel="disclosures", state="available" if items else "empty",
+                                reason="" if items else
+                                f"窗口 {start.isoformat()} 到 {as_of.isoformat()} 内没有公告"),
+                  by="evidence")
+
+
+def _channel_off(run: Run, channel: Literal["fundamentals", "disclosures"], reason: str) -> None:
+    """通道不可用：只写状态与原因，此外一个键都不写（18.8）。"""
+    run.board.put(f"{channel}/status",
+                  ChannelStatus(channel=channel, state="unavailable", reason=reason), by="evidence")
 
 
 def channel_ready(run: Run, channel: str) -> bool:

@@ -229,3 +229,78 @@ def test_timestamp_is_not_used() -> None:
     """报告渲染不读时钟：同一份事件，换个时间戳渲染出同样的文字。"""
     late = [e.model_copy(update={"ts": "2099-01-01T00:00:00Z"}) for e in _rework_events()]
     assert render(_delivered(), _rework_events()) == render(_delivered(), late)
+
+
+# ---- 证据通道（BLUEPRINT 18.11）：三态、两个新节、标题只取条目列表 ----
+
+
+def _channels_on(snapshot: dict) -> dict:
+    """在快照里加上两条通道的键（数值来自 ACME 2026-09-30 的真实读取）。"""
+    return {**snapshot,
+            "fundamentals/status": {"channel": "fundamentals", "state": "available", "reason": ""},
+            "fundamentals/facts": [
+                {"id": "revenue_fy", "label": "营业收入（最近财年，截至 2025-12-31）", "value": 1081.0,
+                 "unit": "USD million", "as_of": "2026-08-14", "source": "fundamentals.latest", "bars_used": 0}],
+            "fundamentals/card": {"source": "合成数据", "currency": "USD", "fiscal_year_end": "2025-12-31",
+                                  "filed": "2026-08-14", "rows": 21, "unavailable": (), "warnings": (
+                                      "revenue 的 2025-12-31 财年被申报过 2 次（2026-02-19、2026-08-14）",)},
+            "fundamentals/analysis": {"claims": (
+                {"fact": "revenue_fy", "value": 1081.0, "reading": "重述后收入过十亿美元"},),
+                "narrative": "增长稳健。"},
+            "disclosures/status": {"channel": "disclosures", "state": "available", "reason": ""},
+            "disclosures/items": [
+                {"id": "D1", "published": "2026-09-22", "source": "合成数据", "kind": "股份回购",
+                 "title": "董事会批准股份回购计划", "ref": "ACME-0011"}],
+            "disclosures/card": {"source": "合成数据", "window_from": "2026-07-02", "window_to": "2026-09-30",
+                                 "items": 1, "dropped": 1, "truncated": 0},
+            "disclosures/analysis": {"signals": (
+                {"item": "D1", "direction": "positive", "reading": "回购显示管理层信心"},),
+                "stance": "positive", "confidence": "medium", "narrative": "窗口内一条公告。"}}
+
+
+def test_a_run_without_channels_renders_no_channel_section() -> None:
+    """不变式 17：通道没开时，报告不出现任何通道的节或数据质量行（与 2.0 相同）。"""
+    text = render(_delivered(), _started_events := [])
+    assert "基本面事实" not in text and "公告条目" not in text
+    assert "基本面通道" not in text and "公告通道" not in text
+
+
+def test_channel_sections_appear_when_the_keys_are_on_the_board() -> None:
+    text = render(_channels_on(_delivered()))
+    assert "## 基本面事实" in text and "## 公告条目（来源原文，未经核验）" in text
+    assert "1081" in text and "USD million" in text
+    assert "重述" in text                                     # 数据卡的重述提醒进报告
+
+
+def test_item_titles_come_from_the_item_list_not_the_model() -> None:
+    """不变式 3：标题只从 disclosures/items 取，模型的输出里即使有标题也不进表格。"""
+    snapshot = _channels_on(_delivered())
+    snapshot["disclosures/analysis"] = {"signals": (
+        {"item": "D1", "direction": "positive", "reading": "模型编的另一个标题：完全不同的标题文字"},),
+        "stance": "positive", "confidence": "low", "narrative": "叙述里也可以提到假标题：完全不同的标题文字"}
+    text = render(snapshot)
+    assert "董事会批准股份回购计划" in text
+    assert text.count("完全不同的标题文字") == 1        # 只出现在 reading 里（narrative 不进报告），不出现在条目表
+
+
+def test_an_unavailable_channel_states_so_in_quality_without_a_table() -> None:
+    snapshot = {**_channels_on(_review()),
+                "fundamentals/status": {"channel": "fundamentals", "state": "unavailable",
+                                        "reason": "0000.HK 在宇宙 synthetic 里没有年报数据文件"}}
+    snapshot.pop("fundamentals/facts")
+    snapshot.pop("fundamentals/card")
+    snapshot.pop("fundamentals/analysis")
+    text = render(snapshot)
+    assert "基本面通道：不可用（0000.HK 在宇宙 synthetic 里没有年报数据文件）" in text
+    assert "## 基本面事实" not in text                  # 不可用的通道没有事实表
+
+
+def test_an_empty_disclosures_window_uses_the_empty_wording() -> None:
+    snapshot = {**_channels_on(_delivered()),
+                "disclosures/status": {"channel": "disclosures", "state": "empty",
+                                       "reason": "窗口 2026-04-01 到 2026-06-30 内没有公告"},
+                "disclosures/items": []}
+    snapshot.pop("disclosures/analysis")
+    text = render(snapshot)
+    assert "公告通道：窗口内没有公告" in text
+    assert "（窗口内没有公告。）" in text

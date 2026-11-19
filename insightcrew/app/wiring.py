@@ -16,6 +16,7 @@
 """
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -23,10 +24,12 @@ from typing import Any
 
 from insightcrew import __version__
 
-from ..adapters.declarations import load_indicators, load_rules
+from ..adapters.declarations import load_fundamentals, load_indicators, load_rules
+from ..adapters.disclosures_json import JsonDisclosures
 from ..adapters.market_csv import CsvMarket
 from ..adapters.models import Tiers, build
 from ..adapters.scripted import Replay, Script
+from ..adapters.statements_json import JsonStatements
 from ..adapters.store_fs import new_run_dir
 from ..domain import symbols
 from ..domain.market import InvalidTicker, MarketData, NoData, SourceUnavailable, UnknownTicker
@@ -75,11 +78,21 @@ def market_for(universe: str) -> CsvMarket:
 
 
 def build_deps(settings: Settings) -> Deps:
-    """只装配代码阶段的依赖，不开运行。facts 命令用：没有模型，没有运行目录。"""
-    return Deps(market=market_for(settings.run.universe),
+    """只装配代码阶段的依赖，不开运行。facts 命令用：没有模型，没有运行目录。
+
+    两个证据端口按宇宙接线（BLUEPRINT 18.7 的目录布局）；宇宙里没有某标的的证据文件时，
+    端口以 NotCovered 回答，通道按不可用处理，运行继续。
+    """
+    universe = settings.run.universe
+    return Deps(market=market_for(universe),
                 indicators=load_indicators(ROOT / "data" / "indicators.toml"),
                 rules=load_rules(ROOT / "data" / "rules.toml"),
-                today=today(settings), universe=settings.run.universe)
+                today=today(settings), universe=universe,
+                statements=JsonStatements(ROOT / "data" / "market", universe),
+                disclosures=JsonDisclosures(ROOT / "data" / "market", universe),
+                fundamentals=load_fundamentals(ROOT / "data" / "fundamentals.toml"),
+                disclosure_window_days=settings.disclosures.window_days,
+                disclosure_max_items=settings.disclosures.max_items)
 
 
 # ---- 模型来源 ----
@@ -120,13 +133,15 @@ def _models(settings: Settings, scenario: Scenario | None,
 # ---- 第一步：把用户输入变成任务 ----
 
 def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: str = "",
-            judges: bool | None = None, debate_rounds: int | None = None) -> Job:
+            judges: bool | None = None, debate_rounds: int | None = None,
+            channels: tuple[str, ...] | None = None) -> Job:
     """命令行与网页的共同入口。空字符串与 None 表示"没有给"。
 
     请求：场景自带的请求打底，用户给的代码与日期覆盖它。
     没有代码也没有场景时：没有可用的真实模型就跑演示场景 demo，有则拒绝（真实模型需要一个代码）。
-    流程配置：有场景用场景自己的（场景是一次完整的脚本化运行），否则用设置里的；
-    judges 与 debate_rounds 是用户在这一次运行上的显式覆盖。
+    流程配置：有场景用场景自己的（场景是一次完整的脚本化运行，--channels 与设置里的
+    channels 都被忽略，BLUEPRINT 18.8），否则用设置里的；judges、debate_rounds 与
+    channels 是用户在这一次运行上的显式覆盖；未知的通道名在这里拒绝。
     """
     chosen = _load_scenario(scenario) if scenario else None
     request = dict(chosen.request) if chosen else {}
@@ -143,10 +158,26 @@ def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: 
         request = {**chosen.request, **request}
 
     base = chosen.config.flow if chosen else settings.flow
-    overrides = {key: value for key, value in (("judges", judges), ("debate_rounds", debate_rounds))
+    names = None if chosen is not None else tuple(_channel_names(channels))
+    overrides = {key: value for key, value in
+                 (("judges", judges), ("debate_rounds", debate_rounds), ("channels", names))
                  if value is not None}
     return Job(request=request, scenario=chosen,
                flow=FlowConfig.model_validate({**base.model_dump(), **overrides}))
+
+
+_CHANNEL_NAMES = ("fundamentals", "disclosures")
+
+
+def _channel_names(channels: tuple[str, ...] | None) -> tuple[str, ...]:
+    """把 --channels 的名字校验成通道名；未知名在这里拒绝，不等到运行里。"""
+    if channels is None:
+        return ()
+    unknown = [name for name in channels if name not in _CHANNEL_NAMES]
+    if unknown:
+        raise BadRequest(f"未知的证据通道：{'、'.join(unknown)}。可用：fundamentals、disclosures。")
+    deduped = [name for name in _CHANNEL_NAMES if name in channels]
+    return tuple(deduped)
 
 
 def _load_scenario(name: str) -> Scenario:
@@ -213,9 +244,9 @@ def open_run(settings: Settings, request: dict[str, Any], *, scenario: Scenario 
         "limits": {"max_requests": limits.max_requests, "max_seconds": limits.max_seconds,
                    "request_timeout_s": limits.request_timeout_s},
     })
-    return run, Deps(market=deps.market, indicators=deps.indicators, rules=deps.rules, today=deps.today,
-                     universe=deps.universe, out_dir=run_dir,
-                     render=lambda snapshot: report.render(snapshot, journal.events, run_id=run.id))
+    return run, dataclasses.replace(
+        deps, out_dir=run_dir,
+        render=lambda snapshot: report.render(snapshot, journal.events, run_id=run.id))
 
 
 def _dir_labels(request: dict[str, Any], deps: Deps) -> tuple[str, str]:

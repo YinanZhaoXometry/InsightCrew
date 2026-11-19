@@ -176,3 +176,34 @@ def test_replay_reports_a_journal_that_was_tampered_with(settings: Settings, tmp
     journal.write_text(journal.read_text(encoding="utf-8").replace("accepted 2/3", "accepted 3/3"), encoding="utf-8")
     assert replay_cmd.run(settings, str(run_dir)) == 1
     assert "不一致" in capsys.readouterr().out
+
+
+# ---- 证据通道的 prepare（BLUEPRINT 18.8、18.11）----
+
+
+def test_channels_flag_reaches_the_flow(settings: Settings) -> None:
+    job = prepare(settings, ticker="ACME", channels=("disclosures",))
+    assert job.flow.channels == ("disclosures",)
+    both = prepare(settings, ticker="ACME", channels=("disclosures", "fundamentals"))
+    assert both.flow.channels == ("fundamentals", "disclosures")     # 固定顺序，去重
+
+
+def test_a_scenario_decides_the_channels_and_the_flag_is_ignored(settings: Settings) -> None:
+    job = prepare(settings, ticker="ACME", scenario="channels_clean",
+                  channels=("disclosures",))
+    assert job.flow.channels == ("fundamentals", "disclosures")      # 场景文件说了算
+    no_channels = prepare(settings, scenario="clean", channels=("disclosures",))
+    assert no_channels.flow.channels == ()                           # 场景没开通道就不开
+
+
+def test_an_unknown_channel_is_refused(settings: Settings) -> None:
+    with pytest.raises(BadRequest, match="news"):
+        prepare(settings, ticker="ACME", channels=("news",))
+
+
+def test_build_deps_wires_the_evidence_ports(settings: Settings) -> None:
+    from insightcrew.app.wiring import build_deps
+    deps = build_deps(settings)
+    assert deps.statements is not None and deps.disclosures is not None
+    assert len(deps.fundamentals) == 12
+    assert (deps.disclosure_window_days, deps.disclosure_max_items) == (90, 30)

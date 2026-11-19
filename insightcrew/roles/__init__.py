@@ -28,19 +28,25 @@ TECHNICAL = Role(
     reads=("ledger/instrument", "ledger/facts", "ledger/card", "audit/technical"),
     writes="technical/analysis", output=Analysis, max_output_tokens=_QUICK_OUT)
 
+# 证据通道的键（BLUEPRINT 18.9）：插在 technical/analysis 之后。通道关闭时这些键不上黑板，
+# Board.view 跳过缺席的键，所以不开通道的运行提示词与版本 2.0 逐字相同。
+_CHANNELS_BRIEF = ("fundamentals/status", "fundamentals/analysis",
+                   "disclosures/status", "disclosures/analysis")
+
 BULL = Role(
     "bull", "quick", _prompt("bull"),
-    reads=("ledger/instrument", "technical/analysis", "bear/argument"),
+    reads=("ledger/instrument", "technical/analysis", *_CHANNELS_BRIEF, "bear/argument"),
     writes="bull/argument", output=Argument, max_output_tokens=_QUICK_OUT)
 
 BEAR = Role(
     "bear", "quick", _prompt("bear"),
-    reads=("ledger/instrument", "technical/analysis", "bull/argument"),
+    reads=("ledger/instrument", "technical/analysis", *_CHANNELS_BRIEF, "bull/argument"),
     writes="bear/argument", output=Argument, max_output_tokens=_QUICK_OUT)
 
 MANAGER = Role(
     "manager", "deep", _prompt("manager"),
-    reads=("ledger/instrument", "ledger/card", "technical/analysis", "bull/argument", "bear/argument",
+    reads=("ledger/instrument", "ledger/card", "technical/analysis", *_CHANNELS_BRIEF,
+           "bull/argument", "bear/argument",
            "memory/lessons", "audit/manager", "judges/on_thesis"),
     writes="manager/thesis", output=Thesis, effort="high",
     max_output_tokens=_DEEP_OUT)
@@ -71,7 +77,8 @@ LENSES = {
 
 JUDGES = tuple(
     Role(f"judge.{lens}", "quick", _prompt("judge", lens=brief),
-         reads=("ledger/instrument", "ledger/facts", "technical/analysis", "manager/thesis",
+         reads=("ledger/instrument", "ledger/facts", "technical/analysis", *_CHANNELS_BRIEF,
+                "fundamentals/facts", "disclosures/items", "manager/thesis",
                 "trader/proposal", "rules/limits", "audit/rules"),
          writes=f"judge.{lens}/verdict", output=Verdict, effort="low", max_output_tokens=_QUICK_OUT)
     for lens, brief in LENSES.items())

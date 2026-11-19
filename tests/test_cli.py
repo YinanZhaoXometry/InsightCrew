@@ -122,9 +122,23 @@ def test_facts_prints_the_ledger_and_the_data_card(runs: Path) -> None:
     code, output = _invoke("facts", "ACME", "--date", "2026-09-30")
     assert code == 0
     assert "分析日 2026-09-30" in output and "rsi_14" in output and "复算分歧：无" in output
-    assert len([line for line in output.splitlines() if line.startswith("  ")]) == 29
+    # 账本的 29 个事实逐一打印（通道的内容另有断言，见 test_facts_prints_the_channels）。
+    assert len([line for line in output.splitlines() if "indicators." in line]) == 29
     code, output = _invoke("facts", "NOPE")
     assert code == 1 and "无法建立账本" in output
+
+
+def test_facts_prints_the_channels(runs: Path) -> None:
+    """18.11：facts 在账本之后打印基本面事实与卡片，以及窗口内的公告条目。"""
+    code, output = _invoke("facts", "ACME", "--date", "2026-09-30")
+    assert code == 0
+    assert "基本面通道：可用" in output
+    assert "revenue_fy" in output and "1081" in output and "USD million" in output
+    assert "重述提醒" in output
+    assert "公告通道：可用" in output
+    assert "董事会批准股份回购计划" in output and "窗口 2026-07-02 到 2026-09-30，3 条" in output
+    _, hk = _invoke("facts", "0000.HK", "--date", "2026-06-30")
+    assert "基本面通道：不可用" in hk and "公告通道：窗口内没有公告" in hk
 
 
 def test_scenarios_all_match_and_leave_no_run_behind(runs: Path) -> None:
@@ -138,3 +152,25 @@ def test_scenarios_all_match_and_leave_no_run_behind(runs: Path) -> None:
 def test_eval_all_runs_the_three_offline_evaluations(runs: Path) -> None:
     code, output = _invoke("eval", "all")
     assert code == 0 and "19/19" in output and "0/6" in output
+
+
+# ---- 证据通道的旗标（BLUEPRINT 18.11）----
+
+
+def test_an_unknown_channel_name_is_refused(runs: Path) -> None:
+    code, output = _invoke("analyze", "ACME", "--channels", "news", "--no-open")
+    assert code == 2 and "news" in output
+
+
+def test_channels_flag_on_a_scenario_run_says_it_is_ignored(runs: Path) -> None:
+    code, output = _invoke("analyze", "--scenario", "clean", "--channels", "fundamentals",
+                           "--no-open", "--quiet")
+    assert code == 0
+    assert "场景运行以场景文件里写的通道为准" in output
+
+
+def test_channels_open_the_analysts_in_a_scenario(runs: Path) -> None:
+    code, output = _invoke("analyze", "--scenario", "channels_clean", "--no-open")
+    assert code == 0
+    assert "fundamentals#1" in output and "disclosures#1" in output
+    assert "结果：delivered" in output

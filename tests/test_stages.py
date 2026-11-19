@@ -8,14 +8,17 @@ from pathlib import Path
 
 import pytest
 
-from insightcrew.adapters.declarations import load_indicators, load_rules
+from insightcrew.adapters.declarations import load_fundamentals, load_indicators, load_rules
+from insightcrew.adapters.disclosures_json import JsonDisclosures
 from insightcrew.adapters.market_csv import CsvMarket
 from insightcrew.adapters.scripted import Script
+from insightcrew.adapters.statements_json import JsonStatements
 from insightcrew.domain.types import (
     Analysis,
     AnalysisSeq,
     ChannelStatus,
     DisclosureAnalysis,
+    DisclosureCard,
     Fact,
     Finding,
     Item,
@@ -343,3 +346,87 @@ def test_audited_current_tracks_channel_analysis_versions() -> None:
     assert stages.audited_current(run)                       # 通道分析也是通过审计的那一版
     _fundamentals_on_board(run)                              # 重写一版：序号变了
     assert not stages.audited_current(run)                   # 审计过期，方案必须重新过审计
+
+
+# ---- 真实 evidence 阶段（WP16）：读取、排序、编号、截断与三态 ----
+
+
+def _deps_wired(today: date = AS_OF) -> Deps:
+    """接好两个证据端口与基本面声明的依赖（真实适配器，离线数据）。"""
+    return dataclasses.replace(
+        _deps(today),
+        statements=JsonStatements(ROOT / "data" / "market", "synthetic"),
+        disclosures=JsonDisclosures(ROOT / "data" / "market", "synthetic"),
+        fundamentals=load_fundamentals(ROOT / "data" / "fundamentals.toml"))
+
+
+def _pipeline_ready(run: Run, deps: Deps) -> None:
+    stages.intake(run, {"ticker": "ACME", "as_of": "2026-09-30"}, deps)
+    stages.ledger(run, deps)
+
+
+def test_evidence_reads_both_channels_for_acme() -> None:
+    deps = _deps_wired()
+    run = _run(deps)
+    _pipeline_ready(run, deps)
+    stages.evidence(run, deps, ("fundamentals", "disclosures"))
+    assert stages.channel_ready(run, "fundamentals")
+    facts = run.board.get("fundamentals/facts", list[Fact])
+    assert {f.id for f in facts} == {s.key for s in deps.fundamentals}
+    revenue = next(f for f in facts if f.id == "revenue_fy")
+    assert revenue.value == 1081.0 and revenue.unit == "USD million"   # 重述后的口径
+    items = run.board.get("disclosures/items", list[Item])
+    assert [i.id for i in items] == ["D1", "D2", "D3"]                 # 新到旧编号
+    assert [i.ref for i in items] == ["ACME-0011", "ACME-0010", "ACME-0009"]
+    card = run.board.get("disclosures/card", DisclosureCard)
+    assert (card.items, card.dropped, card.truncated) == (3, 1, 0)
+    assert _gates(run)[-1] == {"gate": "evidence", "findings": 0, "detail": []}
+    _no_model_call(run)
+
+
+def test_evidence_marks_a_ticker_without_statements_unavailable() -> None:
+    deps = _deps_wired()
+    run = _run(deps)
+    stages.intake(run, {"ticker": "0000.HK", "as_of": "2026-09-30"}, deps)
+    stages.ledger(run, deps)
+    stages.evidence(run, deps, ("fundamentals", "disclosures"))
+    assert not stages.channel_ready(run, "fundamentals")
+    status = run.board.get("fundamentals/status", ChannelStatus)
+    assert status.state == "unavailable" and "没有年报数据文件" in status.reason
+    assert not run.board.has("fundamentals/facts")
+    assert stages.channel_ready(run, "disclosures")                     # 0000.HK 的公告照常
+
+
+def test_evidence_reports_an_empty_disclosures_window() -> None:
+    deps = _deps_wired(today=date(2026, 6, 30))
+    run = _run(deps)
+    stages.intake(run, {"ticker": "0000.HK", "as_of": "2026-06-30"}, deps)
+    stages.ledger(run, deps)
+    stages.evidence(run, deps, ("fundamentals", "disclosures"))
+    status = run.board.get("disclosures/status", ChannelStatus)
+    assert status.state == "empty" and status.reason
+    assert run.board.get("disclosures/items") == []                     # 空列表也上板（18.8）
+
+
+def test_evidence_without_ports_marks_channels_unavailable() -> None:
+    deps = _deps()                                                     # 端口都没接
+    run = _run(deps)
+    _pipeline_ready(run, deps)
+    stages.evidence(run, deps, ("fundamentals", "disclosures"))
+    for channel in ("fundamentals", "disclosures"):
+        status = run.board.get(f"{channel}/status", ChannelStatus)
+        assert status.state == "unavailable" and status.reason
+
+
+def test_a_fundamentals_disagreement_stops_the_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """两条基本面路径的分歧是代码的 bug：记入闸门事件后停机（决策 35 的唯一例外）。"""
+    def wrong(_ss, _close, _as_of, specs):
+        return {spec.key: -1.0 for spec in specs}                      # 与路径 1 必然不一致
+    monkeypatch.setattr(stages, "recompute_fundamentals", wrong)
+    deps = _deps_wired()
+    run = _run(deps)
+    _pipeline_ready(run, deps)
+    with pytest.raises(Halt) as caught:
+        stages.evidence(run, deps, ("fundamentals", "disclosures"))
+    assert caught.value.reason == "ledger_inconsistent"
+    assert _gates(run)[-1]["detail"][0]["check"] == "ledger_inconsistent"

@@ -33,10 +33,17 @@ _REASON = {
     "model_unavailable": "模型不可用",
 }
 _JUDGES = {"evidence": "证据评审", "conservative": "保守评审", "aggressive": "进取评审"}
-_STAGES = {"technical": "技术分析", "debate": "多空辩论", "manager": "研究主管", "trader": "交易员"}
+_STAGES = {"technical": "技术分析", "fundamentals": "基本面分析", "disclosures": "公告分析",
+           "debate": "多空辩论", "manager": "研究主管", "trader": "交易员"}
 _MODES = {"model": "真实模型", "scripted": "脚本化模型（回复为预先编写）", "replay": "回放"}
 _TARGETS = {"thesis": "论点", "levels": "价位与仓位"}
 _STATUS = {"pass": "通过", "fail": "不通过", "n/a": "不适用"}
+_DIRECTION = {"positive": "正面", "negative": "负面", "neutral": "中性"}
+_STANCE = {"positive": "正面", "mixed": "混合", "neutral": "中性", "negative": "负面"}
+_CHANNEL_STATE = {"fundamentals": {"available": "可用", "empty": "没有已申报的年度报表",
+                                   "unavailable": "不可用"},
+                  "disclosures": {"available": "可用", "empty": "窗口内没有公告",
+                                  "unavailable": "不可用"}}
 _DASH = "—"
 _WITHHELD = "本次运行没有交付结论，这部分内容不在报告里展示；它仍在 journal.jsonl 中，可在运行页面的过程记录里查看。"
 
@@ -51,6 +58,8 @@ def render(snapshot: dict[str, Any], events: Sequence[Event] | None = None, run_
         _conclusion(snapshot, events, delivered),
         _confidence(snapshot),
         _facts(snapshot),
+        _fundamentals(snapshot),
+        _disclosures(snapshot),
         _thesis(snapshot, delivered),
         _opinions(snapshot),
         _rules(snapshot, delivered),
@@ -60,7 +69,7 @@ def render(snapshot: dict[str, Any], events: Sequence[Event] | None = None, run_
         _usage(snapshot, started),
         _run_info(started, run_id),
     ]
-    return "\n\n".join(sections) + "\n"
+    return "\n\n".join(section for section in sections if section) + "\n"
 
 
 # ---- 展示格式：不做运算 ----
@@ -175,6 +184,68 @@ def _facts(snapshot: dict[str, Any]) -> str:
     return "\n".join(["## 依据的事实", "",
                       "数值与数据日取自事实账本，不取模型的转述。", "",
                       *_table(("事实", "含义", "账本数值", "数据日", "分析师的解读"), rows)])
+
+
+# ---- 4b 基本面事实（仅在通道打开且上黑板时出现）----
+
+
+def _fundamentals(snapshot: dict[str, Any]) -> str:
+    if not snapshot.get("fundamentals/facts"):
+        return ""              # 通道没开、不可用或没有事实：整节不出现，状态见数据质量一节
+    claims = snapshot.get("fundamentals/analysis", {}).get("claims", ())
+    facts = {fact["id"]: fact for fact in snapshot.get("fundamentals/facts", [])}
+    rows = []
+    for claim in claims:
+        fact = facts.get(claim.get("fact", ""), {})
+        rows.append((claim.get("fact", _DASH), fact.get("label", "（基本面事实里没有这个 ID）"),
+                     _with_unit(fact.get("value"), fact.get("unit", "")), fact.get("as_of", _DASH),
+                     claim.get("reading", "")))
+    lines = ["## 基本面事实", "",
+             "数值与申报日取自基本面事实账本（经第二条路径复算），不取模型的转述。", "",
+             *_table(("事实", "含义", "申报值", "申报日", "分析师的解读"), rows)]
+    card = snapshot.get("fundamentals/card")
+    if card:
+        lines += ["", f"- 数据卡：来源 {card.get('source', _DASH)}，申报货币 {card.get('currency', _DASH)}，"
+                      f"最近财年期末 {card.get('fiscal_year_end', _DASH)}，"
+                      f"所引最晚申报 {card.get('filed', _DASH)}，共 {card.get('rows', _DASH)} 行"]
+        if card.get("unavailable"):
+            lines.append("- 不可用：" + "；".join(f"{u.get('id')}（{u.get('reason')}）"
+                                                  for u in card["unavailable"]))
+        if card.get("warnings"):
+            lines.append("- 重述提醒：" + "；".join(card["warnings"]))
+    return "\n".join(lines)
+
+
+# ---- 4c 公告条目（来源原文，未经核验）----
+
+
+def _disclosures(snapshot: dict[str, Any]) -> str:
+    if not snapshot.get("disclosures/status"):
+        return ""
+    items = snapshot.get("disclosures/items", [])
+    signals = snapshot.get("disclosures/analysis", {}).get("signals", ())
+    lines = ["## 公告条目（来源原文，未经核验）", "",
+             "以下标题与类别是来源的原文。程序只核对每条存在且发布于分析日之前；内容读得对不对由评审判断。"]
+    if not items:
+        lines.append("（窗口内没有公告。）")
+    else:
+        rows = [(item.get("id", _DASH), item.get("published", _DASH), item.get("source", _DASH),
+                 item.get("kind", _DASH), item.get("title", _DASH)) for item in items]
+        lines += ["", *_table(("编号", "发布日", "来源", "类别", "标题"), rows)]
+    if signals:
+        lines += ["", "分析师的信号："]
+        lines += [f"- {s.get('item', _DASH)}：{_DIRECTION.get(s.get('direction'), s.get('direction'))}"
+                  f"——{s.get('reading', '')}" for s in signals]
+    analysis = snapshot.get("disclosures/analysis", {})
+    if analysis:
+        lines += ["", f"窗口内公告合起来的基调：{_STANCE.get(analysis.get('stance'), analysis.get('stance'))}"
+                      f"（把握：{analysis.get('confidence', _DASH)}）"]
+    card = snapshot.get("disclosures/card")
+    if card:
+        lines.append(f"- 窗口 {card.get('window_from', _DASH)} 到 {card.get('window_to', _DASH)}，"
+                     f"列出 {card.get('items', _DASH)} 条；无日期被丢弃 {card.get('dropped', _DASH)} 条，"
+                     f"超出上限被截断 {card.get('truncated', _DASH)} 条")
+    return "\n".join(lines)
 
 
 # ---- 5 论点与失效条件 ----
@@ -307,6 +378,15 @@ def _quality(snapshot: dict[str, Any]) -> str:
                                                for u in card["unavailable"]))
     if card.get("warnings"):
         lines.append(f"- 警告：{'；'.join(card['warnings'])}")
+    for channel, name in (("fundamentals", "基本面"), ("disclosures", "公告")):
+        status = snapshot.get(f"{channel}/status")
+        if not status:
+            continue                                # 通道没开：不加这一行，报告与 2.0 相同
+        state = _CHANNEL_STATE[channel].get(status.get("state"), status.get("state"))
+        line = f"- {name}通道：{state}"
+        if status.get("state") != "available" and status.get("reason"):
+            line += f"（{status['reason']}）"
+        lines.append(line)
     return "\n".join(lines)
 
 

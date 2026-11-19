@@ -18,16 +18,20 @@ from typing import Annotated, Any, NoReturn
 
 import typer
 
+from ..adapters.scripted import Script
 from ..domain import symbols
 from ..domain.ledger import build_ledger, disagreements, recompute_ledger
-from ..domain.market import InvalidTicker, NoData, SourceUnavailable, UnknownTicker
-from ..domain.types import Outcome
+from ..domain.market import Instrument, InvalidTicker, NoData, SourceUnavailable, UnknownTicker
+from ..domain.types import DataCard, Fact, Item, Outcome, Scope
 from ..evals import run as eval_cmd
 from ..evals.scenarios import names as scenario_names
 from ..evals.scenarios import run_all, summary_line
+from ..flows import stages as flow_stages
 from ..flows.analyze import analyze as run_flow
 from ..flows.deps import Deps
-from ..kernel.events import Event
+from ..kernel.board import Board
+from ..kernel.budget import Budget
+from ..kernel.events import Event, Journal
 from ..kernel.runtime import Run
 from . import check as check_cmd
 from . import fetch as fetch_cmd
@@ -39,8 +43,10 @@ from .wiring import ROOT, BadRequest, Job, build_deps, describe_models, open_run
 app = typer.Typer(help="InsightCrew：带独立审计的多智能体交易辅助系统。没有密钥时运行离线演示。",
                   no_args_is_help=True, add_completion=False, pretty_exceptions_show_locals=False)
 
-_GATES = {"intake": "范围", "ledger": "账本", "audit": "审计"}
-_STAGES = {"technical": "技术分析", "debate": "多空辩论", "manager": "研究主管", "trader": "交易员"}
+_GATES = {"intake": "范围", "ledger": "账本", "evidence": "证据", "audit": "审计"}
+_STAGES = {"technical": "技术分析", "fundamentals": "基本面分析", "disclosures": "公告分析",
+           "debate": "多空辩论", "manager": "研究主管", "trader": "交易员"}
+_CHANNEL_STATE = {"available": "可用", "empty": "窗口内没有公告", "unavailable": "不可用"}
 
 
 def _fail(message: str, code: int = 2) -> NoReturn:
@@ -68,6 +74,8 @@ def analyze(
     date: Annotated[str, typer.Option("--date", help="分析日（YYYY-MM-DD）；不给则用最后一根已收盘 K 线")] = "",
     scenario: Annotated[str, typer.Option("--scenario", help="用预先写好的回复跑一个场景")] = "",
     universe: Annotated[str, typer.Option("--universe", help="数据集名字，默认取设置文件")] = "",
+    channels: Annotated[str, typer.Option(
+        "--channels", help="打开的证据通道，逗号分隔：fundamentals、disclosures")] = "",
     no_judges: Annotated[bool, typer.Option("--no-judges", help="跳过模型评审")] = False,
     debate_rounds: Annotated[int | None, typer.Option("--debate-rounds", min=0, help="辩论轮数")] = None,
     quiet: Annotated[bool, typer.Option("--quiet", help="只打印结果，不打印过程")] = False,
@@ -75,14 +83,18 @@ def analyze(
 ) -> None:
     """跑一次分析：给出评级与交易方案，或者说明为什么只能 REVIEW。"""
     settings = _settings(**_universe(universe))
+    names = tuple(c.strip() for c in channels.split(",") if c.strip()) if channels else None
     try:
         job = prepare(settings, ticker=ticker, as_of=date, scenario=scenario,
-                      judges=False if no_judges else None, debate_rounds=debate_rounds)
+                      judges=False if no_judges else None, debate_rounds=debate_rounds,
+                      channels=names)
         run, deps = open_run(settings, job.request, scenario=job.scenario, flow=job.flow)
     except BadRequest as e:
         _fail(str(e))
     except OSError as e:
         _fail(f"数据集 {settings.run.universe!r} 读不出来：{e}")
+    if names and job.scenario:
+        print("场景运行以场景文件里写的通道为准，--channels 与设置里的 channels 都被忽略。")
 
     if not scenario:                              # 回退到离线从不静默：说一次原因（原因里没有密钥）
         mode, _, reason = describe_models(settings)
@@ -192,6 +204,53 @@ def facts(
     print(f"不可用：{'；'.join(f'{u.id}（{u.reason}）' for u in card.unavailable) or '无'}")
     print(f"警告：{'；'.join(card.warnings) or '无'}")
     print(f"复算分歧：{'、'.join(differing) or '无'}")
+    _print_channels(deps, instrument, ledger, card, as_of)
+
+
+def _print_channels(deps: Deps, instrument: Instrument, ledger: list[Fact],
+                    card: DataCard, as_of: date_type) -> None:
+    """两个证据通道在这次分析日会读到什么。数字与运行里的 evidence 阶段完全一致：
+    这里用同一阶段在一张临时黑板上跑一遍（不调模型），场景文件的数值从本命令的输出抄写。"""
+    journal = Journal()
+    probe = Run(id="facts", journal=journal, board=Board(journal),
+                models=Script({}), budget=Budget())
+    probe.board.put("request/scope",
+                    Scope(ticker=instrument.ticker, as_of=as_of.isoformat(),
+                          universe=deps.universe, requested=instrument.ticker), by="facts")
+    probe.board.put("ledger/instrument", instrument, by="facts")
+    probe.board.put("ledger/facts", ledger, by="facts")
+    probe.board.put("ledger/card", card, by="facts")
+    flow_stages.evidence(probe, deps, ("fundamentals", "disclosures"))
+    board = probe.board
+    if board.has("fundamentals/status"):
+        status = board.get("fundamentals/status")["state"]
+        print(f"基本面通道：{_CHANNEL_STATE[status]}"
+              + (f"（{board.get('fundamentals/status')['reason']}）" if status != "available" else ""))
+        if status == "available":
+            for fact in board.get("fundamentals/facts", list[Fact]):
+                unit = "%" if fact.unit == "%" else f" {fact.unit}" if fact.unit else ""
+                print(f"  {fact.id:<20} {fact.label:<28} {fact.value:<14g}{unit:<8} "
+                      f"@{fact.as_of}  {fact.source}")
+            fund_card = board.get("fundamentals/card")
+            print(f"  数据卡：来源 {fund_card['source']}，货币 {fund_card['currency']}，"
+                  f"最近财年末 {fund_card['fiscal_year_end']}，最晚申报 {fund_card['filed']}，"
+                  f"{fund_card['rows']} 行")
+            if fund_card["unavailable"]:
+                missing = "；".join(f"{u['id']}（{u['reason']}）" for u in fund_card["unavailable"])
+                print(f"  不可用：{missing}")
+            if fund_card["warnings"]:
+                print(f"  重述提醒：{'；'.join(fund_card['warnings'])}")
+    if board.has("disclosures/status"):
+        status = board.get("disclosures/status")["state"]
+        print(f"公告通道：{_CHANNEL_STATE[status]}"
+              + (f"（{board.get('disclosures/status')['reason']}）" if status != "available" else ""))
+        if status == "available":
+            for item in board.get("disclosures/items", list[Item]):
+                print(f"  {item.id:<4} {item.published}  {item.kind}: {item.title}"
+                      f"（{item.ref}）")
+            dcard = board.get("disclosures/card")
+            print(f"  窗口 {dcard['window_from']} 到 {dcard['window_to']}，{dcard['items']} 条，"
+                  f"丢弃无日期 {dcard['dropped']} 条，截断 {dcard['truncated']} 条")
 
 
 # ---- scenarios ----

@@ -1,0 +1,145 @@
+{
+  "name": "quiet",
+  "about": "0000.HK 在 2026-06-30：基本面不可用，公告窗口内没有任何公告（empty），两个新分析师都不被调用。",
+  "request": {
+    "ticker": "0000.HK",
+    "as_of": "2026-06-30"
+  },
+  "replies": {
+    "technical": [
+      {
+        "claims": [
+          {
+            "fact": "close",
+            "value": 42.06,
+            "reading": "收盘价在主要均线附近震荡"
+          },
+          {
+            "fact": "atr_14",
+            "value": 0.777217,
+            "reading": "日均真实波幅约 0.78 港元，波动不大"
+          },
+          {
+            "fact": "rsi_14",
+            "value": 52.9971,
+            "reading": "相对强弱 53，动能中性"
+          },
+          {
+            "fact": "sma_20",
+            "value": 41.9695,
+            "reading": "价格贴近 20 日均线，短期结构中性"
+          }
+        ],
+        "narrative": "价格在均线之间震荡，动能中性，波动不大。总体读数中性，没有明确方向。"
+      }
+    ],
+    "bull": [
+      {
+        "points": [
+          {
+            "text": "动能中性，均线粘合后常有方向性突破",
+            "cites": [
+              "rsi_14",
+              "sma_20"
+            ]
+          }
+        ],
+        "rebuttal": "震荡本身不是方向，等待突破。"
+      }
+    ],
+    "bear": [
+      {
+        "points": [
+          {
+            "text": "没有增量信息时，向上向下都可能，风险回报不明",
+            "cites": [
+              "close"
+            ]
+          }
+        ],
+        "rebuttal": "同意等待，但在方向出现前不应持仓。"
+      }
+    ],
+    "manager": [
+      {
+        "rating": "Hold",
+        "horizon_days": 20,
+        "points": [
+          {
+            "text": "技术面中性，公告窗口为空，没有任何增量证据支持方向",
+            "cites": [
+              "close",
+              "rsi_14"
+            ]
+          }
+        ],
+        "invalidation": [
+          "收盘明显脱离均线带",
+          "出现方向性公告"
+        ],
+        "summary": "两条证据通道一条不可用、一条窗口为空，技术面中性，持有观望。"
+      }
+    ],
+    "trader": [
+      {
+        "action": "Hold",
+        "entry": null,
+        "stop": null,
+        "target": null,
+        "size_pct": 0.0,
+        "horizon_days": 20,
+        "cites": [],
+        "rationale": "评级为 Hold，不动。"
+      }
+    ],
+    "judge.evidence": [
+      {
+        "accept": true,
+        "target": "none",
+        "critique": "引用与账本一致；通道不可用与空窗口都不作为证据。",
+        "cites": []
+      }
+    ],
+    "judge.conservative": [
+      {
+        "accept": true,
+        "target": "none",
+        "critique": "Hold 方案无价位无仓位。",
+        "cites": []
+      }
+    ]
+  },
+  "config": {
+    "flow": {
+      "debate_rounds": 1,
+      "audit": "on",
+      "judges": true,
+      "audit_rounds": 3,
+      "judge_rounds": 2,
+      "quorum": 2,
+      "channels": [
+        "fundamentals",
+        "disclosures"
+      ]
+    },
+    "budget": {
+      "run_tokens": 0,
+      "roles": {}
+    }
+  },
+  "expect": {
+    "status": "delivered",
+    "reason": "ok",
+    "facts_and_rules": "verified",
+    "judgment": "accepted 2/3",
+    "calls": [
+      "technical",
+      "bull",
+      "bear",
+      "manager",
+      "trader",
+      "judge.evidence",
+      "judge.conservative"
+    ]
+  }
+}
