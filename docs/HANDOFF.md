@@ -46,9 +46,9 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 9B | `fetch` command | done | Yahoo still throttles (429); since `4228e68` `fetch` falls back to Eastmoney. `fetch AAPL 0700.HK --years 3` wrote four series (about 750 bars each); `facts 0700.HK --universe real` prints an HKD ledger. |
 | 10 | Run page, static | done | Verified in the in-app browser: mode badge, pipeline, audit rejection, route back to Trader, three judges, price chart, playback controls. **Page rewritten by the planning session on 2026-11-19 08:50 and verified again in the browser.** |
 | 12 | Local web app (`serve`) | done | Verified live in the browser: form starts a demo run, stream advances stages, same outcome and confidence lines as the CLI; THIN refuses; past runs open; clean shutdown. 409 covered by test. **Server rewritten by the planning session on 2026-11-19 08:50 and verified again.** |
-| 11 | Documents and packaging | not started | Not yet assigned. Its precondition ("everything else done or cut") is not met while WP8 is blocked — the documents need real-model results. |
+| 11 | Documents and packaging | done | README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP rewritten; `start.sh`, `start.bat`; a `git archive` zip unzipped into an empty directory passes `uv sync`, 380 tests and a keyless `analyze`. Session log entry "2026-11-19 10:05". |
 
-**Everything except WP11 is done. Next: WP11, documents and packaging.** Its precondition is met. [Section 5](#5-what-may-run-at-the-same-time) says what may run at the same time.
+**Every work package is done.** What remains is outside the repository: the demo video, the slides and the contribution statement. [ROADMAP.md](ROADMAP.md) lists known issues and next steps.
 
 ## 3. The repository at handoff
 
@@ -712,6 +712,31 @@ Files created or changed: `insightcrew.toml` (tiers, budget, time limit), `insig
 Committed: see `git log` (WP8 commit after this entry).
 
 For the next session: WP11. Its precondition is met. The numbers for `docs/EVALUATION.md` are the tables above, and each row is tied to an archived journal.
+
+### 2026-11-19 10:05 · WP11 · planning session
+
+Result: done. Documents rewritten for version 2, start scripts added, the zip built and verified from a fresh unzip.
+
+**Two sessions wrote the same documents.** At 09:56 and 09:57, while this session was working, another session rewrote `docs/EVALUATION.md`, `docs/ROADMAP.md` and the anchors in `README.md`, replacing this session's versions. This session committed them unknowingly in `dcb1001`. The owner chose to keep the other session's versions. This session then checked them:
+
+- Every number in EVALUATION.md's tables against the 09:45 entry above. All match.
+- The AAPL walkthrough against `archive/20261119-093532-AAPL-2026-11-18-a161/journal.jsonl`: Hold, then rejected by evidence and aggressive with conservative accepting (seq 27, 29, 31); Overweight with Buy 352.45, stop 340, size 18% (seq 39), audit pass; evidence rejected the thesis (0.62 × ATR, downside 12.45 against upside 8.38) and conservative the levels (seq 48, 50); `review`, `contested`. All match.
+- ROADMAP.md's statements about `sell_requires_position`, `cash_sufficient` (`rules.toml`, `domain/rules.py`) and `IC_BASE_URL` (`app/settings.py`). All hold.
+
+Fixed afterwards (`8d57d74`): two anchors in ARCHITECTURE.md that this session had pointed at its own section numbers; ROADMAP section 4 gains the review session's duplicate-date P3 (still open: `market_csv.py` does not reject a repeated date, so `recompute.load` would raise `IntegrityError`) and the duplicated `_one_line`. The review's other findings were checked and are fixed in the code: the `_usage` total row, byte-offset SSE reads, `/api/runs` without `runs/`, first-line-only reads in `_run_info`.
+
+Commands run, with the last lines of their output:
+
+- `uv run pytest -q` → `380 passed`; `uv run ruff check .` → `All checks passed!`; `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- A link check over README, AGENTS, ARCHITECTURE, EVALUATION and ROADMAP (files and heading anchors) → `bad 0`.
+- Without uv, in a copy of the tracked files: `python3 -m venv .venv && .venv/bin/pip install -e .` on Python 3.15.2 → pydantic-ai-slim 2.70.0, fastapi 0.165.0 (newer than the lock); `.venv/bin/insightcrew analyze --no-open` → `delivered（ok）`, exit 0; `scenarios` → all `相符`.
+- `git archive --format=zip --prefix=InsightCrew/ HEAD` → 220 files, including `uv.lock`, `.env.example`, both start scripts and the 30 archived journals; no `.env`, `.venv/`, `runs/` or `data/market/real/`. Unzipped into an empty directory: `uv sync` ok; `uv run pytest -q` → `380 passed`; `uv run insightcrew analyze --no-open` with no key and no `.env` → `delivered（原因 ok）；判断：accepted 2/3；核验：verified`, exit 0; `./start.sh --no-open --port 9876` → `GET /` 200, `/api/meta` `"mode":"scripted"`, stopped cleanly. `start.sh` keeps its executable bit.
+
+Not run, and why: `start.bat` on Windows (no Windows machine). Building the zip on Windows was not tried; all file names are ASCII.
+
+Committed: `dcb1001`, `8d57d74`, and this entry. Not pushed. The final zip is `../InsightCrew.zip` (outside the repository), built from the commit with this entry.
+
+For the next session: none in the repository. Outside it: demo video, slides, contribution statement.
 
 ## 9. Prompts for starting a session
 
