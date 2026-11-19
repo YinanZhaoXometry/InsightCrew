@@ -55,7 +55,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 16 | Version 2.1: the offline system with channels; 21 scenarios | done | Real `evidence`, wiring, `--channels`, `facts` channels, the grown views and prompt paragraphs, two report sections, five scenarios, three evaluation blocks. 21 scenarios match; eval all prints both blocks; `uncovered`'s report verified; replay of a channel run 一致. 462 tests. |
 | 17A | Version 2.1: SEC EDGAR and Eastmoney announcement adapters, with tests | done | 20 tests over synthetic saved responses (structure real, no real download): tag order per concept, span and form filters, duplicate keys keep the last, titles for 8-K items, paging and covers_from. 483 tests. |
 | 17B | Version 2.1: `fetch` downloads evidence | blocked | Code done, three checks green. The live acceptance run is blocked: Eastmoney's bars endpoint twice answered `Server disconnected without sending a response` (Yahoo 429 as before), so `fetch` exits 1 at the bars stage and the evidence downloads never start. `IC_SEC_CONTACT` **is** set in `.env` (key checked, value not read). Stopped per the network rule; the owner decides. |
-| 18 | Version 2.1: run page sections | not started | Needs WP16. First to be cut. |
+| 18 | Version 2.1: run page sections | done | Pipeline shows the two analyst stages when a run has them; the evidence area gains a channel-status line, a fundamentals table with the card, and an item list with signals; verified in the in-app browser for `channels_clean`, `uncovered` and `demo` (no channel → the page shows nothing new). 486 tests. |
 | 19 | Version 2.1: real-model runs with channels, `eval channels` | not started | Needs WP16, WP17B and the owner's agreement to spend |
 | 20 | Version 2.1: documents and packaging | not started | Needs everything else built or cut |
 
@@ -1052,6 +1052,27 @@ Unverified: the live SEC and Eastmoney-announcement endpoints from this code pat
 Files changed: `insightcrew/app/fetch.py` (the evidence stage), `insightcrew/adapters/edgar.py` (the `client()` factory — the one file outside WP17B's list, see question 11).
 
 Committed: no, until the owner settles question 11 and the network.
+
+### 2026-11-19 evening · WP18 · building session (GLM, via ZCode)
+
+Result: done. The run page shows the channels.
+
+Commands run, with the last lines of their output:
+
+- `uv run pytest -q` → `486 passed` (3 new page tests). `uv run ruff check .` → `All checks passed!` `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- Proof of 18.3: `scenarios` → `21` 相符; 30 archived journals → `replayed ok=30 bad=0`; `eval all` → all six lines unchanged (`19/19`、`0/6`、`6/6`、`0/2`、`277 × 29`、`46 × 12`、`864`、`16`).
+- Verified in the in-app browser (pages served over loopback from their run directories), DOM snapshots:
+  - `channels_clean`: pipeline holds eleven stages including 基本面分析 and 公告分析; timeline lanes 证据/基本面分析师/公告分析师 present; evidence area shows `基本面通道：可用` and `公告通道：可用`, the fundamentals table (1081 USD million etc. with the restatement note from the card), the item table D1–D3 with source titles, the signal list, stance and window note; usage table has nine role groups.
+  - `uncovered`: `基本面通道：不可用（0000.HK 在宇宙 synthetic 里没有年报数据文件）`, no fundamentals table, `公告通道：可用` with D1 and its signal.
+  - `demo` (no channel): pipeline has the original nine stages and **zero** channel mentions anywhere on the page — looks as it did.
+
+Not run, and why: nothing beyond the package. The page's JavaScript has no automated test beyond the three Python-side cases; the browser pass above is the acceptance evidence, at one window width.
+
+Files changed: `insightcrew/app/assets/page.html` (two stages, three lanes, channel-status lines, two evidence blocks, `.signals` style; chips skip stages a run never opened), `tests/test_run_page.py` (cases added).
+
+Committed: by path, then this file. See `git log`.
+
+For the next session: retry `fetch` once for WP17B; then WP19 (needs a key, present) and WP20.
 
 ## 9. Prompts for starting a session
 
