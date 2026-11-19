@@ -50,7 +50,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 12 | Local web app (`serve`) | done | Verified live in the browser: form starts a demo run, stream advances stages, same outcome and confidence lines as the CLI; THIN refuses; past runs open; clean shutdown. 409 covered by test. **Server rewritten by the planning session on 2026-11-19 08:50 and verified again.** |
 | 11 | Documents and packaging | done | README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP rewritten; `start.sh`, `start.bat`; a `git archive` zip unzipped into an empty directory passes `uv sync`, 380 tests and a keyless `analyze`. Session log entry "2026-11-19 10:05". |
 | 13 | Version 2.1: tag, branch, shared contracts, ports, the two analyst roles, audit checks, flow switch, settings | done | Authorised 2026-11-19; built the same evening. All seven contracts, both ports, both roles, the six audit checks, the flow switch and `[disclosures]` settings in place. `evidence` is the WP13 stub (every named channel `unavailable`, reason `尚未接入数据源`). 406 tests. |
-| 14 | Version 2.1: statements, both paths, the fundamentals ledger, synthetic statements | blocked | Code and 25 tests done and passing (two paths agree over a swept range; acceptance numbers all correct). **Blocked on question 8 (and 9) in section 7**: the synthetic statements file sits at the blueprint's path, which WP2's generator test forbids. Not committed until answered. |
+| 14 | Version 2.1: statements, both paths, the fundamentals ledger, synthetic statements | done | Both paths agree at every swept date; acceptance numbers exact (940 / 1105 / 1081 with warnings / 1090 / NotCovered); generator deterministic. 424 tests. Owner settled questions 8 and 9. |
 | 15 | Version 2.1: disclosures adapter, synthetic items | not started | Needs WP13 |
 | 16 | Version 2.1: the offline system with channels; 21 scenarios | not started | Needs WP14 and WP15 |
 | 17A | Version 2.1: SEC EDGAR and Eastmoney announcement adapters, with tests | not started | Needs WP14 and WP15 |
@@ -315,8 +315,8 @@ Gaps found while building (the plan warns about these; each stops the package th
 
 | # | Date | WP | The gap | Suggested answer |
 |---|---|---|---|---|
-| 8 | 2026-11-19 | 14, 15 | **Where synthetic evidence may live.** BLUEPRINT 18.7 puts evidence files at `data/market/<universe>/statements/<file_stem>.json` (and `disclosures/`). But WP2's test `tests/test_market.py::test_generator_writes_the_same_bytes_twice` snapshots `data/market/synthetic/` with `iterdir()` and asserts the entry set **equals exactly** the bars CSVs plus `universe.toml`; any subdirectory makes it fail (first as `IsADirectoryError`). The working rules forbid editing an existing test, and the blueprint's path is a name, which may not be changed without the owner. The two cannot both hold as written. | Allow a minimal edit to that one test's `_snapshot()` helper: list files only (`path.is_file()`), so the generator's own output set is still asserted exactly and evidence subdirectories are simply outside the snapshot. The alternative — moving evidence to a directory the test does not list, e.g. `data/evidence/<universe>/statements/` — changes a blueprint name and ripples into WP16's wiring and WP17's `fetch`. |
-| 9 | 2026-11-19 | 14, 16 | **`pe_fy` under a currency mismatch.** 18.6: "`pe_fy` is unavailable when the statements' currency differs from the instrument's." `build_fundamentals` has the instrument and can withhold the fact (implemented). But `recompute_fundamentals(statements, close, as_of, specs)` has no instrument, so it computes a value for `pe_fy` that path 1 never emits, and `disagreements` (not to be changed) would report `pe_fy` as a one-sided disagreement and halt the run. | WP16's `evidence` passes `recompute_fundamentals` the specs with price-dependent declarations (`fn == "price_multiple"`) removed whenever the currencies differ — signatures stay as written, `disagreements` stays untouched, and WP14 already tests exactly this split (see `test_pe_fy_is_unavailable_when_the_currency_differs`). |
+| 8 | 2026-11-19 | 14, 15 | **Where synthetic evidence may live.** BLUEPRINT 18.7 puts evidence files at `data/market/<universe>/statements/<file_stem>.json` (and `disclosures/`). But WP2's test `tests/test_market.py::test_generator_writes_the_same_bytes_twice` snapshots `data/market/synthetic/` with `iterdir()` and asserts the entry set **equals exactly** the bars CSVs plus `universe.toml`; any subdirectory makes it fail (first as `IsADirectoryError`). The working rules forbid editing an existing test, and the blueprint's path is a name, which may not be changed without the owner. The two cannot both hold as written. | Owner, 2026-11-19: **agreed to the suggested fix.** `_snapshot()` lists files only (`path.is_file()`); applied. Evidence stays at the blueprint's path; the generator's own output set is still asserted exactly. |
+| 9 | 2026-11-19 | 14, 16 | **`pe_fy` under a currency mismatch.** 18.6: "`pe_fy` is unavailable when the statements' currency differs from the instrument's." `build_fundamentals` has the instrument and can withhold the fact (implemented). But `recompute_fundamentals(statements, close, as_of, specs)` has no instrument, so it computes a value for `pe_fy` that path 1 never emits, and `disagreements` (not to be changed) would report `pe_fy` as a one-sided disagreement and halt the run. | Owner, 2026-11-19: **agreed.** WP16's `evidence` passes `recompute_fundamentals` the specs with price-dependent declarations removed whenever the currencies differ; signatures and `disagreements` untouched. |
 
 ### Corrections to the blueprint
 
@@ -341,6 +341,7 @@ When the owner settles a question, the fix goes into BLUEPRINT.md and is listed 
 | 2026-11-19 | 7, 11.2 | From WP8: the role declarations pass `max_output_tokens` (8000 quick, 12000 manager), because the ceiling includes reasoning tokens; the judges run at `effort="low"`. `roles/__init__.py` was edited for this, which section 5.2 did not list for WP8. |
 | 2026-11-19 | 10.3, 12.3 | `eval ablation` exists. `evals/run.py`'s `run` takes keyword arguments `open_run`, `analyze`, `base` and `no_model_reason`; `cli.py`'s `eval` command passes them for `ablation` only. Cells and configurations are in `evals/ablation.py`. |
 | 2026-11-19 11:10 | 18 (new), and one bullet in the introduction | **Section 18 added: the plan for version 2.1, evidence channels.** It is a proposal, not a correction: sections 0 to 17 are unchanged and still describe version 2.0 as built. Section 18 carries its own decisions (29 to 38), work packages (13 to 20), and the changes it asks for to invariants 3, 4, 6 and new invariants 17 and 18. None of it is in force until the owner agrees (the questions above). |
+| 2026-11-19 evening | 18.6, 18.7 (by way of questions 8 and 9) | **Two gaps settled by the owner.** (8) Evidence stays at `data/market/<universe>/{statements,disclosures}/`; WP2's `test_generator_writes_the_same_bytes_twice` had its `_snapshot()` helper amended (with authorisation) to list files only, so the generator's output set is still asserted exactly. (9) Under a currency mismatch, `evidence` (WP16) passes `recompute_fundamentals` the specs without price-dependent declarations; the blueprint's signatures and `disagreements` stand. |
 
 ## 8. Session log
 
@@ -941,6 +942,22 @@ Notes:
 Committed: no. The WP14 files and this entry wait for the owner's answers.
 
 For the next session: on answers to questions 8 and 9 — apply them, rerun the acceptance and the three checks, commit WP14, then WP15.
+
+### 2026-11-19 evening · WP14 unblocked and committed · building session (GLM, via ZCode)
+
+Result: done. The owner agreed to both suggested answers (section 7, questions 8 and 9). Applied: `_snapshot()` in `tests/test_market.py` now lists files only (the one authorised edit to an existing test); the blueprint's paths and signatures stand.
+
+Commands run, with the last lines of their output:
+
+- `uv run pytest -q` → `424 passed in 13.38s`. `uv run ruff check .` → `All checks passed!` `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- Proof of 18.3: `scenarios` → `16` 相符; 30 archived journals → `replayed ok=30 bad=0`; `eval all` → `19/19`、`0/6`、`277 × 29`、`864` (run in full before the commit; the file-listing fix touches no runtime code).
+- The package's acceptance numbers and the deterministic generator are in the blocked entry above; nothing changed since.
+
+Files changed beyond WP14's own list: `tests/test_market.py` (the authorised one-line `_snapshot()` fix), `docs/HANDOFF.md` (answers, correction, status).
+
+Committed: WP14 files by path plus the authorised test fix, then this file. See `git log`.
+
+For the next session: WP15 may start; it needs only WP13.
 
 ## 9. Prompts for starting a session
 
