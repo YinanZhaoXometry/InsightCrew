@@ -79,7 +79,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 36 | Version 2.2: report, page, `serve` | done | Overnight session. 六个新节全部按键驱动（组合状态/风险三方意见（只立场与批评）/工具事实进事实表并标注/新闻与宏观（预测市场单列"来源原话，未经核验"）/社交情感/用到的课程；run/wall_ms 在板上才画墙钟——问题 20 的 C 案下从不出现，分支已备）；页面：news/sentiment/risk 流水线段与泳道、ACTOR_STAGE/KEY_STAGE 映射、并行分析师组（≥2 位时并列成框、无箭头）、墙钟标签、镜像报告的证据区块、表单五字段（组合文件/风险轮数/工具/记忆/通道多选）经 prepare/open_run 透传，坏组合文件 422 且回复不带路径；replay_html.py 无需改动。本包文件 pytest 71 项绿、ruff/pyright 干净、页面 JS 过 node --check；demo 与 uncovered 的报告新旧模块逐字节相同；21 个既有场景逐一 ✓ 相符；43/43 归档重放一致；新增 13 场景中 12 个的报表已实跑核对（portfolio×3、risk×2、sentiment_clean、news_uncovered、memory×2、tools_out_of_range、news_clean、tools_clean——守卫修复落地后最后两个转绿）；仅 macro_clean 仍被挡：刚刚落地的 stages.audit 守卫把 `board.get("macro/facts", [])` 的第二参（应为类型）写成了列表，macro 键在板即 `TypeAdapter([])` 崩（该行的修正属 stages.py 的 owner）；宏观区块的报表在单元测试里以手造板键验证。续跑标记未做：日志没有续跑标记事件（按指示跳过）。全仓 pytest 的失败全在他人文件（见日志）。 |
 | 37 | Version 2.2: evaluations | done | Overnight session (问题 29 授权)。`eval all` 打印全部新行并退出 0：inject 加版本 2.2 块（组合状态翻转 ×2、新闻 claim 引未知宏观事实、情绪信号引未知帖、情绪分出带、教训带数字——6/6 发现、0/2 误报）；consistency 加工具块（7 家族 × 3 分析日 × 3 窗口 = 63 次调用，flows/tools 内部两路 + evals 独立复算 recompute 比对）与宏观块（4 序列 × 3 变换 × 8 分析日 = 96 点，macro vs macro_sql）；pit 加六块（新闻 9、社交 9、宏观 91 含 cpi 两次重述逐日 329.4→329.5/337.0→337.2、预测市场 6（fetched_on==as_of，评测自建临时档案、就地实现 19.8 规则，与 WP34 的 stage_news._markets 同一条规则各持一份）、教训 5（含边界日成员断言）、工具 63（漏 bar 检查，诚实端口 vs 无视 as_of 的坏端口同答案））。新测试 16 项（tests/test_inject.py、test_consistency.py、test_pit.py，各含伪造分歧/泄漏的检出用例）。run.py 仅 docstring（`all` 三项未变，新行随各评测打印）。 |
 | 38 | Version 2.2: real-model runs and ablation | not started | Spending only after the owner's yes and cap. |
-| 39 | Version 2.2: documents, notices, packaging | not started | Alone. |
+| 39 | Version 2.2: documents, notices, packaging | in progress | Documents + notices part done (02:05 session): README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP rewritten to version 2.2 as built; THIRD_PARTY_NOTICES lists the 20 adapted files; start scripts checked and unchanged; link check bad 0; three checks green. The zip rebuild and final packaging wait for WP38 (owner's cap). |
 
 **Work packages 0 to 12 are done: that is version 2.0, and it is a complete submission.** [ROADMAP.md](ROADMAP.md) lists its known issues and next steps. Work packages 13 to 20 are version 2.1, in [BLUEPRINT.md section 18](BLUEPRINT.md#18-version-21-evidence-channels). Work packages 21 to 39 are version 2.2, in [BLUEPRINT.md section 19](BLUEPRINT.md#19-version-22-langgraph-orchestration-and-five-capabilities).
 
@@ -1778,6 +1778,30 @@ Not run, and why: WP38 的真实模型格子（花钱,等问题 14 的上限）�
 Committed: WP32 b30a37e · WP33 6752c63 · WP34 60472f2 · WP35 e8c4623 · WP36 beb6678 · WP37 8f13d8e · 集成修复 97b461b · WP38 脚手架 fc8ce9e。
 
 For the next session: WP38（真实模型,先要上限）→ WP39（文档、THIRD_PARTY_NOTICES 清单、重打包 zip 并空目录验证）。owner 醒后的清单:问题 14（花费上限）、15、20（A/C 案取舍已按 C 落地）、21–32,以及是否批准 WP30 的端点。
+
+### 2026-11-20 02:05 · WP39 (documents part) · delegated session (GLM-5.3, via ZCode)
+
+Result: done — the documents and the notices list only. README, AGENTS, ARCHITECTURE, EVALUATION and ROADMAP rewritten to describe version 2.2 exactly as built (all five capabilities off by default; the 9 `eval v22` cells stated as AWAITING the owner's cap; no live endpoint of the five new sources fetched; wall_ms in memory only, question 20 option C). THIRD_PARTY_NOTICES's "Files adapted" list filled from `grep -rl "Adapted from TradingAgents"`: 20 files. start.sh / start.bat re-checked against reality and left unchanged (uv sync + serve still correct). The zip rebuild and final packaging were NOT done, per instruction: they wait for WP38's real-model runs and the owner's cap.
+
+Commands run, with the last lines of their output:
+  grep -rl "Adapted from TradingAgents" insightcrew data → 20 files (list now in THIRD_PARTY_NOTICES.md)
+  find insightcrew/evals/archive -maxdepth 1 -type d | wc -l → 43
+  uv run insightcrew eval all → exit 0（v2.2 新行全部打印：19/19+6/6+6/6、0 误报；工具 63 点、宏观 96 点一致；六个时点扫描 9/9/91/6/5/63）
+  uv run insightcrew eval v22 → 列出 9 个格子并说明等待 owner 的花费上限，退出码 2
+  uv run pytest -q → 825 passed in 18.65s
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  链接检查（自写 pathlib 脚本）→ README/AGENTS/ARCHITECTURE/EVALUATION/ROADMAP/THIRD_PARTY_NOTICES 的相对链接坏 0；HTML 锚点另见 Unverified
+
+Not run, and why: zip 的重建与空目录验证（按任务书推迟到 WP38 之后）；43 个归档的重放全量扫描与 34 场景全量（02:10 的 wave 条目当夜已验证,本包文件是纯文档,不影响它们）;无网络、无真实模型、未读 .env（问题 29）。
+
+Unverified: 文档中 HTML 锚点（GitHub 风格 #5-the-flow-the-graph 一类）与各文档目录项的对应用脚本只查了文件路径,锚点未逐个核对（锚点错不致断链,标题照抄原文风格）;页面/报告的视觉核对未做（本包未触及页面）。
+
+Files created or changed: README.md、AGENTS.md、docs/ARCHITECTURE.md、docs/EVALUATION.md、docs/ROADMAP.md、THIRD_PARTY_NOTICES.md、docs/HANDOFF.md（本行与本条目）。start.sh、start.bat 检查后未改。未触碰任何代码。
+
+Committed: no（协调方提交）。
+
+For the next session: WP38（先向 owner 要问题 14 的上限,试点后逐格跑,归档全部重放）;之后 WP39 收尾——重打包 ../InsightCrew.zip 并空目录验证（uv sync、825 测试、无密钥 analyze）。
 
 ## 9. Prompts for starting a session
 

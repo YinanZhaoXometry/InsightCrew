@@ -14,9 +14,34 @@ copyright line, and its `pyproject.toml` names no author. The attribution above
 follows the project's README and GitHub organisation (Tauric Research); it is
 recorded as HANDOFF question 15 for the owner to confirm.
 
-## Files adapted (filled at packaging)
+## Files adapted
 
-None yet. WP39 fills this list from `rg -l "Adapted from TradingAgents"`.
+Found by `grep -rl "Adapted from TradingAgents"` over `insightcrew/` and `data/` (WP39, 2026-11-20), one per line:
+
+```
+data/macro.toml
+insightcrew/adapters/decision_log.py
+insightcrew/adapters/fred.py
+insightcrew/adapters/polymarket.py
+insightcrew/adapters/reddit.py
+insightcrew/adapters/stocktwits.py
+insightcrew/adapters/vendors.py
+insightcrew/app/backtest.py
+insightcrew/domain/memory.py
+insightcrew/domain/memory_sql.py
+insightcrew/domain/portfolio.py
+insightcrew/domain/social.py
+insightcrew/flows/stage_risk.py
+insightcrew/flows/tools.py
+insightcrew/roles/prompts/news.md
+insightcrew/roles/prompts/reflector.md
+insightcrew/roles/prompts/risk_aggressive.md
+insightcrew/roles/prompts/risk_conservative.md
+insightcrew/roles/prompts/risk_neutral.md
+insightcrew/roles/prompts/sentiment.md
+```
+
+Twenty files. Each was rewritten to this project's contracts, layers, Chinese comments and conventions; none imports LangChain. `data/macro.toml` carries the header as its first comment line because its FRED alias mapping is taken from TradingAgents' `vendors/fred.py` (HANDOFF question 19).
 
 ---
 
