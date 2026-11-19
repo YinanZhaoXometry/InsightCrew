@@ -49,7 +49,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 10 | Run page, static | done | Verified in the in-app browser: mode badge, pipeline, audit rejection, route back to Trader, three judges, price chart, playback controls. **Page rewritten by the planning session on 2026-11-19 08:50 and verified again in the browser.** |
 | 12 | Local web app (`serve`) | done | Verified live in the browser: form starts a demo run, stream advances stages, same outcome and confidence lines as the CLI; THIN refuses; past runs open; clean shutdown. 409 covered by test. **Server rewritten by the planning session on 2026-11-19 08:50 and verified again.** |
 | 11 | Documents and packaging | done | README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP rewritten; `start.sh`, `start.bat`; a `git archive` zip unzipped into an empty directory passes `uv sync`, 380 tests and a keyless `analyze`. Session log entry "2026-11-19 10:05". |
-| 13 | Version 2.1: tag, branch, shared contracts, ports, the two analyst roles, audit checks, flow switch, settings | in progress | Authorised 2026-11-19 (all seven answers recorded in section 7). |
+| 13 | Version 2.1: tag, branch, shared contracts, ports, the two analyst roles, audit checks, flow switch, settings | done | Authorised 2026-11-19; built the same evening. All seven contracts, both ports, both roles, the six audit checks, the flow switch and `[disclosures]` settings in place. `evidence` is the WP13 stub (every named channel `unavailable`, reason `尚未接入数据源`). 406 tests. |
 | 14 | Version 2.1: statements, both paths, the fundamentals ledger, synthetic statements | not started | Needs WP13 |
 | 15 | Version 2.1: disclosures adapter, synthetic items | not started | Needs WP13 |
 | 16 | Version 2.1: the offline system with channels; 21 scenarios | not started | Needs WP14 and WP15 |
@@ -878,6 +878,34 @@ Files created or changed: `docs/BLUEPRINT.md` (one bullet in the introduction, a
 Committed: no. Both files are uncommitted on `v2`.
 
 For the next session: nothing, until the owner answers the questions under "Version 2.1" in section 7. When questions 1 to 4 are answered, WP13, alone. If the owner declines version 2.1, the submission is `../InsightCrew.zip` as built at 10:14, and section 18 and the rows for WP13 to WP20 stay as a record of a proposal that was not taken.
+
+### 2026-11-19 evening · WP13 · building session (GLM, via ZCode)
+
+Result: done. The owner answered all seven questions (section 7); this session filled the answers in, tagged, branched, committed the plan, then built WP13.
+
+Commands run, with the last lines of their output:
+
+- `git tag v2.0` on the head of `v2` (`9d3a0ff`), then `git switch -c v2.1`, then one commit of the two plan documents: `89d256f Plan: version 2.1`. `git tag -l` → `v1-data-analyst` / `v2.0`.
+- `uv run pytest -q` → `406 passed in 11.41s` (380 before; 26 new: 14 audit, 2 flow, 6 stages, 4 settings, plus the architecture assertions).
+- `uv run ruff check .` → `All checks passed!` `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- Proof of 18.3: `IC_FORCE_OFFLINE=1 uv run insightcrew scenarios` → `16` lines `✓ …：相符`, exit 0; `IC_FORCE_OFFLINE=1 uv run insightcrew eval all` → `故障 19/19 被发现；有效变体 0/6 误报` / `277 个数据点 × 29 项声明，全部一致` / `18 个数据点，比对 864 项事实：加新 K 线不改变任何事实，也没有事实晚于分析日`; `IC_FORCE_OFFLINE=1 uv run insightcrew replay <dir>` for each of the 30 directories in `insightcrew/evals/archive/` → `replayed ok=30 bad=0` (both real-bar journals included; `data/market/real/` is on this machine).
+- WP13's own acceptance (a scripted run with both channels named makes 7 calls and two `unavailable` statuses) is `tests/test_flow.py::test_unavailable_channels_make_no_model_call_and_behave_like_20`, passing.
+
+Not run, and why: nothing against a real model (the two new prompts are untested until WP19, as BLUEPRINT 7 warns); no channel reads real evidence yet — `evidence` is the stub 18.14 WP13 step 6 specifies, and WP16 replaces it.
+
+Unverified: whether the two new prompts work against a model; whether `channel_ready` gating reads well with a real `available` channel (WP16).
+
+Files created: `insightcrew/domain/statements.py`, `insightcrew/domain/disclosures.py`, `insightcrew/roles/prompts/fundamentals.md`, `insightcrew/roles/prompts/disclosures.md`. Edited: `insightcrew/domain/types.py` (seven contracts of 18.4, `Finding.owner` widened, `Point.cites` description), `insightcrew/domain/market.py` (`NotCovered`), `insightcrew/domain/audit.py` (the keyword parameters and the six checks of 18.10; `_points` widened to claim-cited fact IDs and signal-cited item IDs), `insightcrew/roles/__init__.py` (`FUNDAMENTALS`, `DISCLOSURES`, `ALL`), `insightcrew/flows/deps.py` (five new fields with defaults), `insightcrew/flows/analyze.py` (`FlowConfig.channels`, two pipeline stages, the `if cfg.channels` call after `ledger`), `insightcrew/flows/stages.py` (the `evidence` stub, `channel_ready`, the audit's channel branch and `audit/channels`, `audited_current` extended), `insightcrew/app/settings.py` (`[disclosures]`, `sec_contact`), `insightcrew.toml` (`[disclosures]`, a commented `channels` line), `.env.example` (the two lines of 18.11), `tests/fake_stages.py` (doubles for `evidence` and `channel_ready` only), `tests/test_audit.py`, `tests/test_flow.py`, `tests/test_stages.py`, `tests/test_settings.py`, `tests/test_architecture.py` (cases added; nothing removed).
+
+Notes:
+
+1. **`.env.example` carried an uncommitted line the plan did not put there**: `IC_SEC_CONTACT="Yinan Zhao your.email@example.com"` (a placeholder address, written after the planning session, not by it). Per answer 4 the contact belongs in `.env`, and 18.11 says `.env.example` gains the commented form only, so this session replaced that line with the blueprint's two comment lines. If the owner meant it to stay, say so. Whether `IC_SEC_CONTACT` actually sits in `.env` was not read and will be checked at WP17B.
+2. One interpretation worth recording: in `audit`, the widened `point_cites_claimed_fact` accepts an ID that a **claim of any analyst cited** or a **signal cited** — not any ID that merely exists among the fundamentals facts or items (18.10's "cited by a claim of any analyst"). Implemented and tested accordingly (`test_thesis_point_citing_an_uncited_fundamentals_fact_is_a_finding`).
+3. `stages.audit` writes `audit/channels` whenever at least one channel analysis is on the board (18.8), and `audited_current` then requires every entry's `seq` to match the board. With no channel, neither key is written — proven by `test_audit_without_channel_analysis_writes_no_channel_keys` and the 30 replays.
+
+Committed: WP13 files by path (see `git log`), then this file as `Status board: WP13 done`. On `v2.1`, not pushed.
+
+For the next session: WP14 and WP15 may start together (section 5.4 step 2).
 
 ## 9. Prompts for starting a session
 
