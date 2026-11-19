@@ -4,7 +4,9 @@ The status board for the rewrite described in [BLUEPRINT.md](BLUEPRINT.md). The 
 
 **Every session reads this file first, and before it ends updates [section 2](#2-status) and appends to [section 8](#8-session-log).**
 
-Last updated: 2026-11-19 02:35, by the planning session. Submission is 2026-11-23 23:59.
+Last updated: 2026-11-19 evening, by the building session. Submission is 2026-11-23 23:59.
+
+> **Version 2.0 is built: work packages 0 to 12 are done. Version 2.1 is authorised (2026-11-19): the owner answered all seven questions under [Version 2.1](#version-21-traps-and-open-questions) in section 7.** It adds two evidence channels, fundamentals and disclosures, as work packages 13 to 20. The design is [BLUEPRINT.md section 18](BLUEPRINT.md#18-version-21-evidence-channels). Build WP13 to WP20 in the order of section 5.4.
 
 > **The plan changed on 2026-11-19.** The owner reversed the zero-dependency decision: the system is built on maintained libraries (Pydantic AI, Pydantic, FastAPI, Typer, uv). BLUEPRINT.md, BLUEPRINT-REFERENCE.md and this file were revised together and are consistent. If you remember, or find in an older transcript, a version of the plan that says "standard library only", `python3 -m unittest`, `kernel/schema.py` or `adapters/openai_compat.py`, it is void.
 
@@ -14,8 +16,8 @@ Read in this order:
 
 1. This file.
 2. [BLUEPRINT.md](BLUEPRINT.md) sections 0.2, 2 and 3.
-3. The work package you were given, in BLUEPRINT.md section 13, and the sections it names.
-4. The files it names in [BLUEPRINT-REFERENCE.md](BLUEPRINT-REFERENCE.md).
+3. The work package you were given, and the sections it names. WP0 to WP12 are in BLUEPRINT.md section 13. WP13 to WP20 are in section 18.14; for those, read 18.1 to 18.3 as well.
+4. The files it names in [BLUEPRINT-REFERENCE.md](BLUEPRINT-REFERENCE.md). WP13 to WP20 name none: read the code as built.
 
 Which document to believe:
 
@@ -24,7 +26,7 @@ Which document to believe:
 | What to build, and every name in it | BLUEPRINT.md |
 | What is already built, and what is allowed | This file |
 | Why the design is what it is; the course fit | [TRANSFORMATION.md](TRANSFORMATION.md). Background only. Where it differs from the blueprint, the blueprint wins. |
-| `README.md`, the body of `AGENTS.md`, `ARCHITECTURE.md`, `EVALUATION.md`, `ROADMAP.md` | Nothing about the rewrite. They describe version 1, the data analyst, whose code WP0 deletes. Do not follow them, and do not edit them before WP11. |
+| `README.md`, the body of `AGENTS.md`, `ARCHITECTURE.md`, `EVALUATION.md`, `ROADMAP.md` | Since WP11 they describe version 2.0 as built, and are right about it. They say nothing about version 2.1. WP20 updates them; no earlier package of version 2.1 edits them. |
 
 ## 2. Status
 
@@ -47,10 +49,30 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 10 | Run page, static | done | Verified in the in-app browser: mode badge, pipeline, audit rejection, route back to Trader, three judges, price chart, playback controls. **Page rewritten by the planning session on 2026-11-19 08:50 and verified again in the browser.** |
 | 12 | Local web app (`serve`) | done | Verified live in the browser: form starts a demo run, stream advances stages, same outcome and confidence lines as the CLI; THIN refuses; past runs open; clean shutdown. 409 covered by test. **Server rewritten by the planning session on 2026-11-19 08:50 and verified again.** |
 | 11 | Documents and packaging | done | README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP rewritten; `start.sh`, `start.bat`; a `git archive` zip unzipped into an empty directory passes `uv sync`, 380 tests and a keyless `analyze`. Session log entry "2026-11-19 10:05". |
+| 13 | Version 2.1: tag, branch, shared contracts, ports, the two analyst roles, audit checks, flow switch, settings | in progress | Authorised 2026-11-19 (all seven answers recorded in section 7). |
+| 14 | Version 2.1: statements, both paths, the fundamentals ledger, synthetic statements | not started | Needs WP13 |
+| 15 | Version 2.1: disclosures adapter, synthetic items | not started | Needs WP13 |
+| 16 | Version 2.1: the offline system with channels; 21 scenarios | not started | Needs WP14 and WP15 |
+| 17A | Version 2.1: SEC EDGAR and Eastmoney announcement adapters, with tests | not started | Needs WP14 and WP15 |
+| 17B | Version 2.1: `fetch` downloads evidence | not started | Needs WP17A and WP16. The live download needs `IC_SEC_CONTACT` and the owner's request. |
+| 18 | Version 2.1: run page sections | not started | Needs WP16. First to be cut. |
+| 19 | Version 2.1: real-model runs with channels, `eval channels` | not started | Needs WP16, WP17B and the owner's agreement to spend |
+| 20 | Version 2.1: documents and packaging | not started | Needs everything else built or cut |
 
-**Every work package is done.** [ROADMAP.md](ROADMAP.md) lists known issues and next steps.
+**Work packages 0 to 12 are done: that is version 2.0, and it is a complete submission.** [ROADMAP.md](ROADMAP.md) lists its known issues and next steps. Work packages 13 to 20 are version 2.1, in [BLUEPRINT.md section 18](BLUEPRINT.md#18-version-21-evidence-channels).
 
 ## 3. The repository at handoff
+
+**As it stands on 2026-11-19 11:10**, before any work on version 2.1:
+
+- Branch `v2`, head `9d3a0ff`. The only tag is `v1-data-analyst`. Remote `origin` on GitHub holds only `main` at the first commit (`f80272c`); `v2` has no upstream and has not been pushed.
+- The working tree is clean except `docs/BLUEPRINT.md` and this file, which hold the plan for version 2.1 and are not committed.
+- `.env` exists and holds the model key. It is ignored by git. Never print it.
+- `data/market/real/` exists on this machine (four series from `fetch`). It is ignored by git.
+- `../InsightCrew.zip`, outside the repository, was built from `v2` at 10:14. It is version 2.0 and is the submission if version 2.1 is not finished.
+- 380 tests, 16 scenarios, 30 archived real-model journals.
+
+**As it stood before WP0.** The rest of this section is history:
 
 - Work in `InsightCrew/`. It is its own git repository: branch `main`, one commit (`f80272c`), no tags, remote `origin` on GitHub.
 - No code of version 2 exists yet. The working tree still holds version 1.
@@ -83,6 +105,12 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | API key | A DeepSeek key in `.env` (ignored by git) since 2026-11-19 09:00. Real-model runs cost money; WP8 spends on them. |
 | Topic change, with the instructor | Not changed (owner, 2026-11-19). |
 | Changing a name, a rule, a limit or an invariant in the blueprint | No. Stop and ask (section 7). |
+| Version 2.1: planning | Yes (2026-11-19). The owner chose both channels and asked for the plan to be written into the blueprint and this file, with no code, for review. |
+| Version 2.1: building (WP13 to WP20) | **Yes (2026-11-19).** The owner accepts the schedule and the stop-loss rule of 18.15. If time runs short, cut in the order of 18.15 and tell the owner before each cut. |
+| Version 2.1: the tag `v2.0`, the branch `v2.1`, commits | **Yes (2026-11-19).** WP13 tags `v2.0` on the head of `v2`, creates `v2.1`, and commits the uncommitted plan in `docs/BLUEPRINT.md` and this file as one commit `Plan: version 2.1`. Each package then commits its own files by path on `v2.1` after acceptance, message `WP<n>: <result>`. Never push; never commit on `v2` again. |
+| Version 2.1: live downloads from the SEC and Eastmoney | **WP17B may (2026-11-19): the live downloads its acceptance names, once each.** The SEC is called only with a contact address the owner supplies as `IC_SEC_CONTACT` in `.env`; if it is absent at WP17B, skip the real SEC download and say so in the log — do not invent one and do not read `.env`'s contents. The planning session made one-off, read-only requests to nine public endpoints on 2026-11-19 to see whether the sources answer (session log); nothing was written into the repository. |
+| Version 2.1: real-model spending (WP19) | **Yes (2026-11-19), cap 2 USD.** Stop and ask the owner when close to the cap. |
+| Version 2.1: packages | None is needed. The rule above stands: no `uv add`, no upgrade. |
 
 ## 5. What may run at the same time
 
@@ -162,6 +190,53 @@ Three files need care:
 5. **The three checks, at the two joins.** Before WP5 starts and before WP11 starts, the session that starts them runs the three checks while no other agent is working, except that WP9A may still be running before WP5. They must be entirely clean. Whatever fails then goes back to the package that owns the file.
 6. **Mark your row `in progress` before you write your first file**, so that the others can tell whose a failure is.
 
+### 5.4 Version 2.1: work packages 13 to 20
+
+Nothing here starts before the owner's go-ahead (section 4). `17A` and `17B` are the two parts of WP17.
+
+| Step | Starts when | May run at the same time | Agents at once |
+|---|---|---|---|
+| 1 | The owner's go-ahead | **WP13**. Alone: it tags, branches, and changes files every later package builds on. | 1 |
+| 2 | WP13 is done | **WP14** · **WP15** | 2 |
+| 3 | WP14 and WP15 are both done | **WP16** · **WP17A** | 2 |
+| 4 | WP16 is done | **WP18** · **WP17B** (also needs WP17A) | 2 |
+| 5 | WP16 and WP17B are done, or WP17 is cut | **WP19** · WP18 if it is still running | up to 2 |
+| 6 | Everything else is done or cut | **WP20**. Alone. | 1 |
+
+```mermaid
+flowchart LR
+    WP13 --> WP14 --> WP16
+    WP13 --> WP15 --> WP16
+    WP14 --> WP17A
+    WP15 --> WP17A --> WP17B
+    WP16 --> WP17B --> WP19
+    WP16 --> WP18 --> WP20
+    WP16 --> WP19 --> WP20
+```
+
+The chain that cannot be made parallel is WP13, 14, 16, 19, 20: about 19.5 of the 26.5 hours. The blueprint's section 18.15 has the dates, the order of cuts, and the rule for stopping.
+
+The files each package owns. Paths under `insightcrew/` are written without that prefix.
+
+| Package | Creates | Edits, in files it did not create |
+|---|---|---|
+| WP13 | `domain/statements.py`, `domain/disclosures.py`, `roles/prompts/fundamentals.md`, `roles/prompts/disclosures.md` | `domain/types.py`, `domain/market.py`, `domain/audit.py`, `roles/__init__.py` (the two new roles and `ALL` only), `flows/deps.py`, `flows/analyze.py`, `flows/stages.py`, `app/settings.py`, `insightcrew.toml`, `.env.example`, `tests/fake_stages.py`, `tests/test_audit.py`, `test_flow.py`, `test_stages.py`, `test_settings.py`, `test_architecture.py` |
+| WP14 | `domain/fundamentals.py`, `domain/fundamentals_sql.py`, `domain/fundamentals_ledger.py`, `data/fundamentals.toml`, `adapters/statements_json.py`, `data/make_statements.py`, `data/market/synthetic/statements/`, `tests/test_fundamentals.py` | `adapters/declarations.py`: adds `load_fundamentals`. `tests/test_architecture.py`: the second pair of paths. |
+| WP15 | `adapters/disclosures_json.py`, `data/make_disclosures.py`, `data/market/synthetic/disclosures/`, `tests/test_disclosures.py` | |
+| WP16 | Five files in `data/scenarios/` | `flows/stages.py` (`evidence`), `app/wiring.py`, `roles/__init__.py` (the `reads` of the existing roles), the prompts of `bull`, `bear`, `manager` and `judge`, `app/report.py`, `app/cli.py`, `evals/inject.py`, `evals/consistency.py`, `evals/pit.py`, `evals/scenarios.py`, `tests/test_stages.py`, `test_report.py`, `test_scenarios.py`, `test_cli.py`, `test_wiring.py`, `test_architecture.py` |
+| WP17A | `adapters/edgar.py`, `adapters/eastmoney_ann.py`, `tests/test_edgar.py`, `tests/test_eastmoney_ann.py`, `tests/fixtures/edgar/`, `tests/fixtures/eastmoney_ann/` | |
+| WP17B | | `app/fetch.py` |
+| WP18 | | `app/assets/page.html`, `app/replay_html.py`, `tests/test_run_page.py` |
+| WP19 | `evals/channels.py`, new directories under `evals/archive/` | `evals/run.py`, the `eval` command in `app/cli.py`, `roles/prompts/*.md`, `insightcrew.toml` |
+| WP20 | | `README.md`, `AGENTS.md`, `docs/`, the start scripts |
+
+Rules, in addition to 5.3:
+
+1. **Git.** WP13 is the one package that tags and switches: `git tag v2.0` on the head of `v2`, then `git switch -c v2.1`. After that everyone stays on `v2.1`, and rule 2 of section 5.3 applies with `v2.1` in place of `v2`. Nothing is committed on `v2` again, so `v2` and the tag stay the version that was verified. The uncommitted plan in `docs/BLUEPRINT.md` and this file travels to `v2.1` with the switch.
+2. **Nobody outside this table edits `insightcrew/kernel/`, `pyproject.toml` or `uv.lock`.** No package of version 2.1 needs to.
+3. **`tests/test_architecture.py` is edited by WP13, WP14 and WP16**, which never run at the same time. Each adds assertions and changes none.
+4. **The join.** Before WP16 starts, and before WP20 starts, the three checks and the proof in the blueprint's section 18.3 are run while no other agent is working.
+
 ## 6. Environment
 
 | Fact | Value |
@@ -210,6 +285,32 @@ Add one line per question: date, work package, the question, and the answer once
 | 2026-11-19 08:50 | 8 | **`.env.example` has an uncommitted change that puts what looks like a real DeepSeek key on the `DEEPSEEK_API_KEY=` line** (file modified at 08:05, not by the session then running). `.env.example` is tracked; `.env` is the ignored file the program reads, and it does not exist. Nothing reads the key where it is, so every run is still scripted. **Do not `git add` that file as it stands.** The owner decides: move the value to `.env` and restore `.env.example`, and consider replacing the key, since it has been shown in a tool output of that session. | Owner, 2026-11-19 09:00: move it. Done: `.env` created from it (mode 600, ignored by git), `.env.example` restored to its committed text. Owner, 09:05: the key is not replaced. |
 | 2026-11-19 09:05 | — | Topic change with the instructor | Owner: the topic is not changed. |
 
+### Version 2.1: traps and open questions
+
+Traps, for whoever builds WP13 to WP20:
+
+- **The plan is a design and nothing in it has been run.** BLUEPRINT.md section 18 was written by reading the code, not by building. Gaps are likely. When you find one, stop, record it in the table below, and ask.
+- **The compatibility rule (18.3) is the one thing that must not break.** With no channel switched on, a run writes the artifacts and sends the prompts of version 2.0. The 30 archived journals and every number in EVALUATION.md depend on it. Run the proof at the end of every package. If an archived journal stops replaying, the package is wrong; the journal is not.
+- **The contracts listed in 18.3 gain no field.** `AuditStatus` in particular stays as it is; the channel analyses are tracked in `audit/channels`.
+- **Three statements in the traps above are amended for version 2.1, if the owner agrees.** `flows/analyze.py` changes a second time, in WP13, in the three places 18.8 names. `tests/fake_stages.py` and `tests/test_flow.py` gain doubles and cases; nothing in them is changed or removed. The kernel stays frozen.
+- **Replay does not compare a role's instructions.** WP16 adds a paragraph to the prompts of `bull`, `bear`, `manager` and `judge`. The archived runs will still replay, but they were made with the old wording, and the documents must say so (WP20).
+- **Evidence files live in subdirectories of a universe** (`statements/`, `disclosures/`). Check that nothing which lists a universe's bars picks them up. The proof in 18.3 would show it.
+- **The SEC is never called without `IC_SEC_CONTACT`,** and tests never call it at all. Eastmoney's announcement endpoint is unofficial and may change or refuse.
+- **A certificate error or an HTTP 502 on a download is not a reason to retry.** Section 6 applies.
+- **`insightcrew.__version__` is still 2.0.0.** No package changes it unless the owner says so (question 7).
+
+Questions for the owner. Answered 2026-11-19; WP13 to WP20 are authorised.
+
+| # | Date | Question | Answer |
+|---|---|---|---|
+| 1 | 2026-11-19 | May version 2.1 be built at all, given four and a half days and about 26.5 hours of estimated work? Version 2.0 stays a complete submission throughout; if WP16 is not done by the end of 11-21 the plan stops and ships version 2.0 behaviour (18.15). | Yes (2026-11-19): build it, accepting the schedule and the stop-loss rule of 18.15. |
+| 2 | 2026-11-19 | Section 4 says a name, a rule, a limit or an invariant in the blueprint is not changed without the owner. Version 2.1 changes these: `FlowConfig` gains `channels`; `Finding.owner` gains two values; `flows/analyze.py` gains two pipeline stages; invariants 3, 4 and 6 are reworded or extended; invariants 17 and 18 are new (18.16). Agreed? | Yes (2026-11-19), to question 2's list and to the changes 18.16 lists. No other name, rule, limit or invariant changes without asking first. |
+| 3 | 2026-11-19 | May WP13 create the tag `v2.0` and the branch `v2.1`, and may each package commit its own files by path on `v2.1` when its acceptance passes? No push. | Yes (2026-11-19). After switching to `v2.1`, first commit the uncommitted plan in `docs/BLUEPRINT.md` and this file alone as `Plan: version 2.1`. Then one commit per accepted package, by path, message `WP<n>: <result>`. Never push; never commit on `v2` again. |
+| 4 | 2026-11-19 | The SEC asks callers to identify themselves. Will the owner put a contact (a name and an email address) in `.env` as `IC_SEC_CONTACT`? Without it, real US statements and filings are not downloaded and both channels run on synthetic evidence for US tickers. | The owner writes `IC_SEC_CONTACT` into `.env` themselves (2026-11-19). If it is still absent when WP17B starts, skip the real SEC download and say so in the log; do not invent a contact and do not read `.env`'s contents. |
+| 5 | 2026-11-19 | May WP17B make the live downloads its acceptance names, and may WP19 spend on real-model runs (estimated 1 to 2 USD, twelve runs and the prompt fixes before them)? | Yes (2026-11-19): the live downloads named in WP17B's acceptance, once each; WP19's real-model runs allowed, spending capped at 2 USD — stop and ask when close to the cap. |
+| 6 | 2026-11-19 | The chat on 2026-11-19 showed six stages and about 22 hours. Written out, the plan is eight packages and about 26.5 hours: the run page became its own package, and the real sources were split so that the adapters can be built beside WP16. Is the larger figure acceptable, or should a cut be taken now (18.15 lists them in order)? | The 26.5-hour estimate is accepted (2026-11-19). If time runs short, cut in the order of 18.15 and tell the owner before each cut. |
+| 7 | 2026-11-19 | Should the version become 2.1.0 in WP20? It is written in `pyproject.toml` and `insightcrew/__init__.py` and recorded in every `run.started`; changing it changes the project's own entry in `uv.lock`, which no package is otherwise allowed to touch. Until answered it stays 2.0.0. | No (2026-11-19): the version stays 2.0.0; do not change `pyproject.toml` or `uv.lock`. |
+
 ### Corrections to the blueprint
 
 When the owner settles a question, the fix goes into BLUEPRINT.md and is listed here, so that a later session knows the text changed.
@@ -232,6 +333,7 @@ When the owner settles a question, the fix goes into BLUEPRINT.md and is listed 
 | 2026-11-19 | 9.4, 3.2 | A second real-bar source: `adapters/eastmoney.py`, used by `fetch` when Yahoo fails, and `adapters/real_universe.py`, shared by both adapters. Tests: `tests/test_eastmoney.py`, `tests/fixtures/eastmoney/`. |
 | 2026-11-19 | 7, 11.2 | From WP8: the role declarations pass `max_output_tokens` (8000 quick, 12000 manager), because the ceiling includes reasoning tokens; the judges run at `effort="low"`. `roles/__init__.py` was edited for this, which section 5.2 did not list for WP8. |
 | 2026-11-19 | 10.3, 12.3 | `eval ablation` exists. `evals/run.py`'s `run` takes keyword arguments `open_run`, `analyze`, `base` and `no_model_reason`; `cli.py`'s `eval` command passes them for `ablation` only. Cells and configurations are in `evals/ablation.py`. |
+| 2026-11-19 11:10 | 18 (new), and one bullet in the introduction | **Section 18 added: the plan for version 2.1, evidence channels.** It is a proposal, not a correction: sections 0 to 17 are unchanged and still describe version 2.0 as built. Section 18 carries its own decisions (29 to 38), work packages (13 to 20), and the changes it asks for to invariants 3, 4, 6 and new invariants 17 and 18. None of it is in force until the owner agrees (the questions above). |
 
 ## 8. Session log
 
@@ -738,6 +840,45 @@ Committed: `dcb1001`, `8d57d74`, and this entry. Not pushed. The final zip is `.
 
 For the next session: none. Known issues and next steps are in ROADMAP.md.
 
+### 2026-11-19 11:10 · planning version 2.1 · planning session
+
+Result: plan written; nothing built. The owner asked what InsightCrew can learn from the information layer of `TradingAgents-main/` and for a roadmap, a design and an ordered plan. Of the options offered, the owner chose both channels (fundamentals and disclosures), and chose to have the plan written into BLUEPRINT.md and this file, with no code, for review before any building.
+
+What was read, and what it showed:
+
+- `TradingAgents-main/`: `tradingagents/graph/setup.py`, `graph/analyst_execution.py`, `agents/analysts/`, `agents/tools.py`, `agents/context.py`, `dataflows/router.py`, `date_window.py`, `errors.py`, `vendors/` (SEC EDGAR, FRED, StockTwits, Reddit, Yahoo), `default_config.py`, the README and the figures under `assets/`. Read only; nothing copied. Its architecture figure names sources (X, Bloomberg, Reuters, FinnHub, EODHD) that the code does not call. What the code does is in the table in BLUEPRINT.md 18.1.
+- InsightCrew as built: the roles, the flow, the stages, `Deps`, the contracts, the audit, the kernel runtime and board, the scripted and replay models, `app/replay.py`, the settings, the commands, the report, a scenario file. The finding that shaped the design: replay compares every user prompt and the whole board, and `run.started` records the flow configuration, so a new feature must write nothing and change no prompt when it is switched off.
+
+Commands run, with their results:
+
+- One-off, read-only requests from this machine to see whether candidate sources answer. Output was kept in `/tmp/ic_probe/`, outside the repository:
+  - SEC `companyfacts` for AAPL → 200. Each figure carries `filed`; the newest annual rows end 2026-09-26, filed 2026-11-03 on a 10-K.
+  - SEC `submissions` for AAPL → 200. 1004 filings under `recent`, 2015-10-07 to 2026-11-18.
+  - SEC `company_tickers.json`, with no contact address → 403. With an address: not tried.
+  - Eastmoney announcement list for 00700 → 200. 1508 announcements, each dated and categorised. Paging not tried.
+  - HKEX's stock-code lookup → 200. Not used in the plan.
+  - Yahoo's RSS feed for AAPL → 200, 19 items spanning about 6 hours. Google News RSS → 200, 59 items spanning under 3 days. Both too recent for a point-in-time rule; not used.
+  - GDELT → 429. Not used.
+  - FRED's CSV download → curl error 92, an HTTP/2 stream error and not a certificate error. Not retried; macro data is out of scope.
+- `git status --short`, `git tag -l`, `git branch -a -vv`: the state recorded in section 3.
+
+Not run, and why:
+
+- The three checks, the scenarios and the evaluations. No code, test, prompt or setting was changed, so their results are those of the 10:05 entry.
+- Anything against a model. No download into the repository.
+
+Unverified:
+
+- Every part of BLUEPRINT.md section 18. It is a design. In particular: the compatibility rule rests on `Board.view` leaving out a key that is absent and on no role reading by wildcard, both read in the code (`kernel/board.py`, `roles/__init__.py`) and not tested with a new key in `reads`; the tag list and the 350-to-380-day filter for SEC figures were checked against one company; Eastmoney's paging and its behaviour for a US ticker are unknown; the two new prompts are not written.
+- The hour estimates.
+- The call counts stated for the new scenarios in 18.13 and for WP13's acceptance in 18.14. They were worked out by hand from the flow.
+
+Files created or changed: `docs/BLUEPRINT.md` (one bullet in the introduction, and section 18), this file (the notice at the top, sections 1 to 5 and 7, section 9, this entry). No file under `insightcrew/`, `tests/` or `data/`.
+
+Committed: no. Both files are uncommitted on `v2`.
+
+For the next session: nothing, until the owner answers the questions under "Version 2.1" in section 7. When questions 1 to 4 are answered, WP13, alone. If the owner declines version 2.1, the submission is `../InsightCrew.zip` as built at 10:14, and section 18 and the rows for WP13 to WP20 stay as a record of a proposal that was not taken.
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.
@@ -745,6 +886,12 @@ The owner pastes one of these. Replace `<label>` with the package's label in the
 **Any package except WP0.** The same prompt serves whether the agent works alone or beside others:
 
 > Work in `InsightCrew/`. Read `docs/HANDOFF.md` first and follow its section 1. You are doing WP`<label>` from `docs/BLUEPRINT.md`: implement it exactly as written and do not start any other work package. First check in `docs/HANDOFF.md` section 5.1 that everything it needs is done, and set its row to `in progress`. Other agents may be working in the same directory at the same time: touch only the files section 5.2 lists for your package, and follow the rules in section 5.3. Run the acceptance commands and the three checks (`uv run pytest -q`, `uv run ruff check .`, `uv run pyright`) and show me the output. Then set your row in the status table and append a session log entry. Do not add or upgrade any package. If the blueprint is ambiguous, silent, or contradicts a test, stop, record the question in `docs/HANDOFF.md`, and ask me. You may commit your own files by path on branch `v2` once the acceptance commands pass, as section 5.3 describes; never push. Reply to me in Chinese.
+
+**A package of version 2.1, WP14 to WP20.** Use the prompt above with three changes: the package is in `docs/BLUEPRINT.md` section 18.14 and the agent reads 18.1 to 18.3 first; the sets, files and rules are in section 5.4; the branch is `v2.1`. Add: "Before you finish, run the proof in section 18.3 and show me its output."
+
+**WP13.** It runs alone, and only after the owner has answered questions 1 to 4 under "Version 2.1" in section 7:
+
+> Work in `InsightCrew/`. Read `docs/HANDOFF.md` first and follow its section 1. Implement WP13 from `docs/BLUEPRINT.md` section 18.14 exactly as written, after reading 18.1 to 18.5 and 18.8 to 18.11; do not start any other work package. Touch only the files section 5.4 lists for WP13. Do not edit `insightcrew/kernel/`, `pyproject.toml` or `uv.lock`, and do not add or upgrade any package. Run the three checks and the proof in section 18.3 and show me the output. Then set your row in the status table and append a session log entry. If the blueprint is ambiguous, silent, or contradicts a test, stop, record the question in `docs/HANDOFF.md`, and ask me. You may create the tag `v2.0` on the head of `v2` and the branch `v2.1`, and commit your own files by path on `v2.1` once acceptance passes; never push. Reply to me in Chinese.
 
 **WP0.** It runs alone; start nothing else until it is done:
 

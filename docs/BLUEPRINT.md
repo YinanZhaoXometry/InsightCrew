@@ -5,6 +5,7 @@ Status: **plan, not yet built.** Written 2026-11-19, and revised the same day wh
 - [BLUEPRINT-REFERENCE.md](BLUEPRINT-REFERENCE.md) holds the reference code this plan points to: the project file, the whole kernel, the model adapters, both indicator implementations, the role declarations and prompts, the analysis flow, and their tests. The code was run before it was written down; [section 0.3](#03-what-has-been-verified) says exactly what that covers.
 - [HANDOFF.md](HANDOFF.md) is the status board: which work packages are done, what the owner has authorised, and the session log. This document says what to build; that one says where the work stands.
 - [TRANSFORMATION.md](TRANSFORMATION.md) is the earlier proposal. It remains the record of what was learned from the two reference systems and of the fit with the course requirements. Where the two documents differ, this one wins. [Section 17](#17-relation-to-transformationmd) lists the differences.
+- Sections 0 to 17 describe version 2.0, which is built: work packages 0 to 12 are done. [Section 18](#18-version-21-evidence-channels) is the plan for version 2.1, which adds two evidence channels (fundamentals and disclosures). It was proposed on 2026-11-19 and nothing in it is built.
 
 ## 0. Reading guide
 
@@ -1602,3 +1603,626 @@ The earlier invariant "nothing outside the standard library is imported" was wit
 | Section 15: module map | Void. There is no old module to map from. |
 | Section 16: course fit | Kept. The count of model roles and the argument are unchanged. |
 | Any statement that the project uses only the standard library, has no dependencies, or runs with nothing installed | Void since decision 12. |
+
+## 18. Version 2.1: evidence channels
+
+Status: **proposed on 2026-11-19. Design only; nothing is built or tested.** Building starts when the owner has answered the open questions recorded in [HANDOFF.md](HANDOFF.md) section 7 under "version 2.1". Sections 0.2, 2, 3 and 15 apply to this work unchanged. For a run with a channel switched on, this section wins where it differs from sections 5 to 12. For a run with no channel, sections 5 to 12 stand as written.
+
+### 18.1 What is added, and what was learned
+
+Version 2.0 reads one kind of evidence: price and volume. Version 2.1 adds two more, each as a channel that can be switched on:
+
+| Channel | Evidence | Read by | Checked by |
+|---|---|---|---|
+| `fundamentals` | Annual figures as the company filed them: revenue, net income, earnings per share, cash flow, assets, liabilities, and ratios computed from them. They are facts. | Fundamentals Analyst (model, quick) | Code: computed by two paths, and every claim is checked against the fact, as for the Technical Analyst |
+| `disclosures` | Company filings and announcements, each with its publication date. They are items: text, not numbers. | Disclosure Analyst (model, quick) | Code checks that every cited item exists and was published by the analysis date. Whether a reading is right is judgment, and goes to the judges. |
+
+Both channels work the way the Technical Analyst already does: code fetches and computes, and the model reads its view and fills a contract in one call. No role calls a tool. The kernel does not change, and no package is added.
+
+The source of the idea is the information layer of TradingAgents, read again on 2026-11-19 (`TradingAgents-main/tradingagents/agents/`, `dataflows/`, `graph/setup.py`; no code is copied). Its architecture figure names sources its code does not use; what is worth taking is how it acquires data:
+
+| Practice in TradingAgents | Where | Here |
+|---|---|---|
+| Four analysts, each on its own kind of data | `agents/analysts/` | **Adopt** two more: fundamentals and disclosures |
+| One analyst gets its data fetched by code and put in the prompt, and returns a structured report | `analysts/sentiment_analyst.py` | **Adopt** for both channels. It is what the Technical Analyst already does. |
+| Three analysts call tools in a loop, capped at 20 rounds and then told to write the report | `graph/setup.py` | **Not taken.** It would need a kernel change. Its own comments record why it needed a cap (#1420), a verified snapshot (#830) and a move to pre-fetching (#1130). |
+| Statements as filed, with filing dates; a restated figure is served at the version on file on the run's date | `dataflows/vendors/sec_edgar.py` | **Adopt.** The fundamentals channel |
+| A feed that cannot reach a window is reported as unavailable, not as empty; a vendor that failed has said nothing about the instrument | `dataflows/date_window.py`, `dataflows/router.py` | **Adopt** for both channels ([18.5](#185-ports-errors-and-point-in-time-rules)) |
+| Data with no historical vintage is withheld from a run dated in the past | `date_window.py` (`withhold_*`) | **Adopt.** Hong Kong statements have no free source with filing dates, so that channel reports unavailable for Hong Kong. |
+| Analysts are chosen per run | `graph/analyst_execution.py` | **Adopt** as `FlowConfig.channels` |
+| Optional data degrades to a marker; core data stops the run | `router.py` (`OPTIONAL_CATEGORIES`) | **Adopt.** Bars stay core. A channel that fails is marked unavailable and the run continues. |
+| Analysts run at the same time | `graph/setup.py` | **Not taken now.** It would reorder the journal, which replay compares. |
+| Social posts from StockTwits and Reddit | `dataflows/vendors/` | **Not taken.** The feeds are not archived; its own docstring says a historical run's sentiment inputs are not point-in-time. |
+| Macro series and prediction markets | `vendors/fred.py`, `vendors/polymarket.py` | **Not taken now** |
+
+Not in scope for version 2.1: media news, social media, macro data, quarterly figures, Hong Kong statements, tool-calling roles, parallel analysts, the portfolio, memory.
+
+### 18.2 Decisions
+
+Made by the coding assistant on 2026-11-19 after the owner chose the scope (both channels). Each can be reversed by saying so.
+
+| # | Decision | Reason | Cost to reverse |
+|---|---|---|---|
+| 29 | A channel is code that fetches, plus one role that reads. No tool loop. | Keeps "code owns truth", and needs no kernel change. | Low |
+| 30 | Channels are a flow setting, `FlowConfig.channels`, and the default is none. The Technical Analyst always runs. | The 16 scenarios, the 30 archived journals and every number in the documents stay valid. A channel becomes an ablation dimension for free. | Low |
+| 31 | With no channel on, a run writes the same artifacts and sends the same prompts as version 2.0 ([18.3](#183-the-compatibility-rule)). | Replay compares prompts and the board exactly. Without this rule the archived evidence would stop replaying. | High once broken |
+| 32 | Fundamentals are annual figures only, as filed, taken from annual reports. | A fourth quarter is not filed on its own and year-to-date figures are easy to misread as quarters; TradingAgents' adapter spends most of its length on that. Annual figures avoid it. | Medium |
+| 33 | The second channel carries company filings and announcements from official or archived sources, not media news. | Filings are dated, archived and attributable, so the point-in-time rule can be kept. The two keyless news feeds tried on 2026-11-19 held 6 hours and under 3 days of items ([18.18](#1818-what-has-been-verified)). | Medium: another adapter behind the same port |
+| 34 | A channel has three states: `available`, `empty`, `unavailable`. | "The source could not say" and "nothing was published" are different claims. | Low |
+| 35 | A channel that cannot be read never stops a run. A disagreement between the two fundamentals paths does. | A missing channel is missing evidence, which the report can state. A disagreement is a bug in code the guarantee rests on. | Low |
+| 36 | Each analyst is its own pipeline stage, in the order `technical`, `fundamentals`, `disclosures`. A revision still reruns its stage and every stage after it. | One rule, already tested. The cost is two quick calls when the Technical Analyst is sent back, which did not happen in 29 real runs. | Low |
+| 37 | The SEC is called only when the owner has set a contact address, and every request carries it. | The SEC asks callers to identify themselves; its ticker list answered 403 without an address on 2026-11-19. | None |
+| 38 | Money facts are in millions of the reporting currency. | A twelve-digit number in a prompt and a report invites misreading. | Low |
+
+### 18.3 The compatibility rule
+
+When `FlowConfig.channels` is empty, a run must write the artifacts version 2.0 writes and send the prompts it sends: no new board key, no new field in any artifact, and the same prompt for every role. The one difference in the journal is that `run.started` records the new field, as an empty list. Replay does not compare that event.
+
+It holds because of three properties, and each work package must keep them:
+
+1. **No contract that reaches the board in such a run gains a field.** `Fact`, `Analysis`, `Thesis`, `Proposal`, `Verdict`, `Finding`, `RuleResult`, `AuditStatus`, `DataCard`, `Scope`, `Outcome`, `Instrument` and `RuleSpec` keep their fields. Widening a `Literal` is allowed; it does not change what is written.
+2. **New keys are written only by channel code,** and channel code runs only when a channel is on.
+3. **A role's view grows only by keys that are absent in such a run.** `Board.view` renders the keys that exist, so an added entry in `reads` changes no prompt.
+
+A role's instructions and a field's `description` are not compared by replay, and may change. They are still prompt changes: untested until a real-model run, and the archived runs were made with the old wording.
+
+The proof, required in the acceptance of every package from WP13 on:
+
+- `uv run insightcrew scenarios`: the 16 scenarios of version 2.0 still match.
+- `IC_FORCE_OFFLINE=1 uv run insightcrew replay <dir>` for each of the 30 directories in `insightcrew/evals/archive/`: every one prints `一致`. The two journals on real bars need `data/market/real/`, which is not committed; if it is absent, say so and report 28.
+- The first block of `eval inject` still prints 19 of 19 and 0 of 6, `eval consistency` still prints 277 data points and 29 outputs, and `eval pit` still prints 864 facts.
+
+### 18.4 Contracts
+
+Added to `domain/types.py` in WP13. All are `Contract` subclasses.
+
+| Contract | Fields | On the board at |
+|---|---|---|
+| `ChannelStatus` | `channel: Literal["fundamentals", "disclosures"]`, `state: Literal["available", "empty", "unavailable"]`, `reason: str` (one Chinese sentence; empty when available) | `<channel>/status` |
+| `FundamentalsCard` | `source: str`, `currency: str`, `fiscal_year_end: str` (ISO), `filed: str` (ISO, the latest filing date used), `rows: int`, `unavailable: tuple[Unavailable, ...]`, `warnings: tuple[str, ...]` | `fundamentals/card` |
+| `Item` | `id: str` (`D1`, `D2`, ...), `published: str` (ISO date), `source: str`, `kind: str`, `title: str`, `ref: str` | `disclosures/items`, as a list |
+| `DisclosureCard` | `source: str`, `window_from: str`, `window_to: str` (ISO), `items: int`, `dropped: int`, `truncated: int` | `disclosures/card` |
+| `Signal` | `item: str` (an item ID given to the role), `direction: Literal["positive", "negative", "neutral"]`, `reading: str` (one sentence) | inside `DisclosureAnalysis` |
+| `DisclosureAnalysis` | `signals: tuple[Signal, ...]`, `stance: Literal["positive", "mixed", "neutral", "negative"]`, `confidence: Literal["low", "medium", "high"]`, `narrative: str` (three to five sentences) | `disclosures/analysis` |
+| `AnalysisSeq` | `key: str` (the board key of a channel's analysis), `seq: int` (its event number when the audit ran) | `audit/channels`, as a list |
+
+Changed in WP13:
+
+- `Finding.owner` becomes `Literal["technical", "fundamentals", "disclosures", "manager", "trader"]`.
+- The `description` of `Point.cites` says that an ID may be a fact ID or an item ID.
+
+Not changed: the Fundamentals Analyst returns the existing `Analysis` (claims that cite a fact and restate its value). Fundamentals facts are the existing `Fact`:
+
+| `Fact` field | For a fundamentals fact |
+|---|---|
+| `id` | The table key in `data/fundamentals.toml` |
+| `label` | The declared label followed by the fiscal year end, for example `营业收入（最近财年，截至 2025-12-31）` |
+| `value` | In millions of the reporting currency for `money`; as computed for the other units |
+| `unit` | `money`: `"<currency> million"`. `per_share`: the currency. `pct`: `"%"`. `ratio`: `""`. `days`: `"days"`. |
+| `as_of` | The latest date on which any input became public: the newest `filed` among the rows used, and for `pe_fy` the later of that and the date of the last bar. Never after the analysis date. |
+| `source` | `fundamentals.<fn>` |
+| `bars_used` | 0. These facts are not computed from bars. |
+
+Item IDs are `D` followed by a number. Fact IDs are lower-case words. The two sets cannot overlap, so one `cites` tuple can hold both.
+
+### 18.5 Ports, errors and point-in-time rules
+
+`domain/statements.py` and `domain/disclosures.py`. Like `domain/market.py`, each holds a port, the plain values the port returns, and nothing that does I/O. WP13 creates both files with exactly these definitions, so that `Deps` can name the ports before either channel is built. `domain/statements.py` also holds `FundamentalSpec` ([18.6](#186-fundamentals-three-places-two-paths)).
+
+```python
+@dataclass(frozen=True, slots=True)
+class Reported:                       # one figure in one annual filing
+    concept: str                      # revenue | net_income | eps_diluted | operating_cash_flow | total_assets | total_liabilities
+    period_end: datetime.date         # the fiscal year end
+    period_days: int                  # 350 to 380 for a year's flow; 0 for a balance
+    value: float                      # as reported, in the reporting currency
+    filed: datetime.date              # the day the filing became public
+    form: str
+
+@dataclass(frozen=True, slots=True)
+class StatementSet:
+    source: str
+    currency: str
+    rows: tuple[Reported, ...]
+
+class Statements(Protocol):
+    def statements(self, ticker: str, as_of: date) -> StatementSet: ...    # raises NotCovered, SourceUnavailable
+
+@dataclass(frozen=True, slots=True)
+class Published:                      # one filing or announcement
+    published: datetime.date
+    kind: str
+    title: str
+    ref: str
+
+@dataclass(frozen=True, slots=True)
+class DisclosureSet:
+    source: str
+    items: tuple[Published, ...]
+    dropped: int                      # rows with no date, left out
+
+class Disclosures(Protocol):
+    def published(self, ticker: str, start: date, as_of: date) -> DisclosureSet: ...    # raises NotCovered, SourceUnavailable
+```
+
+One error is added to `domain/market.py` in WP13, beside the four that exist:
+
+| Error | Meaning | Becomes |
+|---|---|---|
+| `NotCovered` | The source has nothing for this instrument, or does not reach this window. Says nothing about the company. | The channel's state is `unavailable`, with the message as the reason. The run continues. |
+| `SourceUnavailable` (existing) | The source could not be read | The same, for a channel. For bars it still stops the run. |
+
+Rules every reader of statements and items follows. They extend the eight in [6.3](#63-bars-and-point-in-time-rules):
+
+1. Both port methods take the analysis date and return nothing filed or published after it. There is no method that returns a later row.
+2. A figure is served at the version on file on the analysis date. When a fiscal year was filed more than once by then, the latest of those filings counts; a filing after the date does not exist yet.
+3. A row with no date is not served. Undated items are dropped and counted in `DisclosureCard.dropped`. An undated statement row makes the file malformed.
+4. An item published on the analysis date is visible. The analysis stands at the close of that day, and dates are compared as dates, in the market's own calendar.
+5. A date or a window the source does not cover is `NotCovered`, never an empty result. A statements file states the last date it covers, and an analysis date after it is not covered. A disclosure file states the first and last dates it covers, and the window `[as_of − window_days, as_of]` must lie inside them.
+6. Nothing is derived that no filing states: no fourth quarter, no trailing twelve months, no currency conversion.
+7. The three states are set by code and by nothing else:
+
+| State | Fundamentals | Disclosures |
+|---|---|---|
+| `unavailable` | No port wired, `NotCovered`, or `SourceUnavailable` | The same |
+| `empty` | The source answered and holds no annual figure filed by the analysis date | The source covers the window and holds no item in it |
+| `available` | At least one fact | At least one item |
+
+### 18.6 Fundamentals: three places, two paths
+
+The rule of [6.4](#64-indicators-three-places-two-paths) applies: a fundamentals fact exists when it is in all three places, and a test fails otherwise.
+
+| Place | Holds |
+|---|---|
+| `data/fundamentals.toml` | The declaration: function, concepts, unit, label, formula in words |
+| `domain/fundamentals.py` | Path 1, Python. Used to build the facts. |
+| `domain/fundamentals_sql.py` | Path 2, SQL over an in-memory SQLite table. Used only by the gate and the tests. |
+
+The two modules do not import each other, share no computation code, and import only the standard library. `tests/test_architecture.py` gains the same assertions for this pair as it has for `indicators.py` and `recompute.py`. Both return `None` when a figure they need is missing. They never return zero in its place.
+
+Calling convention. Path 1: `fn(rows, concepts, *, close, as_of)`, where `rows` is the tuple of `Reported`. Path 2: `fn(db, concepts, *, close, as_of)`, where `db` comes from `fundamentals_sql.load(rows)`. Every function takes all four, and ignores what it does not use.
+
+Definitions, fixed here so the two paths agree:
+
+- **Latest fiscal year of a concept**: the greatest `period_end` among the concept's rows. Its value is the row with the greatest `filed` for that `period_end`.
+- **Previous fiscal year**: the greatest `period_end` that is 330 to 400 days before the latest one. Its value is chosen the same way.
+- The port guarantees at most one row for each `(concept, period_end, filed)`.
+
+| Function | Result |
+|---|---|
+| `latest` | The value of `concepts[0]` for its latest fiscal year |
+| `yoy_pct` | `(latest − previous) / abs(previous) × 100`. `None` when there is no previous year or it is zero. |
+| `ratio_pct` | `concepts[0] / concepts[1] × 100`, both for the latest fiscal year of `concepts[0]`. `None` when the second has no row for that year or is zero. |
+| `price_multiple` | `close / latest(concepts[0])`. `None` when the figure is zero or negative. |
+| `filing_age` | Days from the newest `filed` among the rows of `concepts[0]` for its latest fiscal year to `as_of` |
+
+The registry, 12 facts:
+
+| Table key | `fn` | Concepts | Unit |
+|---|---|---|---|
+| `revenue_fy` | `latest` | `revenue` | money |
+| `net_income_fy` | `latest` | `net_income` | money |
+| `eps_diluted_fy` | `latest` | `eps_diluted` | per_share |
+| `operating_cash_flow_fy` | `latest` | `operating_cash_flow` | money |
+| `total_assets_fy` | `latest` | `total_assets` | money |
+| `total_liabilities_fy` | `latest` | `total_liabilities` | money |
+| `revenue_yoy_pct` | `yoy_pct` | `revenue` | pct |
+| `net_income_yoy_pct` | `yoy_pct` | `net_income` | pct |
+| `net_margin_pct` | `ratio_pct` | `net_income`, `revenue` | pct |
+| `liabilities_to_assets_pct` | `ratio_pct` | `total_liabilities`, `total_assets` | pct |
+| `pe_fy` | `price_multiple` | `eps_diluted` | ratio |
+| `filing_age_days` | `filing_age` | `revenue` | days |
+
+The declaration contract, in `domain/statements.py`:
+
+```python
+class FundamentalSpec(Contract):
+    key: str
+    fn: str
+    concepts: tuple[str, ...]
+    unit: Literal["money", "per_share", "pct", "ratio", "days"]
+    label: str
+    formula: str
+```
+
+`domain/fundamentals_ledger.py` (WP14) does for fundamentals what `domain/ledger.py` does for indicators:
+
+```python
+def build_fundamentals(instrument: Instrument, statements: StatementSet, close: float, close_date: date,
+                       as_of: date, specs: tuple[FundamentalSpec, ...]) -> tuple[list[Fact], FundamentalsCard]
+def recompute_fundamentals(statements: StatementSet, close: float, as_of: date,
+                           specs: tuple[FundamentalSpec, ...]) -> dict[str, float | None]
+```
+
+- `build_fundamentals` uses path 1 only. A spec whose function returns `None` emits no fact and one `Unavailable` with the reason in Chinese. Both builders divide a `money` result by one million.
+- `pe_fy` is unavailable when the statements' currency differs from the instrument's. Nothing is converted.
+- `FundamentalsCard.warnings` holds one sentence for each concept whose latest fiscal year was filed more than once by the analysis date, naming the dates: the figure was restated.
+- The existing `ledger.disagreements` compares the two results. It is not changed.
+
+`adapters/declarations.py` gains `load_fundamentals(path) -> tuple[FundamentalSpec, ...]`, with the same errors as `load_indicators`.
+
+### 18.7 Evidence files and synthetic evidence
+
+Evidence lives inside a universe, beside the bars:
+
+```
+data/market/<universe>/statements/<file_stem>.json
+data/market/<universe>/disclosures/<file_stem>.json
+```
+
+Both are machine-written JSON, validated into closed contracts when read; an unknown field is an error. A missing file is `NotCovered`. An unreadable or malformed file is `SourceUnavailable`.
+
+```json
+{"source": "合成数据", "currency": "USD", "covers_to": "2026-12-31",
+ "rows": [{"concept": "revenue", "period_end": "2025-12-31", "period_days": 365,
+           "value": 1105000000, "filed": "2026-02-19", "form": "10-K"}]}
+```
+
+```json
+{"source": "合成数据", "covers_from": "2025-01-01", "covers_to": "2026-12-31",
+ "items": [{"published": "2026-08-06", "kind": "季度业绩", "title": "2026 年第二季度业绩公告", "ref": "ACME-0009"}]}
+```
+
+`published` may be `null`: an undated item, which the reader drops and counts. Two statement rows with the same `(concept, period_end, filed)` make the file malformed.
+
+`adapters/statements_json.py` (WP14): `JsonStatements(root, universe)` implements `Statements`. `adapters/disclosures_json.py` (WP15): `JsonDisclosures(root, universe)` implements `Disclosures`. Each reads a file once, caches it, and filters by date. Both use the standard library and Pydantic only.
+
+**Synthetic evidence** is committed and written by two scripts with literal tables, no randomness, and the same bytes on every run: `data/make_statements.py` (WP14) and `data/make_disclosures.py` (WP15). Every `source` is `合成数据`.
+
+`ACME` statements, in USD, covering up to 2026-12-31. `period_days` is 365 for the four flows and 0 for the two balances.
+
+| Fiscal year end | Filed | Form | revenue | net_income | eps_diluted | operating_cash_flow | total_assets | total_liabilities |
+|---|---|---|---|---|---|---|---|---|
+| 2023-12-31 | 2024-02-22 | 10-K | 820,000,000 | 61,000,000 | 1.22 | 95,000,000 | 1,310,000,000 | 590,000,000 |
+| 2024-12-31 | 2025-02-20 | 10-K | 940,000,000 | 78,000,000 | 1.55 | 120,000,000 | 1,480,000,000 | 640,000,000 |
+| 2025-12-31 | 2026-02-19 | 10-K | 1,105,000,000 | 97,000,000 | 1.92 | 141,000,000 | 1,690,000,000 | 705,000,000 |
+| 2025-12-31 | 2026-08-14 | 10-K/A | 1,081,000,000 | 90,000,000 | 1.78 | not refiled | not refiled | not refiled |
+| 2025-12-31 | 2026-11-05 | 10-K/A | 1,090,000,000 | not refiled | not refiled | not refiled | not refiled | not refiled |
+
+The fourth row is a restatement: a run dated 2026-05-29 reads 1,105 million, and a run dated 2026-09-30 reads 1,081 million with a warning on the card. The fifth is filed after the last bar, so no run can read it; the port's own test reads it with a later date, to show that a later filing changes nothing earlier. A run dated before 2026-02-19 reads fiscal 2024.
+
+`0000.HK` has no statements file, so its fundamentals channel is `unavailable`. The other synthetic instruments have no evidence files.
+
+`ACME` disclosures, covering 2025-01-01 to 2026-12-31:
+
+| Published | Kind | Title |
+|---|---|---|
+| 2025-02-20 | 年度报告 | 2024 财年年度报告 |
+| 2025-05-08 | 季度业绩 | 2025 年第一季度业绩公告 |
+| 2025-08-07 | 季度业绩 | 2025 年第二季度业绩公告 |
+| 2025-11-06 | 季度业绩 | 2025 年第三季度业绩公告 |
+| 2026-02-19 | 年度报告 | 2025 财年年度报告 |
+| 2026-03-12 | 人事变动 | 首席财务官辞任及继任安排 |
+| 2026-05-07 | 季度业绩 | 2026 年第一季度业绩公告 |
+| 2026-06-18 | 重大合同 | 与一家物流客户签订三年期供货协议 |
+| 2026-08-06 | 季度业绩 | 2026 年第二季度业绩公告 |
+| 2026-08-14 | 更正公告 | 2025 财年年度报告的更正（重述营业收入与净利润） |
+| 2026-09-22 | 股份回购 | 董事会批准股份回购计划 |
+| none | 其他 | 未注明日期的补充说明 |
+| 2026-10-15 | 业绩预告 | 2026 年第三季度业绩预告 |
+
+`ref` is `ACME-0001` onward, in the order of the table. The undated row is dropped; the last row is after the last bar. On 2026-09-30 the window holds three items.
+
+`0000.HK` disclosures, covering 2025-01-01 to 2026-12-31: 2025-03-27 年度业绩 `2024 年度业绩公告`; 2025-08-28 中期业绩 `2025 年中期业绩公告`; 2026-03-26 年度业绩 `2025 年度业绩公告`; 2026-08-27 中期业绩 `2026 年中期业绩公告`. On 2026-06-30 the window holds none, which is the `empty` state.
+
+### 18.8 Stages and flow
+
+`FlowConfig` gains one field (WP13):
+
+```python
+channels: tuple[Literal["fundamentals", "disclosures"], ...] = ()
+```
+
+In a real-model run it comes from `[flow] channels` in `insightcrew.toml` or from `--channels`. In a scripted run the scenario file decides it, and the flag and the setting are ignored; the command says so in one line. The web form does not offer the choice in version 2.1.
+
+`Deps` gains fields with defaults, so that every existing construction still works:
+
+```python
+statements: Statements | None = None
+disclosures: Disclosures | None = None
+fundamentals: tuple[FundamentalSpec, ...] = ()
+disclosure_window_days: int = 90
+disclosure_max_items: int = 30
+```
+
+The two limits come from a new `[disclosures]` table in `insightcrew.toml` (`window_days`, `max_items`), with those defaults.
+
+One new code stage, and one helper, in `flows/stages.py`:
+
+| Stage | Steps |
+|---|---|
+| `evidence(run, deps, channels)` | Called once, after `ledger`, and only when `channels` is not empty. For each channel named, in the order `fundamentals`, `disclosures`, write its keys as below. Then append one `gate.checked` with `gate = "evidence"`. |
+| `channel_ready(run, channel)` | True when `<channel>/status` exists and its state is `available` |
+
+For `fundamentals`: read `request/scope` and the fact `close` from `ledger/facts`. With no port, or on `NotCovered` or `SourceUnavailable`, put `fundamentals/status` as `unavailable` with the reason, and nothing else. With no rows, put it as `empty`. Otherwise call `build_fundamentals`, then `recompute_fundamentals` and `disagreements`; any disagreement is recorded in `gate.checked` and raises `Halt("ledger_inconsistent")`. Then put `fundamentals/facts`, `fundamentals/card` and `fundamentals/status`.
+
+For `disclosures`: call `published(ticker, as_of − window_days, as_of)`. Failures as above. Sort the items newest first, and by `ref` within a day; keep the first `max_items`; number them `D1` onward in that order. Put `disclosures/items` (which may be an empty list), `disclosures/card` and `disclosures/status`.
+
+The flow (`flows/analyze.py`, WP13) changes in three places and nowhere else:
+
+```python
+PIPELINE = (("technical", _technical), ("fundamentals", _fundamentals), ("disclosures", _disclosures),
+            ("debate", _debate), ("manager", _manager), ("trader", _trader))
+
+async def _fundamentals(run: Run, cfg: FlowConfig) -> None:
+    if "fundamentals" in cfg.channels and stages.channel_ready(run, "fundamentals"):
+        await call(run, FUNDAMENTALS)
+# _disclosures is the same with its own name and role
+
+# in analyze, after stages.ledger(run, deps):
+if cfg.channels:
+    stages.evidence(run, deps, cfg.channels)
+```
+
+A channel that is off, empty or unavailable makes no model call. The three rules of [8.1](#81-the-flow-flowsanalyzepy) are unchanged, and so are the reference tests in `tests/test_flow.py`; cases are added for the two new stages.
+
+The audit stage reads what exists. When `fundamentals/analysis` is on the board it passes the fundamentals facts and analysis to the audit, and the same for disclosures. It writes `audit/fundamentals` or `audit/disclosures` only then. `AuditStatus` keeps its fields. When either analysis exists, the stage also writes `audit/channels`: a list with one `AnalysisSeq` for each channel analysis on the board, holding its key and its `seq` when the audit ran. When that key exists, `audited_current` also requires every entry to equal the board's current `seq` for its key.
+
+### 18.9 Roles
+
+Two roles are added to `roles/__init__.py` and to its tuple `ALL`, as `FUNDAMENTALS` and `DISCLOSURES`, with prompts `roles/prompts/fundamentals.md` and `roles/prompts/disclosures.md`, in Chinese, under the prompt rules of [section 7](#7-roles). WP13 declares them and writes the two prompts, because the flow names them. WP16 makes the changes to the other roles.
+
+| Role | Tier | Reads | Writes | Output |
+|---|---|---|---|---|
+| `fundamentals` | quick | `ledger/instrument`, `fundamentals/facts`, `fundamentals/card`, `audit/fundamentals` | `fundamentals/analysis` | `Analysis` |
+| `disclosures` | quick | `ledger/instrument`, `disclosures/items`, `disclosures/card`, `audit/disclosures` | `disclosures/analysis` | `DisclosureAnalysis` |
+
+Both pass `max_output_tokens` of 8000, as the other quick roles do.
+
+Views that grow (WP16). Each key is inserted after `technical/analysis` in the role's `reads`:
+
+| Role | Added to `reads` |
+|---|---|
+| `bull`, `bear`, `manager` | `fundamentals/status`, `fundamentals/analysis`, `disclosures/status`, `disclosures/analysis` |
+| `judge.*` | The same four, and `fundamentals/facts` and `disclosures/items` |
+| `technical`, `trader` | Nothing |
+
+The prompts of `bull`, `bear`, `manager` and `judge` each gain one paragraph: which of these keys may arrive, that a status of `unavailable` means the source could not say and is not evidence either way, that `empty` means nothing was published, and that a thesis point may cite an item ID.
+
+What is withheld, and why:
+
+| Role | Does not see | Reason |
+|---|---|---|
+| Fundamentals Analyst | Price facts other than through `pe_fy`, the items, the other analysts' output | It reads statements. Each analyst works from its own evidence. |
+| Disclosure Analyst | Every fact, the other analysts' output | It reads what the company published |
+| Researchers, Research Manager | The raw fundamentals facts and the raw items | As now: they argue from the analysts' audited readings |
+| Trader | Both channels | It implements the thesis and sets levels from price facts |
+
+`tests/test_architecture.py` gains an assertion for each line: the two analysts' in WP13, the others' in WP16.
+
+### 18.10 Audit
+
+```python
+def audit(facts, analysis, thesis, proposal, rule_results, *,
+          fundamentals: tuple[list[Fact], Analysis] | None = None,
+          disclosures: tuple[list[Item], DisclosureAnalysis] | None = None) -> list[Finding]
+```
+
+The two parameters are keyword-only and default to `None`, so every existing call and test is unchanged. Order of findings: technical claims, fundamentals claims, disclosure signals, thesis points, horizon, proposal, rules.
+
+| Check | Owner | Subject | Fails when |
+|---|---|---|---|
+| `analysis_has_claims` | `fundamentals` | `fundamentals.analysis` | Fewer claims than `min(3, number of fundamentals facts)` |
+| `claim_cites_known_fact` | `fundamentals` | `fundamentals.claims[i]` | The claim's `fact` is not a fundamentals fact ID |
+| `claim_value_matches_fact` | `fundamentals` | `fundamentals.claims[i]` | The same tolerance as for technical claims |
+| `disclosures_has_signals` | `disclosures` | `disclosures.analysis` | The analysis has no signal |
+| `signal_cites_known_item` | `disclosures` | `disclosures.signals[i]` | The signal's `item` is not an ID in `disclosures/items` |
+| `point_cites_claimed_fact` | `manager` | `points[i]` | Widened. A thesis point cites nothing, or cites an ID that is neither a fact ID cited by a claim of any analyst nor an item ID cited by a signal. |
+
+The check names for technical claims, and their subjects (`claims[i]`), do not change. `proposal_cites_known_fact` still accepts only IDs in `ledger/facts`: a level is set from prices.
+
+What the audit does not check: whether a signal's direction is right, and any number inside a title, a reading or a narrative. A signal's direction is judgment. It reaches the judges, who see the items.
+
+### 18.11 Report, commands, settings, page
+
+**Report** (`app/report.py`, WP16). New sections, each printed only when its keys are on the board, so a run with no channel renders as it does today:
+
+| Section | After | Content |
+|---|---|---|
+| **基本面事实** | 依据的事实 | One row per fundamentals claim: fact ID, label, value, unit and date from `fundamentals/facts` by ID, and the analyst's reading. Then the card: source, fiscal year end, filing date, warnings, unavailable facts. |
+| **公告条目（来源原文，未经核验）** | 基本面事实 | Every item from `disclosures/items`: ID, date, source, kind, title. Then each signal: item ID, direction, reading. Then stance and confidence. |
+
+A title is printed from `disclosures/items` by ID and never from a model's output. In each report mode a channel's analysis is shown or withheld exactly as `technical/analysis` is. **数据质量** gains one line per channel that was switched on: its state, and the reason when it is not `available`. The words for the states are `可用`, `窗口内没有公告` (or `没有已申报的年度报表`) and `不可用`.
+
+**Commands** (`app/cli.py`, WP16):
+
+- `analyze` gains `--channels`, a comma-separated list. `wiring.prepare` gains the parameter `channels` and refuses an unknown name with `BadRequest`.
+- `facts` prints, after the ledger, the fundamentals facts and card and the items in the window, or the channel's state and reason.
+- `fetch` is unchanged in signature. WP17 extends what it downloads ([18.12](#1812-real-sources)).
+
+**Settings** (`app/settings.py`, WP13): the `[disclosures]` table above, and `sec_contact: SecretStr | None = None`, read from `IC_SEC_CONTACT`. It is masked wherever settings are printed. `.env.example` gains:
+
+```bash
+# 可选：下载美股财报与公告（SEC EDGAR）时使用的联系方式，例如 "姓名 邮箱"。不填则不访问 SEC。
+# IC_SEC_CONTACT=
+```
+
+**Run page** (`app/assets/page.html`, `app/replay_html.py`, WP18): the pipeline strip shows the two analyst stages when a run has them; the evidence area gains a fundamentals table and an item list with the same content as the report. A run with no channel looks as it does today. Run data is still inserted as text.
+
+### 18.12 Real sources
+
+`fetch` (WP17) downloads evidence for each requested ticker after its bars, into `data/market/real/statements/` and `data/market/real/disclosures/`. Bars are written first and are not undone by an evidence failure: the command prints what it wrote, what it skipped and why, and its exit status depends on the bars alone. An empty or failed download is never written; files are written to a temporary name and renamed.
+
+| Instrument | Statements | Disclosures |
+|---|---|---|
+| US | SEC EDGAR, when `IC_SEC_CONTACT` is set | SEC EDGAR, when `IC_SEC_CONTACT` is set |
+| Hong Kong | None. No file is written, so the channel is `unavailable`. | Eastmoney's announcement list |
+
+**`adapters/edgar.py`** is the only code that knows the SEC's endpoints. Every request carries `User-Agent: InsightCrew/<version> <IC_SEC_CONTACT>`. Without a contact it makes no request and `fetch` says the SEC was skipped.
+
+- The company number: `https://www.sec.gov/files/company_tickers.json`, entries with `ticker` and `cik_str`, zero-padded to ten digits. A ticker that is absent is not an SEC filer: no file, and a line saying so.
+- Statements: `https://data.sec.gov/api/xbrl/companyfacts/CIK<ten digits>.json`. Read `facts["us-gaap"][<tag>]["units"][<unit>]`, a list of objects with `end`, `val`, `form`, `filed`, and `start` for a flow.
+- Keep a row when its `form` starts with `10-K`, `20-F` or `40-F`, and it is either a balance (no `start`) or a flow whose `end − start` is 350 to 380 days.
+- Tags, tried in order. A fiscal year keeps the first tag that reports it, and values are never added across tags:
+
+| Concept | Tags | Unit |
+|---|---|---|
+| `revenue` | `RevenueFromContractWithCustomerExcludingAssessedTax`, `Revenues`, `SalesRevenueNet` | `USD` |
+| `net_income` | `NetIncomeLoss` | `USD` |
+| `eps_diluted` | `EarningsPerShareDiluted` | `USD/shares` |
+| `operating_cash_flow` | `NetCashProvidedByUsedInOperatingActivities` | `USD` |
+| `total_assets` | `Assets` | `USD` |
+| `total_liabilities` | `Liabilities` | `USD` |
+
+- A concept reported only in another unit is left out, and becomes an unavailable fact. When the same `(concept, period_end, filed)` occurs more than once, keep the last. The file's `covers_to` is the day of the download.
+- Disclosures: `https://data.sec.gov/submissions/CIK<ten digits>.json`, the parallel arrays under `filings.recent`: `form`, `filingDate`, `items`, `accessionNumber`. Only `recent` is read. Keep the forms `8-K`, `10-Q`, `10-K`, `20-F`, `40-F`, `6-K` and their `/A` amendments. `published` is `filingDate`, `kind` is the form, `ref` is the accession number. For an `8-K` the title is the SEC's own name for each item number in `items`, joined with `; ` (a table in the adapter; an unknown number prints as `Item <number>`). For the others it is the form's name in English. `covers_from` is the later of the requested start and the oldest `filingDate` read; `covers_to` is the day of the download.
+
+**`adapters/eastmoney_ann.py`** is the only code that knows this endpoint, which is unofficial: `https://np-anotice-stock.eastmoney.com/api/security/ann?sr=-1&page_size=50&page_index=<n>&ann_type=H&client_source=web&stock_list=<five digits>`. Read `data.list[]`: `title`, `notice_date` (its first ten characters are the date), `columns[0].column_name` as the kind, `art_code` as the ref. Read pages until one holds a `notice_date` before the requested start, or is empty, or 20 pages have been read. `covers_from` is the requested start when the paging reached it, and otherwise the oldest date read. `covers_to` is the day of the download.
+
+Both adapters are ordinary synchronous functions on `httpx2.Client`; tests pass a client whose transport replays saved responses from `tests/fixtures/edgar/` and `tests/fixtures/eastmoney_ann/`. A saved `companyfacts` response is cut down to the tags above before it is committed; the whole file is several megabytes. A failure raises `SourceUnavailable` with the HTTP status. Downloaded evidence is not committed.
+
+### 18.13 Tests, scenarios, evaluations
+
+Tests, all without network or key:
+
+| File | Covers | From |
+|---|---|---|
+| `test_audit.py`, `test_flow.py`, `test_stages.py`, `test_settings.py` (cases added) | The new checks and owners; a channel that is off, empty or unavailable makes no call; findings routed to the new stages; `audit/channels`; with no channel, a scripted run writes the artifacts and sends the prompts of version 2.0 | WP13 |
+| `test_fundamentals.py` | Registry in sync with both paths; path 1 against path 2 at a sweep of dates; the restatement at three dates; the row filed after the last bar is not served on any earlier date; a date after the cover is `NotCovered`; each `None` case; a malformed file | WP14 |
+| `test_disclosures.py` | Window edges; the undated item dropped and counted; an item is not returned before its date; a window outside the cover is `NotCovered`; ordering and numbering; truncation | WP15 |
+| `test_architecture.py` (assertions added) | The new contracts frozen and closed, and what the two analysts do not see (WP13); the second pair of independent paths (WP14); the views that grew (WP16) | WP13, WP14, WP16 |
+| `test_report.py`, `test_scenarios.py`, `test_cli.py`, `test_wiring.py` (cases added) | Titles come from the item list; the three states in the report; the new scenarios; `--channels` | WP16 |
+| `test_edgar.py`, `test_eastmoney_ann.py` | Parsing saved responses; the tag order; the span filter; no request without a contact; a refused or malformed response writes nothing | WP17 |
+| `test_run_page.py` (cases added) | The new sections; a run with no channel renders the same page as before | WP18 |
+
+Scenarios, added in WP16. All set `flow.channels` to both channels:
+
+| Name | Instrument, date | Shows | Expected |
+|---|---|---|---|
+| `channels_clean` | `ACME`, 2026-09-30 | Three analysts, everything right first time | delivered, `accepted 2/3`, 9 calls |
+| `misquote_fundamentals` | `ACME`, 2026-09-30 | The Fundamentals Analyst misquotes a fact; the run is sent back to `fundamentals` | delivered |
+| `ghost_item` | `ACME`, 2026-09-30 | The Disclosure Analyst cites an item that does not exist; the run is sent back to `disclosures` | delivered |
+| `uncovered` | `0000.HK`, 2026-09-30 | Fundamentals `unavailable`, disclosures `available`; the report says so | delivered, 8 calls |
+| `quiet` | `0000.HK`, 2026-06-30 | Fundamentals `unavailable`, disclosures `empty`; neither analyst is called | delivered, 7 calls |
+
+Scenario numbers are copied from `uv run insightcrew facts`, as in WP5.
+
+Evaluations. Each existing output line stays as it is, and a second block is added:
+
+| Command | Added block |
+|---|---|
+| `eval inject` | From a passing case with both channels, these mutations, each of which must give the stated check: a fundamentals claim's value multiplied by 1.03 (`claim_value_matches_fact`); a fundamentals claim cites `revenue_ttm` (`claim_cites_known_fact`); a signal cites `D99` (`signal_cites_known_item`); the signals removed (`disclosures_has_signals`); a thesis point cites an item no signal cites (`point_cites_claimed_fact`); a thesis point cites a fundamentals fact no claim cites (`point_cites_claimed_fact`). Valid variants that must give no finding: a thesis point that cites only an item a signal cites; a thesis point that cites only a claimed fundamentals fact. Prints 6 of 6 and 0 of 2. |
+| `eval consistency` | `fundamentals.toml`, path 1 and path 2 agree, for every instrument with statements, at a sweep of dates |
+| `eval pit` | Adding later filings and later items changes no fundamentals fact and no item list at any earlier date; no fundamentals fact is dated after the analysis date; no item is published after it |
+| `eval channels` (WP19, needs a model) | Cells of (ticker, date) under three configurations: no channel, `fundamentals`, both. For each: delivered, `REVIEW` rate, revisions, findings by check, calls, tokens, cost, and the share of thesis points that cite channel evidence |
+
+### 18.14 Work packages
+
+Hours are the author's estimates and are not measured. Every package ends with the three checks and with the proof in [18.3](#183-the-compatibility-rule). [HANDOFF.md](HANDOFF.md) section 5.4 says which packages may run at the same time and which files each owns.
+
+| WP | Result | Est. | Needs |
+|---|---|---|---|
+| 13 | A safety tag and a branch; the shared contracts, the two ports, the two analyst roles, the audit checks, the flow switch and the settings. Channels can be switched on and each reports `unavailable`. | 4.5 h | The owner's go-ahead |
+| 14 | Statements: both paths, the registry, the fundamentals ledger, the JSON adapter, synthetic statements | 2.5 h | WP13 |
+| 15 | Disclosures: the JSON adapter, synthetic items | 2 h | WP13 |
+| 16 | The offline system with channels: wiring, the real `evidence` stage, the views that grow, the report, the commands, five scenarios, the three evaluation blocks | 4.5 h | WP14, WP15 |
+| 17 | Real sources: the two adapters and their tests (part A), then `fetch` (part B) | 3 h | Part A: WP14 and WP15. Part B: part A and WP16. |
+| 18 | Run page sections | 2 h | WP16 |
+| 19 | Real-model runs with channels, prompt fixes, `eval channels` | 5 h | WP16, WP17, the API key |
+| 20 | Documents and packaging | 3 h | Everything built or cut |
+
+Total: about 26.5 hours. The chain that cannot be made parallel is WP13, 14, 16, 19, 20: about 19.5 hours.
+
+**WP13: Preparation and the channel switch.** Read: 18.2 to 18.5, the declaration contract in 18.6, 18.8 to 18.10, 18.11 (settings). Runs alone.
+
+1. With the owner's go-ahead: `git tag v2.0` on the head of `v2` as it stands before any change of version 2.1, then `git switch -c v2.1`. Every later package stays on `v2.1`.
+2. `domain/market.py`: add `NotCovered`. `domain/types.py`: add the seven contracts of 18.4, widen `Finding.owner`, change the description of `Point.cites`.
+3. Create `domain/statements.py` and `domain/disclosures.py` with the definitions of 18.5 and `FundamentalSpec` from 18.6, and nothing else. WP14 and WP15 do not edit them.
+4. `domain/audit.py`: the keyword parameters and the checks of 18.10, with cases added to `tests/test_audit.py`. The tests write facts and items by hand.
+5. `roles/__init__.py`: declare `FUNDAMENTALS` and `DISCLOSURES` as in 18.9 and add them to `ALL`. Write their two prompt files. No existing role changes in this package.
+6. `flows/deps.py`: the new fields of 18.8, typed as written there. `flows/analyze.py` and `flows/stages.py`: as in 18.8, except that in this package `evidence` writes `unavailable` with the reason `尚未接入数据源` for every channel named, and writes nothing else. `app/settings.py`, `insightcrew.toml`, `.env.example`: as in 18.11.
+7. Tests as in the first row of the table in 18.13, and the WP13 assertions in `tests/test_architecture.py`. `tests/fake_stages.py` gains doubles for `evidence` and `channel_ready`; nothing that exists in it changes.
+
+Accept: the three checks; the proof in 18.3; `git tag -l` lists `v2.0`. In a test, a scripted run of `clean` with `flow.channels` set to both makes 7 calls and puts two `unavailable` statuses on the board.
+
+**WP14: Statements.** Read: 18.4 to 18.7. Create: `domain/fundamentals.py`, `domain/fundamentals_sql.py`, `domain/fundamentals_ledger.py`, `data/fundamentals.toml`, `adapters/statements_json.py`, `data/make_statements.py`, `data/market/synthetic/statements/ACME.json`, `tests/test_fundamentals.py`. Add `load_fundamentals` to `adapters/declarations.py` and the assertions for the second pair of paths to `tests/test_architecture.py`.
+
+Accept: the three checks; the proof in 18.3; running `data/make_statements.py` twice leaves the file unchanged; for `ACME`, `revenue_fy` is 940 on 2026-02-10, 1105 on 2026-05-29 and 1081 on 2026-09-30, and the last carries a restatement warning; read through the port on 2026-11-30 it is 1090, and on 2027-01-04 the port raises `NotCovered`.
+
+**WP15: Disclosures.** Read: 18.4, 18.5, 18.7. Create: `adapters/disclosures_json.py`, `data/make_disclosures.py`, `data/market/synthetic/disclosures/ACME.json` and `0000.HK.json`, `tests/test_disclosures.py`.
+
+Accept: the three checks; the proof in 18.3; the generator is deterministic; `ACME` on 2026-09-30 with a 90-day window returns three items and one dropped; `0000.HK` on 2026-06-30 returns none; `ACME` on 2025-03-31 raises `NotCovered`.
+
+**WP16: The offline system with channels.** Read: 18.8 to 18.11, 18.13, and sections 7, 8 and 10. Edit: `flows/stages.py` (the real `evidence`), `app/wiring.py`, `roles/__init__.py` and the prompts, `app/report.py`, `app/cli.py`, `evals/inject.py`, `evals/consistency.py`, `evals/pit.py`, `evals/scenarios.py` if it needs it, and the test files named in 18.13. Create: the five scenario files.
+
+Order of work: the stage and its tests; the wiring; `facts`; the views and the paragraphs added to four prompts; `channels_clean` from the values `facts` prints, then the other scenarios; the report; the evaluation blocks.
+
+Accept: the three checks; the proof in 18.3; `uv run insightcrew scenarios` prints 21 scenarios as matching; `uv run insightcrew eval all` prints the added blocks, with 6 of 6 and 0 of 2; the report of `uncovered` says the fundamentals channel is `不可用` and gives the reason, and contains no fundamentals table; `uv run insightcrew replay` of a `channels_clean` run prints `一致`.
+
+**WP17: Real sources.** Read: 18.12. Part A, create: `adapters/edgar.py`, `adapters/eastmoney_ann.py`, their tests and fixtures. Part B, edit: `app/fetch.py`.
+
+Accept: the three checks; the proof in 18.3. With `IC_SEC_CONTACT` set, and only when the owner asks for a live download: `uv run insightcrew fetch AAPL 0700.HK --years 3`, then `uv run insightcrew facts AAPL --universe real` prints fundamentals facts whose dates are not after the analysis date, and `facts 0700.HK --universe real` prints items and says its fundamentals channel is unavailable. If a request fails with a certificate error or an HTTP 502, stop and report it; the workspace rule on package installs describes the cause.
+
+**WP18: Run page.** Read: 18.11, 10.5. Edit: `app/assets/page.html`, `app/replay_html.py`, `tests/test_run_page.py`.
+
+Accept: the three checks; the proof in 18.3; `channels_clean` and `uncovered` opened in a browser show the sections and the states; `demo` looks as it did.
+
+**WP19: Real-model runs.** Read: 18.13, 12.4, and WP8. Create: `evals/channels.py`; edit `evals/run.py`, the `eval` command in `app/cli.py` (so that it passes `channels` what it passes `ablation`), the prompts, and `insightcrew.toml`.
+
+1. One real run of `ACME` with both channels. Read the journal before changing anything.
+2. Fix prompts one at a time, each fix tied to a journal.
+3. `eval channels` over four cells: `ACME` on 2026-09-30 and 2026-05-29, and `AAPL` and `0700.HK` on their last settled bar. Twelve runs.
+4. Decide from the results whether `[flow] channels` is set in `insightcrew.toml`. Archive every journal under `insightcrew/evals/archive/`.
+
+Accept: the three checks; every archived journal replays as `一致`; the results table is in the session log. The expected spend is 1 to 2 USD at the rates measured in WP8; this is an estimate.
+
+**WP20: Documents and packaging.** As WP11, for `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATION.md` and `docs/ROADMAP.md`. Every count that changed is updated: scenarios, tests, model roles, invariants, the evaluation lines. State which archived runs were made before the prompts of `bull`, `bear`, `manager` and `judge` changed.
+
+Accept: as WP11.
+
+### 18.15 Schedule and cuts
+
+| Date | Work | True by the end of the day |
+|---|---|---|
+| 11-19 | WP13; WP14 and WP15 started | The proof in 18.3 passes on `v2.1` |
+| 11-20 | WP14, WP15, WP16; WP17 part A | 21 scenarios match |
+| 11-21 | WP17 part B, WP18, WP19 | Real-model runs with channels are archived |
+| 11-22 | WP20 | A fresh unzip installs and runs |
+| 11-23 | Nothing planned | |
+
+The tag `v2.0` and the archive built from it are a complete submission at every moment. If a day is missed, cut in this order. Each cut leaves a coherent system.
+
+1. **WP18, the page sections.** The timeline still shows every event of the new roles, and the report has the sections.
+2. **Eastmoney announcements.** Hong Kong disclosures are then `unavailable` on real data.
+3. **WP17, real sources.** Channels then run on synthetic evidence only, and the evaluation can speak only about mechanisms.
+4. **Disclosures in real-model runs.** `channels = ["fundamentals"]`.
+5. **Both channels in what is submitted.** `channels` stays empty, the behaviour is that of version 2.0, and the documents describe the channels as built and not evaluated.
+
+If WP16 is not done by the end of 11-21, stop building, take cut 5, and spend the remaining time on WP20.
+
+### 18.16 Invariants
+
+Changes to [section 16](#16-invariants). They need the owner's agreement before WP13 starts.
+
+| # | Change |
+|---|---|
+| 3 | Becomes: every number in a report comes from a fact (`ledger/facts` or `fundamentals/facts`) or from an audited proposal. Text quoted from a source (an item's kind and title) is printed from `disclosures/items` under a heading that says it is the source's wording and unverified, and is never taken from a model's output. Enforced by `test_report`. |
+| 4 | Extended: the same holds for `domain/fundamentals.py` and `domain/fundamentals_sql.py`, and a fundamentals fact exists only with both. Enforced by `test_architecture`, `test_fundamentals`, `eval consistency`. |
+| 6 | Extended: no bar, fact, filing or item dated after the analysis date reaches any stage. Enforced by `test_fundamentals`, `test_disclosures`, `eval pit`. |
+| 17, new | With no channel switched on, a run writes the artifacts and sends the prompts version 2.0 does. Enforced by `test_stages`, `scenarios`, and replay of the archived journals. |
+| 18, new | A channel that could not be read is reported as unavailable, never as empty, and the roles that read it are told which. Enforced by `test_stages`, `test_report`, the scenarios `uncovered` and `quiet`. |
+
+### 18.17 What must not be claimed
+
+In addition to [12.4](#124-what-must-not-be-claimed):
+
+- **That more evidence gives better decisions.** Twelve runs cannot show it.
+- **That the items are news.** They are company filings and announcements. Media coverage and market commentary are not read.
+- **That a title or a signal is verified.** Code checks that an item exists and when it was published. It does not check what the item says, or what the analyst makes of it.
+- **Anything about decisions from synthetic statements or synthetic items.** They test mechanisms.
+- **That the fundamentals channel covers Hong Kong.** It reports unavailable there, by design.
+
+### 18.18 What has been verified
+
+| Item | Status |
+|---|---|
+| The design in this section | **Not built, not tested.** Gaps are likely; an implementer who finds one stops and asks. |
+| That replay compares the prompt and the whole board | Read in `adapters/scripted.py` (`Replay`) and `app/replay.py` (`_diff`) on 2026-11-19 |
+| SEC `companyfacts` for `AAPL` | One request on 2026-11-19 from the development machine: 200. Each figure carries `filed`; the newest annual rows end 2026-09-26 and were filed 2026-11-03 on a 10-K. |
+| SEC `submissions` for `AAPL` | One request: 200. 1004 filings under `recent`, 2015-10-07 to 2026-11-18, with `form`, `filingDate` and `items`. |
+| SEC ticker list | One request without a contact address: 403. With an address: not tried. |
+| Eastmoney announcements for `00700` | One request, page 1, five rows: 200. 1508 in all; each has a title, a date and a category. Paging, and US tickers, not tried. |
+| Yahoo's RSS feed and Google News RSS for `AAPL` | 200. 19 items spanning about 6 hours, and 59 items spanning under 3 days. Too recent to keep the point-in-time rule; not used. |
+| GDELT | 429. Not used. |
+| The two new prompts, and the paragraphs added to four others | Not written. Untestable offline. |
+| Effort estimates | The author's. Not measured. |
