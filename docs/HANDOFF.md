@@ -50,7 +50,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 12 | Local web app (`serve`) | done | Verified live in the browser: form starts a demo run, stream advances stages, same outcome and confidence lines as the CLI; THIN refuses; past runs open; clean shutdown. 409 covered by test. **Server rewritten by the planning session on 2026-11-19 08:50 and verified again.** |
 | 11 | Documents and packaging | done | README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP rewritten; `start.sh`, `start.bat`; a `git archive` zip unzipped into an empty directory passes `uv sync`, 380 tests and a keyless `analyze`. Session log entry "2026-11-19 10:05". |
 | 13 | Version 2.1: tag, branch, shared contracts, ports, the two analyst roles, audit checks, flow switch, settings | done | Authorised 2026-11-19; built the same evening. All seven contracts, both ports, both roles, the six audit checks, the flow switch and `[disclosures]` settings in place. `evidence` is the WP13 stub (every named channel `unavailable`, reason `尚未接入数据源`). 406 tests. |
-| 14 | Version 2.1: statements, both paths, the fundamentals ledger, synthetic statements | not started | Needs WP13 |
+| 14 | Version 2.1: statements, both paths, the fundamentals ledger, synthetic statements | blocked | Code and 25 tests done and passing (two paths agree over a swept range; acceptance numbers all correct). **Blocked on question 8 (and 9) in section 7**: the synthetic statements file sits at the blueprint's path, which WP2's generator test forbids. Not committed until answered. |
 | 15 | Version 2.1: disclosures adapter, synthetic items | not started | Needs WP13 |
 | 16 | Version 2.1: the offline system with channels; 21 scenarios | not started | Needs WP14 and WP15 |
 | 17A | Version 2.1: SEC EDGAR and Eastmoney announcement adapters, with tests | not started | Needs WP14 and WP15 |
@@ -310,6 +310,13 @@ Questions for the owner. Answered 2026-11-19; WP13 to WP20 are authorised.
 | 5 | 2026-11-19 | May WP17B make the live downloads its acceptance names, and may WP19 spend on real-model runs (estimated 1 to 2 USD, twelve runs and the prompt fixes before them)? | Yes (2026-11-19): the live downloads named in WP17B's acceptance, once each; WP19's real-model runs allowed, spending capped at 2 USD — stop and ask when close to the cap. |
 | 6 | 2026-11-19 | The chat on 2026-11-19 showed six stages and about 22 hours. Written out, the plan is eight packages and about 26.5 hours: the run page became its own package, and the real sources were split so that the adapters can be built beside WP16. Is the larger figure acceptable, or should a cut be taken now (18.15 lists them in order)? | The 26.5-hour estimate is accepted (2026-11-19). If time runs short, cut in the order of 18.15 and tell the owner before each cut. |
 | 7 | 2026-11-19 | Should the version become 2.1.0 in WP20? It is written in `pyproject.toml` and `insightcrew/__init__.py` and recorded in every `run.started`; changing it changes the project's own entry in `uv.lock`, which no package is otherwise allowed to touch. Until answered it stays 2.0.0. | No (2026-11-19): the version stays 2.0.0; do not change `pyproject.toml` or `uv.lock`. |
+
+Gaps found while building (the plan warns about these; each stops the package that meets it):
+
+| # | Date | WP | The gap | Suggested answer |
+|---|---|---|---|---|
+| 8 | 2026-11-19 | 14, 15 | **Where synthetic evidence may live.** BLUEPRINT 18.7 puts evidence files at `data/market/<universe>/statements/<file_stem>.json` (and `disclosures/`). But WP2's test `tests/test_market.py::test_generator_writes_the_same_bytes_twice` snapshots `data/market/synthetic/` with `iterdir()` and asserts the entry set **equals exactly** the bars CSVs plus `universe.toml`; any subdirectory makes it fail (first as `IsADirectoryError`). The working rules forbid editing an existing test, and the blueprint's path is a name, which may not be changed without the owner. The two cannot both hold as written. | Allow a minimal edit to that one test's `_snapshot()` helper: list files only (`path.is_file()`), so the generator's own output set is still asserted exactly and evidence subdirectories are simply outside the snapshot. The alternative — moving evidence to a directory the test does not list, e.g. `data/evidence/<universe>/statements/` — changes a blueprint name and ripples into WP16's wiring and WP17's `fetch`. |
+| 9 | 2026-11-19 | 14, 16 | **`pe_fy` under a currency mismatch.** 18.6: "`pe_fy` is unavailable when the statements' currency differs from the instrument's." `build_fundamentals` has the instrument and can withhold the fact (implemented). But `recompute_fundamentals(statements, close, as_of, specs)` has no instrument, so it computes a value for `pe_fy` that path 1 never emits, and `disagreements` (not to be changed) would report `pe_fy` as a one-sided disagreement and halt the run. | WP16's `evidence` passes `recompute_fundamentals` the specs with price-dependent declarations (`fn == "price_multiple"`) removed whenever the currencies differ — signatures stay as written, `disagreements` stays untouched, and WP14 already tests exactly this split (see `test_pe_fy_is_unavailable_when_the_currency_differs`). |
 
 ### Corrections to the blueprint
 
@@ -906,6 +913,34 @@ Notes:
 Committed: WP13 files by path (see `git log`), then this file as `Status board: WP13 done`. On `v2.1`, not pushed.
 
 For the next session: WP14 and WP15 may start together (section 5.4 step 2).
+
+### 2026-11-19 evening · WP14 · building session (GLM, via ZCode)
+
+Result: **blocked on questions 8 and 9 (section 7).** The package's code and tests are written and passing; two gaps in BLUEPRINT 18 that the working rules do not allow to be filled by guessing stop it from being accepted and committed.
+
+Commands run, with the last lines of their output:
+
+- `uv run pytest -q` → `1 failed, 423 passed` — the one failure is WP2's `test_generator_writes_the_same_bytes_twice` against the new `data/market/synthetic/statements/` directory (question 8). Everything else passes, including the 25 new tests of this package. `uv run ruff check .` → `All checks passed!` `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- `uv run python data/make_statements.py` twice → identical sha (`265291c3…`), `写出 …ACME.json（22 行）`.
+- Acceptance numbers, run inline through the port and both builders:
+  `2026-02-10 revenue_fy=940.0 warnings=0 一致=True` / `2026-05-29 revenue_fy=1105.0 warnings=0 一致=True` / `2026-09-30 revenue_fy=1081.0 warnings=3 一致=True` / `2026-11-30 revenue_fy=1090.0 warnings=3 一致=True` / `2027-01-04 NotCovered: ACME 的年报数据覆盖到 2026-12-31，不含 2027-01-04`.
+- Proof of 18.3: `scenarios` → 16 相符; 30 archived journals → `replayed ok=30 bad=0`; `eval all` → 19/19, 0/6, 277 × 29, 864.
+
+Not run, and why: WP14 is not committed (acceptance not passed while question 8 is open). Nothing against a real model.
+
+Unverified: nothing beyond the package's own scope; both paths agree at every swept date, which is the package's core claim.
+
+Files created: `insightcrew/domain/fundamentals.py`, `insightcrew/domain/fundamentals_sql.py`, `insightcrew/domain/fundamentals_ledger.py`, `data/fundamentals.toml`, `insightcrew/adapters/statements_json.py`, `data/make_statements.py`, `data/market/synthetic/statements/ACME.json`, `tests/test_fundamentals.py`. Edited: `insightcrew/adapters/declarations.py` (`load_fundamentals`), `tests/test_architecture.py` (a second independence test, added; the first untouched).
+
+Notes:
+
+1. **Question 8** (evidence files inside a universe vs WP2's generator test) is recorded in section 7 with a suggested minimal fix. Until answered, the synthetic file stays where the blueprint puts it and the WP2 test keeps failing.
+2. **Question 9** (`pe_fy` under a currency mismatch) is recorded with the suggested split-specs answer; `test_pe_fy_is_unavailable_when_the_currency_differs` already encodes it.
+3. Both computation modules are standard-library-only as 18.6 demands: they receive statement rows structurally (a read-only `Protocol`), so `statements.py` is not imported from either.
+
+Committed: no. The WP14 files and this entry wait for the owner's answers.
+
+For the next session: on answers to questions 8 and 9 — apply them, rerun the acceptance and the three checks, commit WP14, then WP15.
 
 ## 9. Prompts for starting a session
 
