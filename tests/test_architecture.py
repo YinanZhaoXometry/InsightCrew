@@ -17,15 +17,19 @@ LAYERS = {
 }
 
 # 每一层允许引入的第三方包。表里没有的包，那一层就不认识。
-# 要点：domain 只认识 Pydantic；智能体库只出现在 kernel 和 adapters；flows 和 roles 一个第三方包都不引入。
+# 要点：domain 只认识 Pydantic；智能体库只出现在 kernel 和 adapters；
+# flows 只有 flows/graph.py 引入 langgraph（不变量 12 修正案，BLUEPRINT 19.17），
+# langchain_core 只作 langgraph 的类型来源（RunnableConfig 定义在那里，节点必须用它注解才会被注入 config）。
 THIRD_PARTY = {
     "kernel": {"pydantic", "pydantic_core", "pydantic_ai"},
     "domain": {"pydantic"},
     "roles": set(),
-    "flows": set(),
+    "flows": {"langgraph", "langchain_core"},
     "adapters": {"pydantic", "pydantic_ai", "httpx2"},
     "evals": {"pydantic"},
-    "app": {"pydantic", "pydantic_settings", "dotenv", "fastapi", "uvicorn", "typer"},
+    # langgraph：wiring/resume 引入 SQLite 检查点（不变量 12 修正案，BLUEPRINT 19.17）。
+    "app": {"pydantic", "pydantic_settings", "dotenv", "fastapi", "uvicorn", "typer",
+            "langgraph"},
 }
 
 

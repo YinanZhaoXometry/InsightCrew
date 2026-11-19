@@ -17,10 +17,16 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
+
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver  # 不变量 12：app 层引入 SQLite 检查点
 
 from insightcrew import __version__
 
@@ -33,9 +39,11 @@ from ..adapters.statements_json import JsonStatements
 from ..adapters.store_fs import new_run_dir
 from ..domain import symbols
 from ..domain.market import InvalidTicker, MarketData, NoData, SourceUnavailable, UnknownTicker
-from ..domain.types import Scope
+from ..domain.portfolio import fingerprint as portfolio_fingerprint
+from ..domain.types import Outcome, Scope
 from ..evals.scenarios import Scenario, load_one
 from ..flows.analyze import FlowConfig
+from ..flows.analyze import drive as drive_flow
 from ..flows.deps import Deps
 from ..kernel.board import Board
 from ..kernel.budget import Budget, Ceiling
@@ -134,7 +142,7 @@ def _models(settings: Settings, scenario: Scenario | None,
 
 def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: str = "",
             judges: bool | None = None, debate_rounds: int | None = None,
-            channels: tuple[str, ...] | None = None) -> Job:
+            channels: tuple[str, ...] | None = None, parallel: bool | None = None) -> Job:
     """命令行与网页的共同入口。空字符串与 None 表示"没有给"。
 
     请求：场景自带的请求打底，用户给的代码与日期覆盖它。
@@ -160,7 +168,8 @@ def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: 
     base = chosen.config.flow if chosen else settings.flow
     names = None if chosen is not None else tuple(_channel_names(channels))
     overrides = {key: value for key, value in
-                 (("judges", judges), ("debate_rounds", debate_rounds), ("channels", names))
+                 (("judges", judges), ("debate_rounds", debate_rounds), ("channels", names),
+                  ("parallel", parallel))
                  if value is not None}
     return Job(request=request, scenario=chosen,
                flow=FlowConfig.model_validate({**base.model_dump(), **overrides}))
@@ -243,6 +252,7 @@ def open_run(settings: Settings, request: dict[str, Any], *, scenario: Scenario 
         "ceilings": {"run_tokens": tokens, "run_cost": cost, "roles": groups},
         "limits": {"max_requests": limits.max_requests, "max_seconds": limits.max_seconds,
                    "request_timeout_s": limits.request_timeout_s},
+        "thread": run_signature(request, deps, cfg, names),   # 运行签名（19.5 第 6 条）：resume 核对用
     })
     return run, dataclasses.replace(
         deps, out_dir=run_dir,
@@ -262,6 +272,46 @@ def _dir_labels(request: dict[str, Any], deps: Deps) -> tuple[str, str]:
         return ticker, deps.market.history(ticker, deps.today)[-1].date.isoformat()
     except (UnknownTicker, NoData, SourceUnavailable):
         return ticker, deps.today.isoformat()
+
+
+# ---- 检查点与运行签名（BLUEPRINT 19.5 第 6 条） ----
+
+
+def run_signature(request: dict[str, Any], deps: Deps, flow: FlowConfig,
+                  tier_names: dict[str, str]) -> str:
+    """运行签名：代码、分析日、整个流程配置、组合指纹、档位名的 SHA-256 前 16 位十六进制。
+
+    续跑以此为线程 ID：同一签名才允许接着既有检查点继续（决策 44 的精神：续跑的输入必须与原运行一致）。
+    组合文件 v2.2 尚未接入，指纹恒为 "none"；WP31 接入后改为实际组合的指纹。
+    """
+    ticker, as_of = _dir_labels(dict(request), deps)
+    payload = json.dumps(
+        [ticker, as_of, flow.model_dump(mode="json"), portfolio_fingerprint(None),
+         sorted(tier_names.values())], ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+@asynccontextmanager
+async def checkpoint(run_dir: Path) -> AsyncIterator[AsyncSqliteSaver]:
+    """真实运行的检查点：运行目录下的 checkpoints.sqlite（异步实现，异步图用）。"""
+    async with AsyncSqliteSaver.from_conn_string(str(run_dir / "checkpoints.sqlite")) as saver:
+        yield saver
+
+
+async def run_flow(run: Run, request: dict[str, Any], deps: Deps,
+                   flow: FlowConfig | None = None) -> Outcome:
+    """命令行与网页的真实运行入口：带 SQLite 检查点与运行签名，供 resume 续跑。
+
+    场景、测试与 replay 直接调 flows.analyze.analyze（无检查点）。
+    """
+    cfg = flow or FlowConfig()
+    started = next((e for e in run.journal.events if e.type == "run.started"), None)
+    names = (started.data.get("models") if started is not None else None) or {}
+    thread = run_signature(request, deps, cfg, dict(names))
+    if deps.out_dir is None:
+        return await drive_flow(run, request, deps, cfg)
+    async with checkpoint(deps.out_dir) as saver:
+        return await drive_flow(run, request, deps, cfg, checkpointer=saver, thread_id=thread)
 
 
 # ---- 运行结束之后：运行页面 ----

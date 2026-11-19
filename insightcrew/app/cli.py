@@ -37,9 +37,11 @@ from ..kernel.runtime import Run
 from . import check as check_cmd
 from . import fetch as fetch_cmd
 from . import replay as replay_cmd
+from . import resume as resume_cmd
 from . import server as server_cmd
 from .settings import Settings, load
 from .wiring import ROOT, BadRequest, Job, build_deps, describe_models, open_run, prepare, write_page
+from .wiring import run_flow as run_flow_with_checkpoints
 
 app = typer.Typer(help="InsightCrew：带独立审计的多智能体交易辅助系统。没有密钥时运行离线演示。",
                   no_args_is_help=True, add_completion=False, pretty_exceptions_show_locals=False)
@@ -79,6 +81,7 @@ def analyze(
         "--channels", help="打开的证据通道，逗号分隔：fundamentals、disclosures")] = "",
     no_judges: Annotated[bool, typer.Option("--no-judges", help="跳过模型评审")] = False,
     debate_rounds: Annotated[int | None, typer.Option("--debate-rounds", min=0, help="辩论轮数")] = None,
+    serial: Annotated[bool, typer.Option("--serial", help="分析师按顺序跑，不并行（日志与并行相同）")] = False,
     quiet: Annotated[bool, typer.Option("--quiet", help="只打印结果，不打印过程")] = False,
     no_open: Annotated[bool, typer.Option("--no-open", help="不打开运行页面")] = False,
 ) -> None:
@@ -88,7 +91,7 @@ def analyze(
     try:
         job = prepare(settings, ticker=ticker, as_of=date, scenario=scenario,
                       judges=False if no_judges else None, debate_rounds=debate_rounds,
-                      channels=names)
+                      channels=names, parallel=False if serial else None)
         run, deps = open_run(settings, job.request, scenario=job.scenario, flow=job.flow)
     except BadRequest as e:
         _fail(str(e))
@@ -103,7 +106,7 @@ def analyze(
             print(f"未使用真实模型：{reason}。" + ("改为运行离线演示场景 demo。" if job.scenario
                                            else "没有场景可依，需要模型的步骤会以 REVIEW 结束。"))
 
-    outcome = asyncio.run(_run(run, deps, job, show=not quiet))
+    outcome = asyncio.run(_run(run, deps, job, show=not quiet))   # _run 经 wiring 的检查点入口
     page = write_page(run, deps)
     print(_outcome_line(outcome))
     print(f"运行目录：{deps.out_dir}")
@@ -114,8 +117,10 @@ def analyze(
 
 
 async def _run(run: Run, deps: Deps, job: Job, *, show: bool) -> Outcome:
-    """跑流程，同时把新出现的事件逐行打印出来：真实模型的运行要一分钟上下，过程应当边跑边看得到。"""
-    task = asyncio.create_task(run_flow(run, job.request, deps, job.flow))
+    """跑流程，同时把新出现的事件逐行打印出来：真实模型的运行要一分钟上下，过程应当边跑边看得到。
+
+    经 wiring 的 run_flow 进入：带 SQLite 检查点与运行签名，被中断的运行可以用 resume 续跑。"""
+    task = asyncio.create_task(run_flow_with_checkpoints(run, job.request, deps, job.flow))
     shown = 0
     while True:
         finished = task.done()
@@ -283,6 +288,14 @@ def replay(
 ) -> None:
     """按日志无模型重放一次运行，核对结果与黑板是否与当时一致。"""
     raise typer.Exit(replay_cmd.run(_settings(), run_dir))
+
+
+@app.command()
+def resume(
+    run_dir: Annotated[str, typer.Argument(help="被中断的运行目录，如 runs/20260101-120000-ACME-…-abcd")],
+) -> None:
+    """把一次被中断的运行从检查点接着跑完（日志尚未 run.finished 才可以）。"""
+    raise typer.Exit(resume_cmd.run(_settings(), run_dir))
 
 
 @app.command()

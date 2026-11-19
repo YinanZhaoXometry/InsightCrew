@@ -39,7 +39,8 @@ def test_analyze_with_nothing_runs_the_demo_and_writes_four_files(runs: Path) ->
     assert "结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified" in output
     assert "闸门 审计：发现 1 个问题（max_risk_per_trade_pct）" in output
     assert "打回：从 交易员 重跑" in output
-    assert {p.name for p in _only_run(runs).iterdir()} == {"journal.jsonl", "report.md", "board.json", "replay.html"}
+    assert {p.name for p in _only_run(runs).iterdir()} == {"journal.jsonl", "report.md", "board.json",
+                                                            "replay.html", "checkpoints.sqlite"}
 
 
 def test_quiet_prints_the_outcome_only(runs: Path) -> None:
