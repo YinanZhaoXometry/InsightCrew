@@ -51,7 +51,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 11 | Documents and packaging | done | README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP rewritten; `start.sh`, `start.bat`; a `git archive` zip unzipped into an empty directory passes `uv sync`, 380 tests and a keyless `analyze`. Session log entry "2026-11-19 10:05". |
 | 13 | Version 2.1: tag, branch, shared contracts, ports, the two analyst roles, audit checks, flow switch, settings | done | Authorised 2026-11-19; built the same evening. All seven contracts, both ports, both roles, the six audit checks, the flow switch and `[disclosures]` settings in place. `evidence` is the WP13 stub (every named channel `unavailable`, reason `尚未接入数据源`). 406 tests. |
 | 14 | Version 2.1: statements, both paths, the fundamentals ledger, synthetic statements | done | Both paths agree at every swept date; acceptance numbers exact (940 / 1105 / 1081 with warnings / 1090 / NotCovered); generator deterministic. 424 tests. Owner settled questions 8 and 9. |
-| 15 | Version 2.1: disclosures adapter, synthetic items | not started | Needs WP13 |
+| 15 | Version 2.1: disclosures adapter, synthetic items | done | 14 tests; window edges inclusive, undated dropped and counted, out-of-cover and missing file NotCovered, malformed SourceUnavailable; generator deterministic; the three acceptance numbers of 18.14 hold. 438 tests. |
 | 16 | Version 2.1: the offline system with channels; 21 scenarios | not started | Needs WP14 and WP15 |
 | 17A | Version 2.1: SEC EDGAR and Eastmoney announcement adapters, with tests | not started | Needs WP14 and WP15 |
 | 17B | Version 2.1: `fetch` downloads evidence | not started | Needs WP17A and WP16. The live download needs `IC_SEC_CONTACT` and the owner's request. |
@@ -958,6 +958,27 @@ Files changed beyond WP14's own list: `tests/test_market.py` (the authorised one
 Committed: WP14 files by path plus the authorised test fix, then this file. See `git log`.
 
 For the next session: WP15 may start; it needs only WP13.
+
+### 2026-11-19 evening · WP15 · building session (GLM, via ZCode)
+
+Result: done. The disclosures port's JSON adapter, the deterministic generator, both synthetic files and 14 tests.
+
+Commands run, with the last lines of their output:
+
+- `uv run python data/make_disclosures.py` → `写出 …disclosures/ACME.json（13 条）` / `写出 …disclosures/0000.HK.json（4 条）`; the generator's determinism is `test_generator_is_deterministic` (two runs, byte-equal).
+- Acceptance numbers as tests: `ACME` on 2026-09-30 with a 90-day window → `["ACME-0009", "ACME-0010", "ACME-0011"]`, `dropped == 1`; `0000.HK` on 2026-06-30 → `items == ()`; `ACME` on 2025-03-31 → `NotCovered`.
+- `uv run pytest -q` → `438 passed in 12.82s`. `uv run ruff check .` → `All checks passed!` `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- Proof of 18.3: `scenarios` → `16` 相符; 30 archived journals → `replayed ok=30 bad=0`; `eval all` → `19/19`、`0/6`、`277 × 29`、`864`.
+
+Not run, and why: nothing beyond the package's scope. Sorting, truncation and D1 numbering stay in `evidence` (18.8), so they arrive with WP16; the port returns file order (asserted).
+
+Unverified: nothing.
+
+Files created: `insightcrew/adapters/disclosures_json.py`, `data/make_disclosures.py`, `data/market/synthetic/disclosures/ACME.json`, `data/market/synthetic/disclosures/0000.HK.json`, `tests/test_disclosures.py`.
+
+Committed: by path, then this file. See `git log`.
+
+For the next session: WP16 (needs WP14 and WP15, both done) and WP17A (same) may start together.
 
 ## 9. Prompts for starting a session
 
