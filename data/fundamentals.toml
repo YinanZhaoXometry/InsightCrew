@@ -75,7 +75,7 @@ formula = "总负债 ÷ 总资产 × 100，同一财年"
 fn = "price_multiple"
 concepts = ["eps_diluted"]
 unit = "ratio"
-label = "市盈率（最近财年）"
+label = "市盈率"
 formula = "分析日收盘价 ÷ 最近财年稀释每股收益；申报货币与标的货币不同时不可用"
 
 [filing_age_days]
