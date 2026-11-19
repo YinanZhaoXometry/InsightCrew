@@ -32,6 +32,7 @@ class DecisionLog:
 
     def __init__(self, path: str | Path, *, max_entries: int = 0):
         self._path = Path(path)
+        self._path.parent.mkdir(parents=True, exist_ok=True)   # 锁文件先于日志文件打开：目录必须先在
         self._max = max_entries
 
     def append(self, record: DecisionRecord) -> bool:

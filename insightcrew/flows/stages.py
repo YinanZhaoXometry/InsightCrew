@@ -303,8 +303,9 @@ def audit(run: Run, deps: Deps) -> list[Finding]:
     news = None
     if run.board.has("news/analysis"):
         news = (run.board.get("news/items", list[NewsEntry]),
-                run.board.get("macro/markets", list[MarketEntry]),
-                run.board.get("macro/facts", list[Fact]),
+                run.board.get("macro/markets", list[MarketEntry])
+                if run.board.has("macro/markets") else [],
+                run.board.get("macro/facts", list[Fact]) if run.board.has("macro/facts") else [],
                 run.board.get("news/analysis", NewsAnalysis))
     sentiment = None
     if run.board.has("sentiment/analysis"):

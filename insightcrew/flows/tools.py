@@ -55,7 +55,7 @@ class ToolBox(dict[str, Callable[..., Any]]):
     黑板键 tools/facts。工具自己绝不写黑板键。
     """
 
-    def __init__(self, facts: list[dict[str, Any]]):
+    def __init__(self, facts: list[Fact]):
         super().__init__()
         self.facts = facts
 
@@ -74,7 +74,7 @@ def build_tools(run: Run, deps: Deps, specs: Iterable[_ToolSpec]) -> dict[str, C
     rows = [(instrument.ticker, bar.date.isoformat(), bar.open, bar.high, bar.low,
              bar.close, bar.volume) for bar in bars]
     by_family = {spec.key: spec for spec in specs}
-    facts: list[dict[str, Any]] = []
+    facts: list[Fact] = []
     seen: set[str] = set()
 
     def indicator(name: str, n: int) -> dict[str, Any] | str:
@@ -111,10 +111,10 @@ def build_tools(run: Run, deps: Deps, specs: Iterable[_ToolSpec]) -> dict[str, C
         if fact is None:            # 两条路径都算不出：历史不足，如实说明，不编造
             return (f"历史不足：{label} 在现有的 {len(bars)} 根 K 线上算不出来。"
                     "数据不可用，不要编造。")
-        result = {"id": fact_id, "value": fact.value, "unit": fact.unit, "as_of": fact.as_of}
         if fact_id not in seen:     # 每条新事实只收集一次，保留首次调用的顺序
             seen.add(fact_id)
-            facts.append(result)
+            facts.append(fact)      # 板键 tools/facts 存完整 Fact；返回给模型的仍是下面的四键
+        result = {"id": fact_id, "value": fact.value, "unit": fact.unit, "as_of": fact.as_of}
         return result
 
     indicator.__doc__ = _describe(by_family)

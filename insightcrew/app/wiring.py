@@ -377,11 +377,10 @@ def run_signature(request: dict[str, Any], deps: Deps, flow: FlowConfig,
     """运行签名：代码、分析日、整个流程配置、组合指纹、档位名的 SHA-256 前 16 位十六进制。
 
     续跑以此为线程 ID：同一签名才允许接着既有检查点继续（决策 44 的精神：续跑的输入必须与原运行一致）。
-    组合文件 v2.2 尚未接入，指纹恒为 "none"；WP31 接入后改为实际组合的指纹。
     """
     ticker, as_of = _dir_labels(dict(request), deps)
     payload = json.dumps(
-        [ticker, as_of, flow.model_dump(mode="json"), portfolio_fingerprint(None),
+        [ticker, as_of, flow.model_dump(mode="json"), portfolio_fingerprint(deps.portfolio),
          sorted(tier_names.values())], ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 

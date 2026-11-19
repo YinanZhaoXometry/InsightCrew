@@ -70,29 +70,46 @@ async def test_memory_on_writes_none_known_until_records_exist():
     assert board["memory/status"]["state"] == "none_known"
 
 
-async def test_news_and_macro_on_write_unavailable_statuses():
-    outcome, run = await _run(FlowConfig(channels=("news", "macro")), _deps())
-    assert outcome.status == "delivered"
+def _scenario_replies(name: str) -> dict:
+    loaded = json.loads((Path(__file__).parent.parent / "data" / "scenarios" / f"{name}.json")
+                        .read_text(encoding="utf-8"))
+    return loaded["replies"]
+
+
+async def test_news_and_macro_on_write_available_evidence():
+    """WP34 的真实阶段：合成宇宙在分析日覆盖窗口——条目、宏观事实与状态都上板。"""
+    outcome, run = await _run(FlowConfig(channels=("news", "macro")), _deps(),
+                              replies=_scenario_replies("macro_clean"))
+    assert outcome.status == "delivered", outcome.reason
     board = run.board.snapshot()
-    assert board["news/status"]["state"] == "unavailable"        # WP34 的桩：尚未接入
-    assert board["macro/status"]["state"] == "unavailable"
+    assert board["news/status"]["state"] == "available"
+    assert board["macro/status"]["state"] == "available"
+    assert board["news/items"] and board["macro/facts"]
     actors = [e.actor for e in run.journal.events if e.type == "model.called"]
-    assert "news" not in actors                                   # 不可用的通道不发生模型调用
+    assert "news" in actors                                        # 可用通道的分析师被调用
 
 
-async def test_sentiment_on_writes_unavailable_status():
-    outcome, run = await _run(FlowConfig(channels=("sentiment",)), _deps())
-    assert outcome.status == "delivered"
-    assert run.board.snapshot()["sentiment/status"]["state"] == "unavailable"
+async def test_sentiment_on_writes_available_evidence():
+    outcome, run = await _run(FlowConfig(channels=("sentiment",)), _deps(),
+                              replies=_scenario_replies("sentiment_clean"))
+    assert outcome.status == "delivered", outcome.reason
+    board = run.board.snapshot()
+    assert board["sentiment/status"]["state"] == "available"
+    assert board["sentiment/posts"]
+    assert "sentiment" in [e.actor for e in run.journal.events if e.type == "model.called"]
 
 
-async def test_risk_rounds_on_runs_the_stub_and_changes_nothing():
-    _, off = await _run(FlowConfig(), _deps())
-    outcome, on = await _run(FlowConfig(risk_rounds=1), _deps())
-    assert outcome.status == "delivered"
-    assert not any(k.startswith("risk/") for k in on.board.snapshot())   # WP32 的桩不写键
-    assert [e.actor for e in on.journal.events if e.type == "model.called"] == \
-        [e.actor for e in off.journal.events if e.type == "model.called"]
+async def test_risk_rounds_on_debates_then_revises():
+    """WP32 的真实阶段：三角依次发言，交易员修订一次（19.10 的顺序）。"""
+    outcome, run = await _run(FlowConfig(risk_rounds=1), _deps(),
+                              replies=_scenario_replies("risk_shrinks_size"))
+    assert outcome.status == "delivered", outcome.reason
+    board = run.board.snapshot()
+    assert all(k in board for k in ("risk/aggressive", "risk/neutral", "risk/conservative"))
+    actors = [e.actor for e in run.journal.events if e.type == "model.called"]
+    assert actors.count("trader") == 2
+    i = actors.index("risk.aggressive")
+    assert actors[i:i + 4] == ["risk.aggressive", "risk.conservative", "risk.neutral", "trader"]
 
 
 async def test_tools_on_uses_the_tool_variant_without_calls():

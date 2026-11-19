@@ -216,11 +216,11 @@ def test_facts_are_collected_in_call_order_without_duplicates(deps: Deps) -> Non
     second = tools["indicator"]("rsi", 14)
     again = tools["indicator"]("sma", 20)
     assert again == first                                        # 重复调用同答案
-    assert [f["id"] for f in tools.facts] == ["sma_20", "rsi_14"]   # 按调用顺序、不重复
-    assert tools.facts == [first, second]
+    assert [f.id for f in tools.facts] == ["sma_20", "rsi_14"]     # 按调用顺序、不重复（板键存完整 Fact）
+    assert [f.value for f in tools.facts] == [first["value"], second["value"]]
     refused = tools["indicator"]("sma", 999)                    # 错误说明不进事实列表
     assert isinstance(refused, str) and refused.endswith(END)
-    assert [f["id"] for f in tools.facts] == ["sma_20", "rsi_14"]
+    assert [f.id for f in tools.facts] == ["sma_20", "rsi_14"]
     assert set(run.board.snapshot()) == {"request/scope"}        # 工具不写任何黑板键
 
 
