@@ -1,0 +1,33 @@
+# Adapted from TradingAgents (Apache-2.0), modified.
+# 宏观序列声明（BLUEPRINT 19.7、19.12）。表名是别名（alias），fred_id 是 FRED 的公开序列 ID
+# ——别名到序列 ID 的对照改编自 TradingAgents 的 dataflows/vendors/fred.py（19.4 授权，WP28 一行）。
+# transforms 是这个序列要产出的事实（路径 1 与路径 2 各有同名函数）：
+#   level   水平值（事实 ID 是 macro_<alias>）；
+#   chg_3m  3 个月变化：该月末的值 − 3 个月前月末的值（事实 ID 是 macro_<alias>_chg_3m）；
+#   yoy     同比变化：该月末的值 − 12 个月前月末的值（事实 ID 是 macro_<alias>_yoy）。
+# 变化的单位与序列本身相同（pct 为百分点，index 为指数点）；观测只用 realtime_start
+# 不晚于分析日的版本，同一观测期取最晚的版本。
+
+[fed_funds]
+fred_id = "FEDFUNDS"
+label = "联邦基金利率"
+unit = "pct"
+transforms = ["level", "chg_3m", "yoy"]
+
+[cpi]
+fred_id = "CPIAUCSL"
+label = "消费者价格指数"
+unit = "index"
+transforms = ["level", "chg_3m", "yoy"]
+
+[unemployment]
+fred_id = "UNRATE"
+label = "失业率"
+unit = "pct"
+transforms = ["level", "chg_3m", "yoy"]
+
+[us10y]
+fred_id = "DGS10"
+label = "10 年期国债收益率"
+unit = "pct"
+transforms = ["level", "chg_3m", "yoy"]

@@ -1,0 +1,127 @@
+{
+  "source": "合成数据",
+  "alias": "us10y",
+  "fred_id": "DGS10",
+  "observations": [
+    {
+      "date": "2025-01-31",
+      "value": 4.54,
+      "realtime_start": "2025-01-31"
+    },
+    {
+      "date": "2025-02-28",
+      "value": 4.24,
+      "realtime_start": "2025-02-28"
+    },
+    {
+      "date": "2025-03-31",
+      "value": 4.23,
+      "realtime_start": "2025-03-31"
+    },
+    {
+      "date": "2025-04-30",
+      "value": 4.16,
+      "realtime_start": "2025-04-30"
+    },
+    {
+      "date": "2025-05-31",
+      "value": 4.4,
+      "realtime_start": "2025-05-31"
+    },
+    {
+      "date": "2025-06-30",
+      "value": 4.24,
+      "realtime_start": "2025-06-30"
+    },
+    {
+      "date": "2025-07-31",
+      "value": 4.42,
+      "realtime_start": "2025-07-31"
+    },
+    {
+      "date": "2025-08-31",
+      "value": 4.36,
+      "realtime_start": "2025-08-31"
+    },
+    {
+      "date": "2025-09-30",
+      "value": 4.15,
+      "realtime_start": "2025-09-30"
+    },
+    {
+      "date": "2025-10-31",
+      "value": 4.1,
+      "realtime_start": "2025-10-31"
+    },
+    {
+      "date": "2025-11-30",
+      "value": 4.1,
+      "realtime_start": "2025-11-30"
+    },
+    {
+      "date": "2025-12-31",
+      "value": 4.1,
+      "realtime_start": "2025-12-31"
+    },
+    {
+      "date": "2026-01-31",
+      "value": 4.08,
+      "realtime_start": "2026-01-31"
+    },
+    {
+      "date": "2026-02-28",
+      "value": 4.0,
+      "realtime_start": "2026-02-28"
+    },
+    {
+      "date": "2026-03-31",
+      "value": 4.05,
+      "realtime_start": "2026-03-31"
+    },
+    {
+      "date": "2026-04-30",
+      "value": 4.02,
+      "realtime_start": "2026-04-30"
+    },
+    {
+      "date": "2026-05-31",
+      "value": 3.98,
+      "realtime_start": "2026-05-31"
+    },
+    {
+      "date": "2026-06-30",
+      "value": 3.95,
+      "realtime_start": "2026-06-30"
+    },
+    {
+      "date": "2026-07-31",
+      "value": 3.96,
+      "realtime_start": "2026-07-31"
+    },
+    {
+      "date": "2026-08-31",
+      "value": 3.9,
+      "realtime_start": "2026-08-31"
+    },
+    {
+      "date": "2026-09-30",
+      "value": 3.85,
+      "realtime_start": "2026-09-30"
+    },
+    {
+      "date": "2026-10-31",
+      "value": 3.8,
+      "realtime_start": "2026-10-31"
+    },
+    {
+      "date": "2026-11-30",
+      "value": 3.78,
+      "realtime_start": "2026-11-30"
+    },
+    {
+      "date": "2026-12-31",
+      "value": 3.75,
+      "realtime_start": "2026-12-31"
+    }
+  ]
+}
