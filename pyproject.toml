@@ -37,6 +37,10 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = ["error"]
+markers = [
+    "integration: 需要真实网络的测试，默认不运行（BLUEPRINT 19.16）",
+]
+addopts = "-m 'not integration'"
 
 [tool.ruff]
 line-length = 120

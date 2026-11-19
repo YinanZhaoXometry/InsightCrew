@@ -95,7 +95,7 @@ class Finding(Contract):
 
     check: str                    # 检查项或规则的键
     layer: Literal["L2", "L3"]
-    owner: Literal["technical", "fundamentals", "disclosures", "manager", "trader"]
+    owner: Literal["technical", "fundamentals", "disclosures", "manager", "trader", "news", "sentiment", "reflector"]
     subject: str                  # 出问题的对象，例如 "claims[2]"、"proposal.stop"
     message: str
     limit: float | None = None
@@ -173,7 +173,7 @@ class AuditStatus(Contract):
 class ChannelStatus(Contract):
     """一个通道在本次运行中的状态。由代码设定，别的谁也不行。"""
 
-    channel: Literal["fundamentals", "disclosures"]
+    channel: Literal["fundamentals", "disclosures", "news", "sentiment", "macro"]
     state: Literal["available", "empty", "unavailable"]
     reason: str                   # 一句中文；available 时为空
 

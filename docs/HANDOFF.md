@@ -61,7 +61,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 19 | Version 2.1: real-model runs with channels, `eval channels` | done | 13 real runs archived (one pilot + 12 evaluation), every journal replays 一致; no prompt fix was needed (the pilot journal showed clean channel outputs and substantive, not mechanical, dissents); `[flow] channels` stays unset. Total spend ≈ 0.5 USD of the 2 USD cap. |
 | 20 | Version 2.1: documents and packaging | done | README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP updated (counts: 486 tests, 21 scenarios, 8 agent kinds, 43 archives, invariants 3/4/6 reworded, 17/18 added; the 30 v2.0 journals are marked as made before the prompt change, the 13 v2.1 after). Link check bad 0; the zip rebuilt from the head and verified from a fresh unzip. |
 
-| 21 | Version 2.2: tag `v2.1`, branch `v2.2`, no-network fixture, two literals, `NotConfigured`, `THIRD_PARTY_NOTICES.md` | not started | Alone. Needs nothing. |
+| 21 | Version 2.2: tag `v2.1`, branch `v2.2`, no-network fixture, two literals, `NotConfigured`, `THIRD_PARTY_NOTICES.md` | done | Tag on `082a0a32`; branch `v2.2` and plan commit `506dd4d`; 486 tests, ruff/pyright clean; 21 scenarios 相符; 43/43 replays 一致; socket guard shown both ways (temp test, deleted). Question 15 (the notices' copyright line) awaits the owner. |
 | 22 | Version 2.2: LangGraph graph, parallel analysts, wall time, checkpointer, `resume` | not started | Critical path. First step `uv add langgraph langgraph-checkpoint-sqlite`; on failure stop (fallback in BLUEPRINT 19.5 item 7). Its parallel step waits for WP23. |
 | 23 | Version 2.2: kernel deferred commit and tools | not started | |
 | 24 | Version 2.2: portfolio core | not started | |
@@ -466,6 +466,7 @@ Questions for the owner, and gaps found while building:
 | 12 | 2026-11-19 | 30, 34 | Which news feeds: Google News RSS and Yahoo Finance RSS (keyless; the 18.18 check saw them answer) are the plan's default. Any objection, or another source the owner prefers? | Owner, 2026-11-19 23:32: **agreed.** Google News RSS and Yahoo Finance RSS are the default news chain (`[sources] news = ["google_rss", "yahoo_rss"]`), as BLUEPRINT 19.12 says. Each live request is still asked for first. |
 | 13 | 2026-11-19 | 30 | `IC_FRED_API_KEY` in `.env`: the owner said they will provide it. Until then FRED is `NotConfigured` and macro runs on synthetic series only. | — |
 | 14 | 2026-11-19 | 38 | WP38's spending cap. To be asked when WP38 starts, with an estimate from the pilot. | — |
+| 15 | 2026-11-19 | 21 | **The copyright line in `THIRD_PARTY_NOTICES.md`.** BLUEPRINT 19.4 rule 3 says to take "the Apache-2.0 text from `../TradingAgents-main/LICENSE` and its copyright line", but that LICENSE is the unfilled Apache template — its only copyright line is the placeholder `Copyright [yyyy] [name of copyright owner]` — and its `pyproject.toml` names no author. WP21 wrote `Copyright Tauric Research` above the verbatim license text, following the project's README and GitHub organisation, and noted this in the file. Confirm, or name the line to use; WP39 finalises the file. | — |
 
 ### Version 2.2: shared-file requests
 
@@ -1305,6 +1306,30 @@ Unverified: everything in section 19, in particular that LangGraph resolves unde
 Committed: no. WP21 commits the plan as `Plan: version 2.2` after tagging `v2.1`.
 
 For the next session: WP21, alone. Then step 2 of section 5.5 with as many agents as are available.
+
+### 2026-11-19 23:42 · WP21 · building session (GLM-5.3, via ZCode)
+
+Result: done. Tag `v2.1` on `082a0a32` (head of `v2.1`); branch `v2.2` created; the plan (`docs/BLUEPRINT.md`, `docs/HANDOFF.md`, `AGENTS.md`) committed as `506dd4d` "Plan: version 2.2"; the WP21 files built, every acceptance item green, committed after acceptance.
+
+Commands run, with the last lines of their output:
+  git tag v2.1 082a0a32… && git switch -c v2.2 && git add docs/BLUEPRINT.md docs/HANDOFF.md AGENTS.md && git commit -m "Plan: version 2.2" → 506dd4d, 3 files changed
+  uv run pytest -q → 486 passed in 14.21s
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  uv run insightcrew scenarios → 21 × "✓ …相符"
+  for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew replay "$d"; done → replayed OK: 43, failed: 0; the first prints "一致：结果…与黑板快照完全相同"
+  socket guard, via a temporary test file deleted right after the run (WP21 owns no test file; the file was never committed): default run → "2 failed … RuntimeError: 测试不允许访问网络；需要联网的测试必须标记 @pytest.mark.integration … 1 deselected"; with -m integration → "1 passed, 2 deselected" (loopback socket only)
+  git tag -l → v1-data-analyst, v2.0, v2.1
+
+Not run, and why: no network request of any kind (the version 2.2 rule asks first); no `uv add`/`uv sync` (WP22's, and asked for first); `.env` not read.
+
+Unverified: the copyright line of `THIRD_PARTY_NOTICES.md` — the upstream LICENSE is the unfilled Apache template, so "Copyright Tauric Research" is my reading of its README/GitHub organisation; question 15.
+
+Files created or changed: created `tests/conftest.py`, `THIRD_PARTY_NOTICES.md`; edited `insightcrew/domain/types.py` (the two literals of 19.7), `insightcrew/domain/market.py` (`NotConfigured`, and the module docstring's error count 五→六 with 19.8 added to the reference), `pyproject.toml` (`[tool.pytest.ini_options]`: the `integration` marker and `addopts = "-m 'not integration'"` only), `docs/HANDOFF.md` (row 21, question 15, this entry).
+
+Committed: one commit on `v2.2` holding the files above plus this file (only my own edits were in it); see `git log` for the hash.
+
+For the next session: step 2 of section 5.5 — WP22 to WP30. WP22's first step is `uv add langgraph langgraph-checkpoint-sqlite`; ask the owner before running it. Question 15 waits for the owner; nothing blocks on it before WP39.
 
 ## 9. Prompts for starting a session
 
