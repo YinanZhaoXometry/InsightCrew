@@ -13,11 +13,11 @@ quorum = 2
 
 [limits]
 max_requests = 40
-max_seconds = 600
+max_seconds = 900            # 实测最慢一次 338 秒（含一轮评审返工）；最坏的返工路径约是它的两倍
 request_timeout_s = 120
 
 [budget]
-run_tokens = 200000          # 0 = 不设上限
+run_tokens = 220000          # 0 = 不设上限。实测最大一次 107145 token（WP8），取约两倍
 run_cost = 0.0               # 0 = 不设上限。设了成本上限就需要一个库能查到价格的模型。
 batch_tokens = 0
 batch_cost = 0.0
@@ -26,5 +26,5 @@ batch_cost = 0.0
 # judge = 30000
 
 [tiers]                      # "供应商:模型名"，或不带前缀的裸名字 + IC_BASE_URL（见 BLUEPRINT 9.1）
-quick = "deepseek:deepseek-chat"
-deep = "deepseek:deepseek-chat"
+quick = "deepseek:deepseek-flash"
+deep = "deepseek:deepseek-v4-pro"

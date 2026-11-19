@@ -244,8 +244,15 @@ def fetch(
 def evaluate(
     name: Annotated[str, typer.Argument(help="inject、consistency、pit、ablation，或 all")],
 ) -> None:
-    """运行离线评测。all 跑其中不需要模型的三项。"""
-    raise typer.Exit(eval_cmd.run(ROOT, name))
+    """运行评测。all 跑其中不需要模型的三项；ablation 需要真实模型。"""
+    if name != "ablation":
+        raise typer.Exit(eval_cmd.run(ROOT, name))
+    settings = _settings()
+    mode, _, reason = describe_models(settings)
+    if mode != "model":
+        raise typer.Exit(eval_cmd.run(ROOT, name, no_model_reason=reason))
+    raise typer.Exit(eval_cmd.run(ROOT, name, open_run=partial(open_run, settings), analyze=run_flow,
+                                  base=settings.flow))
 
 
 @app.command()

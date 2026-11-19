@@ -717,6 +717,8 @@ Declared in `roles/__init__.py`, in the reference. A role is data:
 Role(name, tier, instructions, reads, writes, output, effort=None, max_output_tokens=2000)
 ```
 
+**Changed in WP8, from real runs.** The output ceiling counts reasoning tokens, and both DeepSeek models reason by default. At 2000 the manager spent the whole ceiling reasoning and returned nothing. The declarations now pass `max_output_tokens` of 8000 for the quick roles and 12000 for the manager; the kernel default is unchanged. At `high` effort the evidence judge went back and forth between accepting and rejecting until it ran out of tokens, in 3 of 8 calls. With `effort="low"` on the three judges, that fell to 0 in the runs that followed.
+
 | Role | Tier | Effort | Reads | Writes | Output |
 |---|---|---|---|---|---|
 | `technical` | quick | not set | `ledger/instrument`, `ledger/facts`, `ledger/card`, `audit/technical` | `technical/analysis` | `Analysis` |
@@ -724,7 +726,7 @@ Role(name, tier, instructions, reads, writes, output, effort=None, max_output_to
 | `bear` | quick | not set | `ledger/instrument`, `technical/analysis`, `bull/argument` | `bear/argument` | `Argument` |
 | `manager` | deep | high | `ledger/instrument`, `ledger/card`, `technical/analysis`, `bull/argument`, `bear/argument`, `memory/lessons`, `audit/manager`, `judges/on_thesis` | `manager/thesis` | `Thesis` |
 | `trader` | quick | not set | `ledger/instrument`, `ledger/facts`, `manager/thesis`, `portfolio/state`, `rules/limits`, `audit/trader`, `judges/on_levels` | `trader/proposal` | `Proposal` |
-| `judge.evidence`, `judge.conservative`, `judge.aggressive` | quick | not set | `ledger/instrument`, `ledger/facts`, `technical/analysis`, `manager/thesis`, `trader/proposal`, `rules/limits`, `audit/rules` | `judge.<lens>/verdict` | `Verdict` |
+| `judge.evidence`, `judge.conservative`, `judge.aggressive` | quick | low | `ledger/instrument`, `ledger/facts`, `technical/analysis`, `manager/thesis`, `trader/proposal`, `rules/limits`, `audit/rules` | `judge.<lens>/verdict` | `Verdict` |
 
 What is withheld, and why. Each line is a property of the `reads` column. `tests/test_architecture.py` asserts the lines for the judges and for the portfolio; add an assertion there when adding a line here.
 
@@ -928,6 +930,8 @@ In the reference. Both are built on the library's `FunctionModel`, a model whose
 - A failure raises `SourceUnavailable` with the HTTP status. The endpoint is unofficial and may change or throttle.
 - Downloaded bars are not committed.
 
+**Second source, added 2026-11-19: `adapters/eastmoney.py`.** Yahoo answered HTTP 429 to every attempt from this machine, so `fetch` falls back to Eastmoney's daily-kline endpoint (`push2his.eastmoney.com/api/qt/stock/kline/get`, no key, unadjusted prices with `fqt=0`) and says which source it used. It writes the same directory through `adapters/real_universe.py`, which both adapters share (`plan`, `write`). It addresses a series as `market.code`: `116.<five digits>` for Hong Kong, `100.HSI` and `107.SPY` for the benchmarks, and 105, 106, 107 tried in turn for other US tickers. It returns the session in progress as a bar with a close, so a bar dated today in the market's own time zone before 16:30 is written with an empty close, as Yahoo's unsettled rows are. Instrument names come back in Chinese. Tests: `tests/test_eastmoney.py` over saved responses in `tests/fixtures/eastmoney/`.
+
 ### 9.5 Declarations and the run store
 
 `adapters/declarations.py`: `load_indicators(path) -> tuple[IndicatorSpec, ...]` and `load_rules(path) -> tuple[RuleSpec, ...]`. Each reads the file with `tomllib` and validates every table as its contract, with the table's name as `key`. A missing, mistyped or unknown field is an error at start-up that names the table and the field.
@@ -937,6 +941,8 @@ In the reference. Both are built on the library's `FunctionModel`, a model whose
 A run directory holds `journal.jsonl` (the truth), and three projections that can be regenerated from it: `report.md`, `board.json`, `replay.html`.
 
 ## 10. Application
+
+> **Amended 2026-11-19.** Seven points in 5.2 and 10.2 to 10.6 were changed in the code when WP5, WP10 and WP12 were redone, and the changes were accepted: `wiring.prepare` and `BadRequest`; run directories named from the normalised ticker and resolved date; `run.started` records role ceilings and `gate.checked` carries detail on a refusal; `replay` and `scenarios` run in a temporary directory; what a `review` report withholds; the timeline's one column per turn; the server's `running`/`incomplete` states, `Origin` check and `no-store`. [HANDOFF.md](HANDOFF.md) section 8, entry "2026-11-19 08:50", lists them. Where the text below differs on those points, the code is right.
 
 ### 10.1 Settings
 
@@ -1148,7 +1154,7 @@ Each dial is a setting. Raising one hands the model more of the work. None chang
 | Dial | Where | Now | Raise it when |
 |---|---|---|---|
 | Structured output | `run.output_mode` | `auto` | The provider enforces schemas: `native`. Corrective retries should fall to zero. |
-| Reasoning effort | `Role.effort` | Not set; `high` for the manager | A role's judgment is the bottleneck in the ablation |
+| Reasoning effort | `Role.effort` | Not set; `high` for the manager, `low` for the judges (WP8) | A role's judgment is the bottleneck in the ablation |
 | Tier per role | `Role.tier` | Quick for all but the manager | Cost allows |
 | Debate | `flow.debate_rounds` | 1 | Lower to 0 when the ablation shows the rating and the judges' verdicts do not change without it |
 | Judges | `flow.judges`, `flow.quorum`, `LENSES` | 3 lenses, quorum 2 | Fewer lenses when dissent rates fall; a different model for one judge when they agree too readily |
