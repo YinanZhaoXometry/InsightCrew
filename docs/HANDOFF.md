@@ -52,7 +52,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 13 | Version 2.1: tag, branch, shared contracts, ports, the two analyst roles, audit checks, flow switch, settings | done | Authorised 2026-11-19; built the same evening. All seven contracts, both ports, both roles, the six audit checks, the flow switch and `[disclosures]` settings in place. `evidence` is the WP13 stub (every named channel `unavailable`, reason `尚未接入数据源`). 406 tests. |
 | 14 | Version 2.1: statements, both paths, the fundamentals ledger, synthetic statements | done | Both paths agree at every swept date; acceptance numbers exact (940 / 1105 / 1081 with warnings / 1090 / NotCovered); generator deterministic. 424 tests. Owner settled questions 8 and 9. |
 | 15 | Version 2.1: disclosures adapter, synthetic items | done | 14 tests; window edges inclusive, undated dropped and counted, out-of-cover and missing file NotCovered, malformed SourceUnavailable; generator deterministic; the three acceptance numbers of 18.14 hold. 438 tests. |
-| 16 | Version 2.1: the offline system with channels; 21 scenarios | not started | Needs WP14 and WP15 |
+| 16 | Version 2.1: the offline system with channels; 21 scenarios | done | Real `evidence`, wiring, `--channels`, `facts` channels, the grown views and prompt paragraphs, two report sections, five scenarios, three evaluation blocks. 21 scenarios match; eval all prints both blocks; `uncovered`'s report verified; replay of a channel run 一致. 462 tests. |
 | 17A | Version 2.1: SEC EDGAR and Eastmoney announcement adapters, with tests | not started | Needs WP14 and WP15 |
 | 17B | Version 2.1: `fetch` downloads evidence | not started | Needs WP17A and WP16. The live download needs `IC_SEC_CONTACT` and the owner's request. |
 | 18 | Version 2.1: run page sections | not started | Needs WP16. First to be cut. |
@@ -317,6 +317,7 @@ Gaps found while building (the plan warns about these; each stops the package th
 |---|---|---|---|---|
 | 8 | 2026-11-19 | 14, 15 | **Where synthetic evidence may live.** BLUEPRINT 18.7 puts evidence files at `data/market/<universe>/statements/<file_stem>.json` (and `disclosures/`). But WP2's test `tests/test_market.py::test_generator_writes_the_same_bytes_twice` snapshots `data/market/synthetic/` with `iterdir()` and asserts the entry set **equals exactly** the bars CSVs plus `universe.toml`; any subdirectory makes it fail (first as `IsADirectoryError`). The working rules forbid editing an existing test, and the blueprint's path is a name, which may not be changed without the owner. The two cannot both hold as written. | Owner, 2026-11-19: **agreed to the suggested fix.** `_snapshot()` lists files only (`path.is_file()`); applied. Evidence stays at the blueprint's path; the generator's own output set is still asserted exactly. |
 | 9 | 2026-11-19 | 14, 16 | **`pe_fy` under a currency mismatch.** 18.6: "`pe_fy` is unavailable when the statements' currency differs from the instrument's." `build_fundamentals` has the instrument and can withhold the fact (implemented). But `recompute_fundamentals(statements, close, as_of, specs)` has no instrument, so it computes a value for `pe_fy` that path 1 never emits, and `disagreements` (not to be changed) would report `pe_fy` as a one-sided disagreement and halt the run. | Owner, 2026-11-19: **agreed.** WP16's `evidence` passes `recompute_fundamentals` the specs with price-dependent declarations removed whenever the currencies differ; signatures and `disagreements` untouched. |
+| 10 | 2026-11-19 | 16 | **`facts` output vs WP5's exact-count assertion.** 18.11 requires `facts` to print, after the ledger, the fundamentals facts and card and the window's items (or the channel's state). WP5's `tests/test_cli.py::test_facts_prints_the_ledger_and_the_data_card` asserts the output holds **exactly 29 two-space-indented lines** (the ledger's 29 facts); the mandated new lines are indented the same way, so the count becomes 47. The working rules forbid editing an existing test; the blueprint's requirement and the assertion cannot both hold. | Owner, 2026-11-19: **agreed to the suggested fix.** The assertion now counts the ledger's own lines (`"indicators." in line`), still exactly 29; the channel lines are asserted by WP16's new `test_facts_prints_the_channels`. |
 
 ### Corrections to the blueprint
 
@@ -979,6 +980,34 @@ Files created: `insightcrew/adapters/disclosures_json.py`, `data/make_disclosure
 Committed: by path, then this file. See `git log`.
 
 For the next session: WP16 (needs WP14 and WP15, both done) and WP17A (same) may start together.
+
+### 2026-11-19 evening · WP16 · building session (GLM, via ZCode)
+
+Result: done. The offline system with both channels end to end. Question 10 was found and settled on the way (section 7): the owner approved the one-line amendment to WP5's exact-count assertion, intent unchanged.
+
+Commands run, with the last lines of their output:
+
+- `uv run pytest -q` → `462 passed in 15.26s`. `uv run ruff check .` → `All checks passed!` `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- `IC_FORCE_OFFLINE=1 uv run insightcrew scenarios` → `21` lines `✓ …：相符` (16 old + `channels_clean` 9 calls, `misquote_fundamentals` 15, `ghost_item` 14, `uncovered` 8, `quiet` 7, as 18.13 states).
+- `IC_FORCE_OFFLINE=1 uv run insightcrew eval all` → `故障 19/19…；有效变体 0/6` / `证据通道故障 6/6…；有效变体 0/2` / `277 个数据点 × 29 项声明，全部一致` / `基本面一致性评测：46 个数据点 × 12 项声明，全部一致` / `时点评测：…864 项事实…` / `证据通道时点评测：16 个数据点：加更晚的申报与公告不改变任何更早日期的事实或条目，也没有事实晚于分析日`.
+- 30 archived journals → `replayed ok=30 bad=0`.
+- `IC_FORCE_OFFLINE=1 uv run insightcrew analyze --scenario uncovered --no-open --quiet` → `结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified`; its report contains `基本面通道：不可用（0000.HK 在宇宙 synthetic 里没有年报数据文件）` and `公告通道：可用`, no 基本面事实 section, and the 公告条目 section with source titles; `replay` of that run → `一致：…与黑板快照完全相同`.
+
+Not run, and why: the page sections (WP18); real-model runs (WP19); nothing else.
+
+Unverified: the four prompt paragraphs are prompt changes — untested until WP19, and the archived runs were made with the old wording (the documents must say so, WP20).
+
+Files created: `data/scenarios/channels_clean.json`, `misquote_fundamentals.json`, `ghost_item.json`, `uncovered.json`, `quiet.json`. Edited: `insightcrew/flows/stages.py` (the real `evidence`), `insightcrew/app/wiring.py` (ports wired, `channels` in `prepare`), `insightcrew/app/cli.py` (`--channels`, `facts` channels, stage names), `insightcrew/roles/__init__.py` (the grown `reads`), `insightcrew/roles/prompts/{bull,bear,manager,judge}.md` (one paragraph each), `insightcrew/app/report.py` (two sections, quality lines), `insightcrew/evals/inject.py`, `consistency.py`, `pit.py` (the added blocks), `tests/test_stages.py`, `test_report.py`, `test_scenarios.py`, `test_cli.py`, `test_wiring.py`, `test_architecture.py` (cases added; the one authorised amendment to `test_cli.py` recorded under question 10).
+
+Notes:
+
+1. `facts` now prints the channels by running the same `evidence` stage on a throwaway board — the numbers a scenario file copies are by construction the numbers a run sees.
+2. Under a currency mismatch the `evidence` stage passes `recompute_fundamentals` the specs without `price_multiple` (question 9's answer, in force).
+3. The fundamentals report section appears only when `fundamentals/facts` is on the board (18.11's "printed only when its keys are on the board"); an unavailable or empty channel states itself in 数据质量 and prints no table.
+
+Committed: by path, then this file. See `git log`.
+
+For the next session: WP17A (adapters and tests, needs WP14/15 ✓), then WP17B (`fetch`, needs WP17A and WP16 ✓).
 
 ## 9. Prompts for starting a session
 
