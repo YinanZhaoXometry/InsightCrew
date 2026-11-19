@@ -47,6 +47,7 @@
                               border-radius:7px; background:#fff; min-height:34px; }
   #form input:disabled, #form select:disabled { background:var(--lane); color:var(--muted); }
   #f-scenario { min-width:230px; } #f-ticker { width:130px; } #f-rounds { width:70px; }
+  #f-risk-rounds { width:70px; } #f-portfolio { width:230px; }
   .primary { padding:7px 20px; min-height:34px; border-radius:7px; border:1px solid var(--accent);
              background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
   .primary:hover { filter:brightness(1.08); }
@@ -70,11 +71,18 @@
   .stage { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; font-size:12.5px;
            border:1px solid var(--line); background:var(--card); color:var(--muted); }
   .stage .kind { font-size:10px; padding:0 5px; border-radius:4px; border:1px solid currentColor; opacity:.75; }
+  .stage .ms { font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
   .stage.done { background:var(--good-bg); border-color:#bfe0cd; color:var(--good); }
   .stage.running { background:var(--accent-bg); border-color:var(--accent); color:var(--accent); font-weight:600; }
   .stage.revised { background:var(--warn-bg); border-color:#edd9ac; color:var(--warn); }
   .stage.halted { background:var(--bad-bg); border-color:#f4c7c1; color:var(--bad); font-weight:600; }
   .arrow { color:var(--line); font-size:12px; }
+  /* 并行分析师组：几位分析师同时跑，画成一个框里的并列泳道 */
+  .parallel { display:flex; flex-direction:column; gap:4px; padding:6px 8px 6px; border:1px dashed var(--accent);
+              border-radius:9px; background:var(--card); position:relative; margin:2px 0; }
+  .parallel .par-tag { position:absolute; top:-8px; left:10px; font-size:10px; padding:0 6px; border-radius:4px;
+                       background:var(--accent-bg); color:var(--accent); border:1px solid #c9d3f7; }
+  .parallel .stage { background:#fff; }
 
   /* 回放控制 */
   #playbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; }
@@ -168,6 +176,17 @@
       <label>分析日 <input id="f-date" type="date"></label>
       <label class="inline"><input id="f-judges" type="checkbox"> 模型评审</label>
       <label>辩论轮数 <input id="f-rounds" type="number" min="0" max="10"></label>
+      <label>风险辩论轮数 <input id="f-risk-rounds" type="number" min="0" max="10"></label>
+      <label class="inline"><input id="f-tools" type="checkbox"> 分析工具</label>
+      <label class="inline"><input id="f-memory" type="checkbox"> 记忆</label>
+      <label>组合文件 <input id="f-portfolio" maxlength="256" placeholder="data/portfolios/flat_usd.json" autocomplete="off"></label>
+      <label>证据通道 <select id="f-channels" multiple size="5">
+        <option value="fundamentals">fundamentals 基本面</option>
+        <option value="disclosures">disclosures 公告</option>
+        <option value="news">news 新闻</option>
+        <option value="sentiment">sentiment 情感</option>
+        <option value="macro">macro 宏观（需同时选 news）</option>
+      </select></label>
       <button class="primary" type="submit">开始</button>
     </form>
     <p class="note" id="mode-note"></p>
@@ -221,31 +240,57 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 const STAGES = [["intake", "范围闸门", "code"], ["ledger", "事实账本", "code"], ["technical", "技术分析", "model"],
                 ["fundamentals", "基本面分析", "model"], ["disclosures", "公告分析", "model"],
+                ["news", "新闻分析", "model"], ["sentiment", "情感分析", "model"],
                 ["debate", "多空辩论", "model"], ["manager", "研究主管", "model"], ["trader", "交易员", "model"],
+                ["risk", "风险辩论", "model"],
                 ["audit", "审计", "code"], ["judges", "评审", "model"], ["report", "报告", "code"]];
 const STAGE_NAME = Object.fromEntries(STAGES.map(([key, name]) => [key, name]));
 STAGE_NAME.evidence = "证据";
 const STAGE_ORDER = STAGES.map(([key]) => key);
-const CHANNEL_STAGES = { fundamentals: "fundamentals/status", disclosures: "disclosures/status" };
+const ANALYST_KEYS = ["technical", "fundamentals", "disclosures", "news", "sentiment"];   // evidence 之后并行的几位
+/* 一段什么时候出现在流水线里：通道段看自己的状态键，风险段看第一个发言的键 */
+const CHANNEL_STAGES = { fundamentals: "fundamentals/status", disclosures: "disclosures/status",
+                         news: "news/status", sentiment: "sentiment/status", risk: "risk/aggressive" };
 const ACTOR_STAGE = { intake: "intake", ledger: "ledger", evidence: "ledger", technical: "technical",
-                      fundamentals: "fundamentals", disclosures: "disclosures", bull: "debate", bear: "debate",
+                      fundamentals: "fundamentals", disclosures: "disclosures", news: "news",
+                      sentiment: "sentiment", "risk.aggressive": "risk", "risk.neutral": "risk",
+                      "risk.conservative": "risk",
+                      bull: "debate", bear: "debate",
                       manager: "manager", trader: "trader", audit: "audit" };
+/* 产物键前缀 → 流水线段：证据阶段代写的键归到各自的段 */
+const KEY_STAGE = [["judges/", "judges"], ["run/", "report"], ["news/", "news"], ["macro/", "news"],
+                   ["sentiment/", "sentiment"], ["risk/", "risk"], ["tools/", "technical"]];
 const STAGE_LANE = { technical: "technical", fundamentals: "fundamentals", disclosures: "disclosures",
-                     debate: "bull", manager: "manager", trader: "trader" };
+                     news: "news", sentiment: "sentiment", debate: "bull", manager: "manager", trader: "trader" };
 const LANES = [["app", "系统", "code"], ["intake", "范围闸门", "code"], ["ledger", "事实账本", "code"],
                ["evidence", "证据", "code"],
                ["technical", "技术分析师", "model"], ["fundamentals", "基本面分析师", "model"],
-               ["disclosures", "公告分析师", "model"],
+               ["disclosures", "公告分析师", "model"], ["news", "新闻分析师", "model"],
+               ["sentiment", "情感分析师", "model"],
                ["bull", "多方研究员", "model"], ["bear", "空方研究员", "model"],
-               ["manager", "研究主管", "model"], ["trader", "交易员", "model"], ["audit", "审计", "code"],
+               ["manager", "研究主管", "model"], ["trader", "交易员", "model"],
+               ["risk.aggressive", "激进风控", "model"], ["risk.conservative", "保守风控", "model"],
+               ["risk.neutral", "中立风控", "model"], ["audit", "审计", "code"],
                ["judge.evidence", "证据评审", "model"], ["judge.conservative", "保守评审", "model"],
                ["judge.aggressive", "进取评审", "model"], ["flow", "流程", "code"]];
 const GROUP_NAME = { technical: "技术分析师", fundamentals: "基本面分析师", disclosures: "公告分析师",
+                     news: "新闻分析师", sentiment: "情感分析师",
                      bull: "多方研究员", bear: "空方研究员", manager: "研究主管",
-                     trader: "交易员", judge: "评审（三个视角）" };
-const CHANNEL_STATE = { available: "可用", empty: "窗口内没有公告", unavailable: "不可用" };
+                     trader: "交易员", risk: "风险辩论（三方）", judge: "评审（三个视角）" };
+const CHANNEL_STATE = {                       // 每条通道自己的三态文案（empty 的说法各不相同）
+  fundamentals: { available: "可用", empty: "没有已申报的年度报表", unavailable: "不可用" },
+  disclosures: { available: "可用", empty: "窗口内没有公告", unavailable: "不可用" },
+  news: { available: "可用", empty: "窗口内没有新闻", unavailable: "不可用" },
+  sentiment: { available: "可用", empty: "窗口内没有帖子", unavailable: "不可用" },
+  macro: { available: "可用", empty: "没有宏观序列", unavailable: "不可用" } };
 const DIRECTION_TEXT = { positive: "正面", negative: "负面", neutral: "中性" };
 const STANCE_TEXT = { positive: "正面", mixed: "混合", neutral: "中性", negative: "负面" };
+const RISK_NAME = { aggressive: "激进风控", conservative: "保守风控", neutral: "中立风控" };
+const PSTATE_TEXT = { not_provided: "未提供组合", flat: "空仓", held: "持有", unavailable: "不可用" };
+const BAND_TEXT = { bullish: "强烈看多", mildly_bullish: "略偏多", neutral: "中性", mixed: "多空分歧",
+                    mildly_bearish: "略偏空", bearish: "强烈看空" };
+const TAG_TEXT = { bullish: "看多", bearish: "看空", none: "无标签" };
+const HIT_TEXT = { stop: "止损", target: "目标", neither: "均未触及", "n/a": "不适用" };
 const JUDGES = [["evidence", "证据评审"], ["conservative", "保守评审"], ["aggressive", "进取评审"]];
 const REASON = {
   invalid_ticker: "代码格式不正确", unknown_ticker: "代码不在数据集里", no_data: "该日期之前没有已收盘的行情",
@@ -337,8 +382,9 @@ function stageOf(e) {
   if (!["model.called", "model.failed", "budget.exceeded", "artifact.written"].includes(e.type)) return null;
   const actor = e.actor || "";
   if (actor.startsWith("judge.")) return "judges";
-  if (e.type === "artifact.written" && e.data.key.startsWith("judges/")) return "judges";
-  if (e.type === "artifact.written" && e.data.key.startsWith("run/")) return "report";
+  if (e.type === "artifact.written") {
+    for (const [prefix, stage] of KEY_STAGE) if (e.data.key.startsWith(prefix)) return stage;
+  }
   return ACTOR_STAGE[actor] || null;
 }
 
@@ -433,16 +479,35 @@ function renderHeader() {
 function renderPipeline(events) {
   const { status, redo } = pipeline(events);
   const board = fold(events);
-  const chips = [];
-  let shown = 0;
-  STAGES.forEach(([key, name, kind]) => {
-    if (CHANNEL_STAGES[key] && !board[CHANNEL_STAGES[key]]) return;   // 这次运行没开这条通道
+  const started = startedData();
+  const wall = board["run/wall_ms"] || null;            // 每分析师墙钟：黑板没有这个键就不展示
+  const parallel = started && started.flow && started.flow.parallel !== false;
+  const chip = (key) => {
+    const entry = STAGES.find(([k]) => k === key);
     let cls = status[key] || "idle";
     if (cls === "done" && redo[key]) cls = "revised";
-    if (shown++) chips.push(el("span", { class: "arrow" }, "→"));
-    chips.push(el("span", { class: "stage " + cls, title: kind === "model" ? "由模型完成" : "由代码完成" },
-      name, el("span", { class: "kind" }, kind === "model" ? "模型" : "代码"),
-      redo[key] ? "↺" + redo[key] : null));
+    return el("span", { class: "stage " + cls,
+                        title: entry[2] === "model" ? "由模型完成" : "由代码完成" },
+      entry[1], el("span", { class: "kind" }, entry[2] === "model" ? "模型" : "代码"),
+      redo[key] ? "↺" + redo[key] : null,
+      wall && wall[key] !== undefined ? el("span", { class: "ms" }, wall[key] + " ms") : null);
+  };
+  const visible = STAGES.map(([key]) => key)
+    .filter((key) => !CHANNEL_STAGES[key] || board[CHANNEL_STAGES[key]]);
+  const grouped = parallel && ANALYST_KEYS.filter((key) => visible.includes(key)).length > 1;
+  const chips = [];
+  visible.forEach((key, i) => {
+    const inGroup = grouped && ANALYST_KEYS.includes(key);
+    if (i) chips.push(el("span", { class: "arrow" }, "→"));
+    if (inGroup && key === ANALYST_KEYS[0]) {           /* 并行模式：几位分析师同时跑，画成一个框里并列 */
+      const group = el("span", { class: "parallel", title: "这几位分析师同时运行，产物按固定顺序落账" },
+        el("span", { class: "par-tag" }, "并行"));
+      for (const k of ANALYST_KEYS) if (visible.includes(k)) group.append(chip(k));
+      chips.push(group);
+      return;
+    }
+    if (inGroup) return;                                /* 组里已经画过 */
+    chips.push(chip(key));
   });
   fill($("pipeline"), chips);
 }
@@ -624,12 +689,25 @@ function renderTimeline(events) {
 
 function renderEvidence(events) {
   const board = fold(events), outcome = board["run/outcome"], kids = [el("h2", null, "证据")];
-  for (const [key, name] of [["fundamentals", "基本面"], ["disclosures", "公告"]]) {
+  const delivered = outcome && outcome.status === "delivered";
+  for (const [key, name] of [["fundamentals", "基本面"], ["disclosures", "公告"], ["news", "新闻"],
+                             ["sentiment", "情感"], ["macro", "宏观"]]) {
     const status = board[key + "/status"];
     if (!status) continue;                       // 这次运行没开这条通道：一行都不加
-    const text = CHANNEL_STATE[status.state] || status.state;
+    const text = (CHANNEL_STATE[key] || {})[status.state] || status.state;
     kids.push(el("p", { class: "note" },
       name + "通道：" + text + (status.state !== "available" && status.reason ? "（" + status.reason + "）" : "")));
+  }
+  const pstate = board["portfolio/state"];
+  if (pstate) {                                  // 组合状态：没给组合文件时没有这个键
+    const text = PSTATE_TEXT[pstate.state] || pstate.state;
+    const held = pstate.state === "held" ? "数量 " + num(pstate.quantity) + "（" + (pstate.currency || "—")
+        + "），占权益 " + num(pstate.position_pct) + "%" : "";
+    const flat = pstate.state === "flat" ? "现金占权益 " + num(pstate.cash_pct) + "%"
+        + "（" + (pstate.currency || "—") + "）" : "";
+    kids.push(el("p", { class: "note" }, "组合状态：" + text
+      + (held || flat || (pstate.reason ? "（" + pstate.reason + "）" : "")) + (held && pstate.cash_pct !== null
+        ? "；现金占权益 " + num(pstate.cash_pct) + "%" : "")));
   }
   const fundFacts = board["fundamentals/facts"];
   if (fundFacts) {
@@ -673,15 +751,108 @@ function renderEvidence(events) {
     if (dcard) kids.push(el("p", { class: "note" }, "窗口 " + dcard.window_from + " 到 " + dcard.window_to
       + "，" + dcard.items + " 条；丢弃无日期 " + dcard.dropped + " 条，截断 " + dcard.truncated + " 条"));
   }
+  const newsItems = board["news/items"];
+  if (board["news/status"] && board["news/status"].state !== "unavailable") {
+    kids.push(el("h3", null, "新闻标题（来源原文，未经核验）"));
+    if (newsItems && newsItems.length) {
+      kids.push(table(["编号", "发布日", "来源", "标题"], newsItems.map((item) =>
+        [el("span", { class: "mono" }, item.id), item.published, item.source, item.title])));
+    } else kids.push(el("p", { class: "note" }, "（窗口内没有新闻。）"));
+    const nAnalysis = board["news/analysis"];
+    if (nAnalysis) {
+      if (nAnalysis.signals && nAnalysis.signals.length) {
+        kids.push(el("ul", { class: "signals" }, nAnalysis.signals.map((signal) => el("li", null,
+          el("span", { class: "mono" }, signal.item), " "
+          + (DIRECTION_TEXT[signal.direction] || signal.direction) + "——" + signal.reading))));
+      }
+      kids.push(el("p", { class: "note" }, "窗口内新闻合起来的基调："
+        + (STANCE_TEXT[nAnalysis.stance] || nAnalysis.stance) + "（把握：" + nAnalysis.confidence + "）"));
+    }
+    const ncard = board["news/card"];
+    if (ncard) kids.push(el("p", { class: "note" }, "窗口 " + ncard.window_from + " 到 " + ncard.window_to
+      + "，" + ncard.items + " 条；丢弃无日期 " + ncard.dropped + " 条，截断 " + ncard.truncated + " 条"));
+  }
+  if (board["macro/status"] && board["macro/status"].state !== "unavailable") {
+    const macroFacts = board["macro/facts"] || [];
+    if (macroFacts.length) {
+      const readings = Object.fromEntries((((board["news/analysis"] || {}).claims) || [])
+        .map((claim) => [claim.fact, claim.reading || ""]));
+      kids.push(el("h3", null, "宏观事实（经两条路径复算，数值不取模型的转述）"),
+        table(["事实", "含义", "数值", "数据日", "分析师的解读"], macroFacts.map((fact) =>
+          [el("span", { class: "mono" }, fact.id), fact.label || "—", withUnit(fact.value, fact.unit),
+           fact.as_of || "—", readings[fact.id] || "—"]), [2]));
+    }
+    const markets = board["macro/markets"] || [];
+    if (markets.length) {
+      kids.push(el("h3", null, "预测市场（来源原话，未经核验）"),
+        el("p", { class: "note" }, "问题与概率照录自来源，程序不做核对；概率为来源给的隐含概率（0 到 1）。"),
+        table(["编号", "问题", "隐含概率", "成交量", "截止日"], markets.map((m) =>
+          [el("span", { class: "mono" }, m.id), m.question, num(m.probability), num(m.volume), m.end_date]), [2, 3]));
+    }
+  }
+  if (board["sentiment/status"] && board["sentiment/status"].state !== "unavailable") {
+    const sAnalysis = board["sentiment/analysis"];
+    if (sAnalysis) {
+      kids.push(el("h3", null, "社交情感"),
+        el("p", { class: "note" }, "情绪带：" + (BAND_TEXT[sAnalysis.band] || sAnalysis.band)
+          + "，情绪分 " + num(sAnalysis.score) + "（0 最看空，10 最看多）；把握：" + sAnalysis.confidence));
+      if (sAnalysis.signals && sAnalysis.signals.length) {
+        kids.push(el("ul", { class: "signals" }, sAnalysis.signals.map((signal) => el("li", null,
+          el("span", { class: "mono" }, signal.post), " "
+          + (DIRECTION_TEXT[signal.direction] || signal.direction) + "——" + signal.reading))));
+      }
+    }
+    const posts = board["sentiment/posts"];
+    if (posts && posts.length) {
+      kids.push(table(["编号", "发布日", "来源", "自带标签", "内容"], posts.map((post) =>
+        [el("span", { class: "mono" }, post.id), post.published, post.source,
+         TAG_TEXT[post.tag] || post.tag, post.text])));
+    } else kids.push(el("p", { class: "note" }, "（窗口内没有帖子。）"));
+    const scard = board["sentiment/card"];
+    if (scard) kids.push(el("p", { class: "note" }, "窗口 " + scard.window_from + " 到 " + scard.window_to
+      + "，" + scard.items + " 条；丢弃无日期 " + scard.dropped + " 条，截断 " + scard.truncated + " 条"));
+  }
+  const lessons = board["memory/lessons"];
+  if (lessons) {                                 // 记忆没开时没有这个键；开着而无可用的课程则是空表
+    kids.push(el("h3", null, "用到的课程（只有结果可知日不晚于分析日的课程）"));
+    kids.push(lessons.length
+      ? table(["代码", "分析日", "结果可知于", "当时评级", "收益率", "超额收益", "触及", "课程"],
+              lessons.map((lesson) => [lesson.ticker, lesson.as_of, lesson.known_on, lesson.rating,
+                num(lesson.return_pct) + "%", lesson.alpha_pct === null || lesson.alpha_pct === undefined
+                  ? "—" : num(lesson.alpha_pct) + "%", HIT_TEXT[lesson.hit] || lesson.hit, lesson.lesson]),
+              [4, 5])
+      : el("p", { class: "note" }, "（没有分析日之前已经知道结果的课程。）"));
+  }
+  const riskKeys = [["risk/aggressive", "激进风控"], ["risk/conservative", "保守风控"], ["risk/neutral", "中立风控"]];
+  const riskRows = riskKeys.filter(([key]) => board[key]);
+  if (riskRows.length) {
+    kids.push(el("h3", null, "风险三方意见（未经审计的意见）"),
+      el("p", { class: "note" }, "三位风控在审计之前评论方案；页面展示的价位与仓位是审计通过的那一版方案。"),
+      table(["风控", "意见"], riskRows.map(([key, name]) => {
+        const view = board[key] || {};
+        return [name, delivered ? view.critique || "（没有批评）" : "（发表了意见；没有交付结论，正文见过程记录）"];
+      })));
+  }
   const analysis = board["technical/analysis"];
-  if (analysis && analysis.claims && analysis.claims.length) {
+  const tools = board["tools/facts"] || [];
+  if ((analysis && analysis.claims && analysis.claims.length) || tools.length) {
     const facts = Object.fromEntries((board["ledger/facts"] || []).map((fact) => [fact.id, fact]));
-    kids.push(el("h3", null, "分析师引用的事实（数值取自事实账本，不取模型的转述）"),
-      table(["事实", "含义", "账本数值", "数据日", "分析师的解读"], analysis.claims.map((claim) => {
-        const fact = facts[claim.fact] || {};
-        return [el("span", { class: "mono" }, claim.fact), fact.label || "（账本中没有这个事实）",
-                withUnit(fact.value, fact.unit), fact.as_of || "—", claim.reading || ""];
-      }), [2]));
+    const byTool = Object.fromEntries(tools.map((fact) => [fact.id, fact]));
+    const claims = (analysis && analysis.claims) || [];
+    const rows = claims.map((claim) => {
+      const fact = facts[claim.fact] || byTool[claim.fact] || {};
+      const fromTool = claim.fact in byTool;
+      return [el("span", { class: "mono" }, claim.fact + (fromTool ? "（工具）" : "")),
+              fact.label || (fromTool ? "（工具按需计算）" : "（账本中没有这个事实）"),
+              withUnit(fact.value, fact.unit), fact.as_of || "—", claim.reading || ""];
+    });
+    const cited = new Set(claims.map((claim) => claim.fact));
+    for (const fact of tools) if (!cited.has(fact.id)) {
+      rows.push([el("span", { class: "mono" }, fact.id + "（工具）"), "（工具按需计算）",
+                 withUnit(fact.value, fact.unit), fact.as_of || "—", "—"]);
+    }
+    kids.push(el("h3", null, "分析师引用的事实（数值取自事实账本，不取模型的转述；标有（工具）的行是按需请求的指标）"),
+      table(["事实", "含义", "账本数值", "数据日", "分析师的解读"], rows, [2]));
   }
   const rules = board["audit/rules"];
   if (rules && rules.length) {
@@ -695,7 +866,6 @@ function renderEvidence(events) {
       }), [2, 3]));
   }
   if (board["judges/status"]) {
-    const delivered = outcome && outcome.status === "delivered";
     kids.push(el("h3", null, "评审（" + board["judges/status"] + "）"),
       table(["评审", "结论", delivered ? "意见" : ""], JUDGES.map(([lens, name]) => {
         const verdict = board["judge." + lens + "/verdict"];
@@ -731,6 +901,9 @@ function renderUsage(events) {
   }
   const notes = ["“请求”多于“调用”的部分是输出不合契约后的纠正重试。",
                  "成本上限：" + (ceilings.run_cost ? num(ceilings.run_cost, 6) : "不设上限") + "。"];
+  const wall = fold(events)["run/wall_ms"];
+  if (wall) notes.push("各段用时（毫秒）：" + Object.entries(wall)
+    .map(([node, ms]) => (STAGE_NAME[node] || node) + " " + count(ms)).join("、") + "。");
   const exceeded = events.find((e) => e.type === "budget.exceeded");
   if (exceeded) notes.unshift("预算在第 " + exceeded.seq + " 条事件处超限（范围 " + exceeded.data.scope + "），此后不再发起模型调用。");
   kids.push(el("p", { class: "note" }, notes.join(" ")));
@@ -926,7 +1099,8 @@ function applyScenario() {
   const scenario = state.meta.scenarios.find((s) => s.name === name);
   const note = $("scenario-note");
   note.hidden = !scenario;
-  for (const id of ["f-judges", "f-rounds"]) $(id).disabled = Boolean(scenario);   // 场景自带流程配置
+  for (const id of ["f-judges", "f-rounds", "f-risk-rounds", "f-tools", "f-memory", "f-channels"])
+    $(id).disabled = Boolean(scenario);   // 场景自带流程配置（组合文件仍然可以给：--portfolio 优先于场景内联）
   if (!scenario) return;
   $("f-ticker").value = scenario.ticker;
   $("f-date").value = scenario.as_of;
@@ -941,9 +1115,16 @@ async function submitForm(ev) {
   if (scenario) body.scenario = scenario;
   if (ticker) body.ticker = ticker;
   if (day) body.as_of = day;
+  const portfolio = $("f-portfolio").value.trim();
+  if (portfolio) body.portfolio = portfolio;
   if (!scenario) {
     body.judges = $("f-judges").checked;
     if ($("f-rounds").value !== "") body.debate_rounds = Number($("f-rounds").value);
+    if ($("f-risk-rounds").value !== "") body.risk_rounds = Number($("f-risk-rounds").value);
+    if ($("f-tools").checked) body.tools = true;
+    if ($("f-memory").checked) body.memory = true;
+    const channels = [...$("f-channels").selectedOptions].map((option) => option.value);
+    if (channels.length) body.channels = channels;
   }
   const { status, data } = await getJSON("/api/runs", { method: "POST", headers: { "Content-Type": "application/json" },
                                                         body: JSON.stringify(body) });

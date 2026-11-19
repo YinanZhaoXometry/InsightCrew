@@ -273,3 +273,59 @@ def test_no_reply_contains_the_key_the_endpoint_or_a_path(client: TestClient, tm
     for response in (client.get("/api/meta"), client.get("/api/nothing"), client.post("/api/runs", json={"x": 1})):
         assert response.headers["Cache-Control"] == "no-store"
         assert response.headers["X-Content-Type-Options"] == "nosniff"
+
+
+# ---- 版本 2.2 的表单字段（BLUEPRINT 19.15）：组合文件、风险轮数、工具、记忆、新通道 ----
+
+
+def _artifact(messages: list[tuple[str, int, Any]], key: str) -> Any:
+    return next(data["data"]["value"] for name, _, data in messages
+                if name == "journal" and data["type"] == "artifact.written" and data["data"]["key"] == key)
+
+
+def test_the_form_passes_a_portfolio_file_through(client: TestClient) -> None:
+    """组合文件经表单进入 open_run：组合阶段写下 portfolio/state，运行照常交付。"""
+    messages = _watch(client, _start(client, scenario="clean", portfolio="data/portfolios/flat_usd.json"))
+    assert _outcome(messages)["status"] == "delivered"
+    state = _artifact(messages, "portfolio/state")
+    assert state["state"] == "flat" and state["cash_pct"] == 100.0
+    assert _artifact(messages, "portfolio/input")["currency"] == "USD"
+
+
+def test_a_portfolio_file_that_cannot_be_read_is_refused_without_a_path(client: TestClient,
+                                                                         tmp_path: Path) -> None:
+    for portfolio in ("data/portfolios/no-such-file.json", "data/rules.toml"):
+        response = client.post("/api/runs", json={"scenario": "demo", "portfolio": portfolio})
+        assert response.status_code == 422, portfolio
+        assert response.json()["error"] == "组合文件读不出来或不符合格式。"
+    assert list(tmp_path.iterdir()) == []          # 拒绝发生在开运行之前，什么都没有创建
+
+
+def test_the_form_passes_the_new_flow_switches_through(client: TestClient) -> None:
+    """风险轮数、工具、记忆与通道经表单进入 prepare：记入 run.started 的流程配置，
+    证据与记忆阶段写下各自的键（ACME 的合成新闻与宏观序列在 2026-09-30 可读）。"""
+    messages = _watch(client, _start(client, ticker="ACME", risk_rounds=2, tools=True, memory=True,
+                                     channels=["news", "macro"]))
+    assert _outcome(messages)["reason"] == "model_unavailable"     # 无场景也没有真实模型：到第一次模型调用停下
+    started = next(data["data"] for name, _, data in messages
+                   if name == "journal" and data["type"] == "run.started")
+    assert started["flow"]["risk_rounds"] == 2 and started["flow"]["tools"] is True
+    assert started["flow"]["memory"] is True
+    assert tuple(started["flow"]["channels"]) == ("news", "macro")
+    assert _artifact(messages, "news/status")["channel"] == "news"
+    assert _artifact(messages, "news/status")["state"] == "available"
+    assert _artifact(messages, "macro/status")["state"] == "available"
+    assert isinstance(_artifact(messages, "memory/lessons"), list)
+
+
+def test_the_new_form_fields_are_validated(client: TestClient, tmp_path: Path) -> None:
+    for body in ({"ticker": "ACME", "risk_rounds": 99}, {"ticker": "ACME", "channels": "news"},
+                 {"ticker": "ACME", "portfolio": "x" * 257}, {"ticker": "ACME", "memory": 3},
+                 {"ticker": "ACME", "channels": ["nope"]}, {"ticker": "ACME", "channels": ["macro"]}):
+        response = client.post("/api/runs", json=body)
+        assert response.status_code == 422, body
+    error = client.post("/api/runs", json={"ticker": "ACME", "channels": ["macro"]}).json()["error"]
+    assert "宏观通道（macro）需要与 news 一起点名" in error
+    named = client.post("/api/runs", json={"ticker": "ACME", "channels": ["nope"]}).json()["error"]
+    assert "未知的证据通道：nope" in named
+    assert list(tmp_path.iterdir()) == []

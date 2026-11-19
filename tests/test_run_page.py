@@ -135,3 +135,74 @@ def test_a_channelless_run_embeds_no_channel_keys() -> None:
     payload = _embedded(render(_events()))
     keys = [e["data"]["key"] for e in payload["events"] if e["type"] == "artifact.written"]
     assert not any(key.startswith(("fundamentals/", "disclosures/")) for key in keys)
+
+
+# ---- 版本 2.2（BLUEPRINT 19.15）：新的流水线段、并行组、泳道、表单与证据区 ----
+
+
+def _v22_events() -> list[Event]:
+    """在最小事件序列上补 v2.2 各能力会写出的黑板键（形状与契约一致的最小字典）。"""
+    extra = [
+        Event(seq=7, ts="", type="artifact.written", actor="portfolio", data={
+            "key": "portfolio/state", "version": 1,
+            "value": {"state": "held", "currency": "USD", "quantity": 90.0,
+                      "position_pct": 90.0, "cash_pct": 10.0, "reason": ""}}),
+        Event(seq=8, ts="", type="artifact.written", actor="evidence", data={
+            "key": "news/status", "version": 1,
+            "value": {"channel": "news", "state": "available", "reason": ""}}),
+        Event(seq=9, ts="", type="artifact.written", actor="evidence", data={
+            "key": "news/items", "version": 1,
+            "value": [{"id": "N1", "published": "2026-09-28", "source": "合成数据",
+                       "title": "Acme 拿下大额机器人订单", "url": "https://example.com/n1"}]}),
+        Event(seq=10, ts="", type="artifact.written", actor="sentiment", data={
+            "key": "sentiment/posts", "version": 1,
+            "value": [{"id": "S1", "published": "2026-09-29", "source": "合成数据",
+                       "text": "机器人板块要起飞", "tag": "bullish"}]}),
+        Event(seq=11, ts="", type="model.called", step="risk.aggressive#1", actor="risk.aggressive", data={
+            "model": "scripted", "prompt": "…", "messages": [],
+            "output": {"stance": "aggressive", "critique": "仓位太小", "size_pct": None,
+                       "stop": None, "target": None, "cites": [], "rebuttal": ""},
+            "usage": {"requests": 1, "input_tokens": 900, "output_tokens": 200}, "cost": None}),
+        Event(seq=12, ts="", type="artifact.written", actor="risk.aggressive", data={
+            "key": "risk/aggressive", "version": 1,
+            "value": {"stance": "aggressive", "critique": "仓位太小", "size_pct": None,
+                      "stop": None, "target": None, "cites": [], "rebuttal": ""}}),
+        Event(seq=13, ts="", type="artifact.written", actor="technical", data={
+            "key": "tools/facts", "version": 1,
+            "value": [{"id": "sma_30", "value": 99.25, "unit": "USD", "as_of": "2026-09-30"}]}),
+    ]
+    return _events() + extra
+
+
+def test_the_page_declares_the_v22_stages_and_actors() -> None:
+    assert "新闻分析" in ASSET and "情感分析" in ASSET and "风险辩论" in ASSET   # 流水线的三段
+    assert "新闻分析师" in ASSET and "情感分析师" in ASSET                      # 时间线泳道
+    assert "激进风控" in ASSET and "保守风控" in ASSET and "中立风控" in ASSET
+    assert '"risk.aggressive": "risk"' in ASSET                                 # ACTOR_STAGE 映射
+    assert '"risk.neutral": "risk"' in ASSET and '"risk.conservative": "risk"' in ASSET
+    assert 'news: "news/status"' in ASSET and 'sentiment: "sentiment/status"' in ASSET
+    assert 'risk: "risk/aggressive"' in ASSET                                   # 段何时出现
+    assert "KEY_STAGE" in ASSET                                                  # 产物键前缀归段
+
+
+def test_the_page_declares_the_v22_sections_and_the_parallel_group() -> None:
+    for heading in ("新闻标题（来源原文，未经核验）", "预测市场（来源原话，未经核验）", "社交情感",
+                    "用到的课程", "风险三方意见（未经审计的意见）", "组合状态", "宏观事实"):
+        assert heading in ASSET, heading
+    assert "ANALYST_KEYS" in ASSET and "并行" in ASSET       # 并行模式：分析师并列，不画箭头
+    assert "run/wall_ms" in ASSET                            # 墙钟：黑板键在才画（问题 20 的 C 案）
+
+
+def test_the_form_declares_the_v22_fields() -> None:
+    for field in ("f-risk-rounds", "f-tools", "f-memory", "f-portfolio", "f-channels"):
+        assert f'id="{field}"' in ASSET, field
+
+
+def test_v22_events_are_embedded() -> None:
+    payload = _embedded(render(_v22_events()))
+    keys = [e["data"]["key"] for e in payload["events"] if e["type"] == "artifact.written"]
+    for key in ("portfolio/state", "news/status", "news/items", "sentiment/posts",
+                "risk/aggressive", "tools/facts"):
+        assert key in keys
+    actors = {e["actor"] for e in payload["events"]}
+    assert "risk.aggressive" in actors

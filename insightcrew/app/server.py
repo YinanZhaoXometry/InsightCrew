@@ -55,6 +55,11 @@ class RunRequest(Contract):
     scenario: str = Field(default="", max_length=64)
     judges: bool | None = None
     debate_rounds: int | None = Field(default=None, ge=0, le=10)
+    portfolio: str = Field(default="", max_length=256)     # 组合文件路径（BLUEPRINT 19.15）
+    risk_rounds: int | None = Field(default=None, ge=0, le=10)
+    tools: bool | None = None
+    memory: bool | None = None
+    channels: tuple[str, ...] = ()                        # 名字在 prepare 里校验（含 macro 需带 news）
 
 
 @dataclass
@@ -112,11 +117,16 @@ def create_app(settings: Settings, runs_dir: Path | None = None) -> FastAPI:
                                  "active_run": session.active}, status_code=409)
         try:
             job = prepare(settings, ticker=body.ticker, as_of=body.as_of, scenario=body.scenario,
-                          judges=body.judges, debate_rounds=body.debate_rounds)
+                          judges=body.judges, debate_rounds=body.debate_rounds,
+                          channels=body.channels or None, portfolio=body.portfolio,
+                          risk_rounds=body.risk_rounds, tools=body.tools, memory=body.memory)
             run, deps = open_run(settings, job.request, scenario=job.scenario, flow=job.flow,
-                                 runs_dir=session.runs_dir)
+                                 runs_dir=session.runs_dir, portfolio=job.portfolio_path)
         except BadRequest as e:
             return JSONResponse({"error": str(e)}, status_code=422)
+        except ValueError:
+            # 组合文件读不出来或不含契约（load_portfolio 的说明文字点名路径）：回复里不能有路径，只说结论。
+            return JSONResponse({"error": "组合文件读不出来或不符合格式。"}, status_code=422)
         session.active = run.id
         task = asyncio.create_task(_execute(session, run, deps, job))
         session.tasks.add(task)                                 # 事件循环只弱引用任务：这里留一份

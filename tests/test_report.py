@@ -304,3 +304,200 @@ def test_an_empty_disclosures_window_uses_the_empty_wording() -> None:
     text = render(snapshot)
     assert "公告通道：窗口内没有公告" in text
     assert "（窗口内没有公告。）" in text
+
+
+# ---- 版本 2.2 的新节（BLUEPRINT 19.15）：全部按键出现，键不在就整节不出现 ----
+
+
+def _v22_keys() -> dict:
+    """v2.2 各能力的板键，形状与契约（19.7、19.8 第 4 条）一致的最小字典。"""
+    return {
+        "portfolio/state": {"state": "held", "currency": "USD", "quantity": 90.0,
+                            "position_pct": 90.0, "cash_pct": 10.0, "reason": ""},
+        "risk/aggressive": {"stance": "aggressive", "critique": "仓位太小，浪费一次明确的机会",
+                            "size_pct": 8.0, "stop": 98.0, "target": 106.0,
+                            "cites": ("rsi_14",), "rebuttal": ""},
+        "risk/conservative": {"stance": "conservative", "critique": "止损太近，正常波动就会打掉",
+                              "size_pct": 3.0, "stop": 97.5, "target": 103.0,
+                              "cites": ("atr_14",), "rebuttal": ""},
+        "risk/neutral": {"stance": "neutral", "critique": "方向同意，价位与仓位维持原案",
+                         "size_pct": None, "stop": None, "target": None,
+                         "cites": (), "rebuttal": ""},
+        "tools/facts": [
+            {"id": "sma_30", "value": 99.25, "unit": "USD", "as_of": "2026-09-30"},
+            {"id": "highest_60", "value": 103.1, "unit": "USD", "as_of": "2026-09-30"}],
+        "news/status": {"channel": "news", "state": "available", "reason": ""},
+        "news/items": [
+            {"id": "N1", "published": "2026-09-28", "source": "合成数据",
+             "title": "Acme 拿下大额机器人订单", "url": "https://example.com/n1"},
+            {"id": "N2", "published": "2026-09-25", "source": "合成数据",
+             "title": "行业竞争加剧的传闻", "url": "https://example.com/n2"}],
+        "news/card": {"source": "合成数据", "window_from": "2026-09-23", "window_to": "2026-09-30",
+                      "items": 2, "dropped": 1, "truncated": 0},
+        "news/analysis": {"signals": (
+            {"item": "N1", "direction": "positive", "reading": "订单落地，收入可见"},
+            {"item": "N2", "direction": "negative", "reading": "传闻未经证实"}),
+            "claims": ({"fact": "macro_cpi", "value": 329.4, "reading": "通胀温和"},),
+            "stance": "mixed", "confidence": "medium", "narrative": "一多一空。"},
+        "macro/status": {"channel": "macro", "state": "available", "reason": ""},
+        "macro/facts": [
+            {"id": "macro_cpi", "label": "消费者价格指数（水平）", "value": 329.4, "unit": "index",
+             "as_of": "2026-08-31", "source": "macro.level", "bars_used": 0}],
+        "macro/card": {"source": "合成数据", "series": 4, "unavailable": ()},
+        "macro/markets": [
+            {"id": "P1", "question": "美联储 11 月会降息吗", "probability": 0.62, "volume": 1200000.0,
+             "end_date": "2026-11-05", "fetched_on": "2026-09-30"}],
+        "sentiment/status": {"channel": "sentiment", "state": "available", "reason": ""},
+        "sentiment/posts": [
+            {"id": "S1", "published": "2026-09-29", "source": "合成数据", "text": "机器人板块要起飞",
+             "tag": "bullish"},
+            {"id": "S2", "published": "2026-09-27", "source": "合成数据", "text": "涨太多了，先落袋",
+             "tag": "bearish"}],
+        "sentiment/card": {"source": "合成数据", "window_from": "2026-09-23", "window_to": "2026-09-30",
+                           "items": 2, "dropped": 0, "truncated": 0},
+        "sentiment/analysis": {"band": "mildly_bullish", "score": 6.5, "confidence": "medium",
+                               "signals": ({"post": "S1", "direction": "positive", "reading": "看多情绪占上风"},),
+                               "narrative": "略偏多。"},
+        "memory/lessons": [
+            {"ticker": "ACME", "as_of": "2026-08-14", "known_on": "2026-08-21", "rating": "Buy",
+             "return_pct": 2.5, "alpha_pct": 1.5, "hit": "target", "lesson": "趋势未破时不因波动提前离场"}],
+        "memory/status": {"state": "available", "reason": ""},
+    }
+
+
+def test_a_run_without_v22_keys_renders_no_new_section() -> None:
+    """不变式 17（19.3）：能力没开时报告一个新节都不出现（与 2.1 相同）。"""
+    text = render(_delivered(), _started())
+    for section in ("组合状态", "风险三方意见", "新闻与宏观", "社交情感", "用到的课程", "工具按需计算",
+                    "各段用时"):
+        assert section not in text, section
+
+
+def test_portfolio_section_appears_by_state() -> None:
+    held = render({**_delivered(), "portfolio/state": _v22_keys()["portfolio/state"]})
+    assert "## 组合状态" in held
+    assert "- 状态：持有。数量 90 股（USD），占权益 90%；现金占权益 10%" in held
+
+    flat = render({**_delivered(), "portfolio/state": {
+        "state": "flat", "currency": "USD", "quantity": 0.0, "position_pct": 0.0,
+        "cash_pct": 100.0, "reason": ""}})
+    assert "- 状态：空仓。组合里没有这个标的；现金占权益 100%（USD）" in flat
+
+    mismatch = render({**_delivered(), "portfolio/state": {
+        "state": "unavailable", "currency": "HKD", "quantity": None, "position_pct": None,
+        "cash_pct": None, "reason": "组合货币为 HKD，与标的货币 USD 不同，不做换算"}})
+    assert "- 状态：不可用（组合货币为 HKD，与标的货币 USD 不同，不做换算）" in mismatch
+
+
+def test_risk_section_shows_stance_and_critique_only() -> None:
+    """19.15：只展示立场与批评；风控建议的价位/仓位不是审计对象，不进报告。"""
+    snapshot = {**_delivered(), **{k: v for k, v in _v22_keys().items() if k.startswith("risk/")}}
+    text = render(snapshot)
+    assert "## 风险三方意见（未经审计的意见）" in text
+    assert "- 激进风控：仓位太小，浪费一次明确的机会" in text
+    assert "- 保守风控：止损太近，正常波动就会打掉" in text
+    assert "- 中立风控：方向同意，价位与仓位维持原案" in text
+    assert "报告展示的价位与仓位是审计通过的那一版方案" in text
+    for suggested in ("97.5", "106", "103"):          # 他们建议的价位（size_pct/stop/target）
+        assert suggested not in text, suggested
+    # 没开风险辩论的运行：整节不出现
+    assert "## 风险三方意见" not in render(_delivered())
+
+
+def test_risk_critiques_are_withheld_in_a_review_report() -> None:
+    snapshot = {**_review(), **{k: v for k, v in _v22_keys().items() if k.startswith("risk/")}}
+    text = render(snapshot, _rework_events())
+    assert "- 激进风控：发表了意见。" in text
+    assert "仓位太小" not in text                    # 批评正文描述的是未交付的方案
+
+
+def test_tool_facts_join_the_facts_table_marked() -> None:
+    """19.11：工具事实进事实表并标注（工具）；数值取自事实，不取模型的转述。"""
+    snapshot = {**_delivered(),
+                "technical/analysis": {"claims": (
+                    {"fact": "close", "value": 100.0, "reading": "价格站上均线"},
+                    {"fact": "sma_30", "value": 88.0, "reading": "仍在 30 日均线之上"}),   # 转述错了
+                    "narrative": "整体偏多。"},
+                "tools/facts": _v22_keys()["tools/facts"]}
+    text = render(snapshot)
+    assert "| sma_30（工具） | （工具按需计算） | 99.25 USD | 2026-09-30 | 仍在 30 日均线之上 |" in text
+    assert "| highest_60（工具） | （工具按需计算） | 103.1 USD | 2026-09-30 | — |" in text
+    assert "标有（工具）的行是技术分析师按需请求的指标" in text
+    assert "88" not in text                           # 模型把 99.25 转述成了 88
+
+
+def test_news_and_macro_section_lists_items_facts_and_markets() -> None:
+    keys = {k: v for k, v in _v22_keys().items()
+            if k.startswith(("news/", "macro/"))}
+    text = render({**_delivered(), **keys})
+    assert "## 新闻与宏观" in text
+    assert "| N1 | 2026-09-28 | 合成数据 | Acme 拿下大额机器人订单 |" in text
+    assert "| macro_cpi | 消费者价格指数（水平） | 329.4 index | 2026-08-31 | 通胀温和 |" in text
+    assert "预测市场（来源原话，未经核验）" in text
+    assert "| P1 | 美联储 11 月会降息吗 | 0.62 | 1200000 | 2026-11-05 |" in text   # 概率照录，不换算
+    assert "- N2：负面——传闻未经证实" in text
+    assert "窗口内新闻合起来的基调：混合（把握：medium）" in text
+    # 通道没开：整节不出现，也不出现宏观数据卡
+    assert "## 新闻与宏观" not in render(_delivered())
+
+
+def test_news_titles_come_from_the_item_list_not_the_model() -> None:
+    keys = {k: v for k, v in _v22_keys().items() if k.startswith(("news/", "macro/"))}
+    keys["news/analysis"] = {"signals": (
+        {"item": "N1", "direction": "positive", "reading": "模型编的标题：一条不存在的新闻"},),
+        "claims": (), "stance": "positive", "confidence": "low", "narrative": "叙述：一条不存在的新闻"}
+    text = render({**_delivered(), **keys})
+    assert "Acme 拿下大额机器人订单" in text
+    assert text.count("一条不存在的新闻") == 1         # 只出现在 reading 里；narrative 不进报告
+
+
+def test_an_unavailable_news_channel_says_so_and_lists_no_items() -> None:
+    text = render({**_delivered(),
+                   "news/status": {"channel": "news", "state": "unavailable", "reason": "该窗口未覆盖"}})
+    assert "## 新闻与宏观" in text
+    assert "新闻通道不可用（该窗口未覆盖）。" in text
+    assert "新闻标题" not in text
+    assert "新闻通道：不可用（该窗口未覆盖）" in text   # 数据质量一节说明状态
+
+
+def test_sentiment_section_shows_band_score_and_posts() -> None:
+    keys = {k: v for k, v in _v22_keys().items() if k.startswith("sentiment/")}
+    text = render({**_delivered(), **keys})
+    assert "## 社交情感" in text
+    assert "- 情绪带：**略偏多**，情绪分 6.5（0 最看空，10 最看多）；把握：medium" in text
+    assert "| S1 | 2026-09-29 | 合成数据 | 看多 | 机器人板块要起飞 |" in text
+    assert "| S2 | 2026-09-27 | 合成数据 | 看空 | 涨太多了，先落袋 |" in text
+    assert "- S1：正面——看多情绪占上风" in text
+    assert "## 社交情感" not in render(_delivered())
+
+
+def test_an_empty_sentiment_window_uses_the_empty_wording() -> None:
+    keys = {k: v for k, v in _v22_keys().items() if k.startswith("sentiment/")}
+    keys["sentiment/posts"] = []
+    keys.pop("sentiment/analysis")
+    keys["sentiment/status"] = {"channel": "sentiment", "state": "empty",
+                                "reason": "窗口 2026-04-01 到 2026-06-30 内没有帖子"}
+    text = render({**_delivered(), **keys})
+    assert "（窗口内没有帖子。）" in text
+    assert "情感通道：窗口内没有帖子" in text
+
+
+def test_lessons_section_lists_settled_outcomes_with_the_lesson() -> None:
+    keys = {k: v for k, v in _v22_keys().items() if k.startswith("memory/")}
+    text = render({**_delivered(), **keys})
+    assert "## 用到的课程" in text
+    assert ("| ACME | 2026-08-14 | 2026-08-21 | Buy | 2.5% | 1.5% | 目标 |"
+            " 趋势未破时不因波动提前离场 |") in text
+    # 记忆没开：键不在，整节不出现；开着而没有课：说一句，不造表
+    assert "## 用到的课程" not in render(_delivered())
+    empty = render({**_delivered(), "memory/lessons": [],
+                    "memory/status": {"state": "none_known", "reason": "还没有已结算的决策"}})
+    assert "（没有分析日之前已经知道结果的课程：还没有已结算的决策。）" in empty
+
+
+def test_wall_time_line_needs_the_board_key() -> None:
+    """19.5 第 5 条：每分析师墙钟住在 run/wall_ms；黑板没有这个键就不出现（问题 20 的 C 案）。"""
+    assert "各段用时" not in render(_delivered(), _started())
+    text = render({**_delivered(), "run/wall_ms": {"technical": 812, "manager": 3010, "trader": 950}},
+                  _started())
+    assert "- 各段用时：技术分析 812 毫秒、研究主管 3010 毫秒、交易员 950 毫秒" in text
