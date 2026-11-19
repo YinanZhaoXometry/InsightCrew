@@ -10,22 +10,20 @@ HTTP 状态不对、响应不是 JSON、结构残缺、一根 bar 都没有，�
 from __future__ import annotations
 
 import datetime
-import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 from urllib.parse import quote
 
 import httpx2
 
 from ..domain.market import Instrument, SourceUnavailable
-from ..domain.symbols import benchmark_for, file_stem
+from ..domain.symbols import benchmark_for
+from .real_universe import COLUMNS, Market, plan, write
 
-Market = Literal["US", "HK"]                     # Instrument.market 的两个字面量
 _BASE = "https://query1.finance.yahoo.com/v8/finance/chart"
 _HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
-_COLUMNS = "date,open,high,low,close,volume"
 
 
 def fetch(
@@ -39,7 +37,7 @@ def fetch(
     tickers 是已规范化的代码（用户输入先过 symbols.normalize）。client 缺省时自建、
     用完即关；传入的客户端由调用方负责关闭。任何失败抛 SourceUnavailable，一个文件都不写。
     """
-    todo, markets = _plan(tickers)
+    todo, markets = plan(tickers)
     if not todo:
         return ()
     if client is None:
@@ -51,23 +49,6 @@ def fetch(
     return _download_and_write(client, todo, markets, years, root)
 
 
-def _plan(tickers: Sequence[str]) -> tuple[list[str], dict[str, Market]]:
-    """要下载的代码与各自的市场：请求的在前，基准随后，每个代码只出现一次。
-
-    基准与它所服务的代码同市场（benchmark_for 的语义本来如此），所以 ^HSI
-    随港股请求进入 HK 市场。基准重复出现只抓一次。
-    """
-    todo: list[str] = []
-    markets: dict[str, Market] = {}
-    for ticker in tickers:
-        market: Market = "HK" if ticker.endswith(".HK") else "US"
-        for code in (ticker, benchmark_for(ticker)):
-            if code not in todo:
-                todo.append(code)
-                markets[code] = market
-    return todo, markets
-
-
 def _download_and_write(
     client: httpx2.Client,
     todo: Sequence[str],
@@ -75,18 +56,8 @@ def _download_and_write(
     years: int,
     root: str | Path,
 ) -> tuple[str, ...]:
-    """先全部下载并解析（失败在这里抛出，还一个文件都没碰），再统一写盘。
-
-    universe.toml 最后写：宇宙一出现，它引用的每个 CSV 都已经在盘上。
-    """
-    results = [_download(client, ticker, years, markets[ticker]) for ticker in todo]
-    target = Path(root) / "real"
-    target.mkdir(parents=True, exist_ok=True)
-    for ticker, (text, _) in zip(todo, results, strict=True):
-        _atomic_write(target / f"{file_stem(ticker)}.csv", text)
-    _atomic_write(target / "universe.toml",
-                  _universe_toml([instrument for _, instrument in results]))
-    return tuple(todo)
+    """先全部下载并解析（失败在这里抛出，还一个文件都没碰），再统一写盘。"""
+    return write(root, [_download(client, ticker, years, markets[ticker]) for ticker in todo])
 
 
 def _download(
@@ -152,7 +123,7 @@ def _parse(ticker: str, payload: object, market: Market) -> tuple[str, Instrumen
         raise SourceUnavailable(f"Yahoo 响应里没有 meta.longName/shortName（{ticker}）")
 
     opens, highs, lows, closes, volumes = columns
-    lines = [_COLUMNS]
+    lines = [COLUMNS]
     for ts, open_, high, low, close, volume in zip(
             timestamps, opens, highs, lows, closes, volumes, strict=True):
         day = datetime.datetime.fromtimestamp(ts + offset, tz=datetime.UTC).date()
@@ -168,23 +139,3 @@ def _parse(ticker: str, payload: object, market: Market) -> tuple[str, Instrumen
     instrument = Instrument(ticker=ticker, name=name, market=market, currency=currency,
                             benchmark=benchmark_for(ticker), lot=0, synthetic=False)
     return "\n".join(lines) + "\n", instrument
-
-
-def _universe_toml(instruments: list[Instrument]) -> str:
-    """把 Instrument 排成 universe.toml。表名与字符串值用 TOML 基本字符串（json.dumps 同一套转义）。"""
-    lines: list[str] = []
-    for instrument in instruments:
-        lines.append(f"[{json.dumps(instrument.ticker)}]")
-        fields = instrument.model_dump()
-        fields.pop("ticker")                              # 表名就是代码，表内不再重复
-        for key, value in fields.items():
-            lines.append(f"{key} = {json.dumps(value)}")
-        lines.append("")
-    return "\n".join(lines)
-
-
-def _atomic_write(path: Path, text: str) -> None:
-    """写临时文件再改名：磁盘上要么是旧文件要么是完整的新文件，永远看不到半个。"""
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(text, encoding="utf-8", newline="")
-    tmp.replace(path)
