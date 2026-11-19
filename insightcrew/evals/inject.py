@@ -17,11 +17,21 @@ from pathlib import Path
 from typing import NamedTuple
 
 from ..adapters.declarations import load_fundamentals, load_indicators, load_rules
+from ..adapters.declarations_macro import load_macro
+from ..adapters.macro_json import JsonMacro
 from ..adapters.market_csv import CsvMarket
+from ..adapters.news_json import JsonNews
+from ..adapters.portfolio_json import load_portfolio
+from ..adapters.social_json import JsonSocial
 from ..domain import rules
 from ..domain.audit import audit
 from ..domain.fundamentals_ledger import build_fundamentals
 from ..domain.ledger import build_ledger
+from ..domain.macro import build_macro
+from ..domain.memory import Lesson, OutcomeRecord, lesson_findings
+from ..domain.news import NewsAnalysis, NewsEntry, NewsSignal
+from ..domain.portfolio import PortfolioState, Position, state_for
+from ..domain.social import PostEntry, SentimentAnalysis, SentimentSignal
 from ..domain.types import (
     Action,
     Analysis,
@@ -272,7 +282,8 @@ def main() -> int:
     print(f"结论：故障 {len(mutations) - misses}/{len(mutations)} 被发现；"
           f"有效变体 {false_alarms}/{len(variants)} 误报")
     channel_ok = _channels_block(facts, values, specs)
-    return 0 if misses == 0 and false_alarms == 0 and channel_ok else 1
+    v22_ok = _v22_block(facts, values, specs)
+    return 0 if misses == 0 and false_alarms == 0 and channel_ok and v22_ok else 1
 
 
 # ---- 证据通道的第二块（BLUEPRINT 18.13）：双通道在场的注入与有效变体 ----
@@ -381,6 +392,154 @@ def _channels_block(facts: list[Fact], values: dict[str, float],
         print(f"  {i:>2}  {label:<24} {'':<26} {verdict}")
 
     print(f"结论：证据通道故障 {len(rows) - misses}/{len(rows)} 被发现；"
+          f"有效变体 {false_alarms}/{len(variants)} 误报")
+    return misses == 0 and false_alarms == 0
+
+
+# ---- 版本 2.2 的第三块（BLUEPRINT 19.16）：组合规则、新闻与情绪引用、教训文字 ----
+
+
+def _v22_block(facts: list[Fact], values: dict[str, float],
+               specs: tuple[RuleSpec, ...]) -> bool:
+    """版本 2.2 的六个故障与两个有效变体（BLUEPRINT 19.16 的 inject 清单）。
+
+    组合：data/portfolios 的两份示例文件经 state_for 折成 flat 与 held 状态；把状态
+    翻转（flat→held 的 Buy、held→flat 的 Sell），sell_requires_position 与
+    max_position_pct 必须接住。新闻与情绪：合成档案在 2026-09-30 的窗口（4 条新闻、
+    4 帖）与 build_macro 的宏观事实；claim 引用不存在的宏观事实、信号引用不存在的
+    帖子、分数落在自己声称的情感带之外，都必须被发现。教训：文字里带数字必须被发现。
+    """
+    close = values["close"]
+    base = _build_case(values)
+
+    # —— 组合：flat 与 held 两份示例文件，外加一份小仓位 held 变体（有效变体用） ——
+    held_state = state_for(load_portfolio(_ROOT / "data" / "portfolios" / "held_acme.json"),
+                           _TICKER, close, "USD")
+    flat_state = state_for(load_portfolio(_ROOT / "data" / "portfolios" / "flat_usd.json"),
+                           _TICKER, close, "USD")
+    small_held = load_portfolio(_ROOT / "data" / "portfolios" / "held_acme.json").model_copy(
+        update={"cash": 9000.0,
+                "positions": (Position(ticker=_TICKER, quantity=4.0, average_price=100.0),)})
+    small_state = state_for(small_held, _TICKER, close, "USD")
+    sell_case = replace(
+        base,
+        thesis=base.thesis.model_copy(update={"rating": Rating.SELL}),
+        proposal=base.proposal.model_copy(update={"action": Action.SELL, "entry": None,
+                                                  "stop": None, "target": None,
+                                                  "size_pct": 50.0}))
+
+    def evaluate_state(case: Case, state: PortfolioState) -> list[Finding]:
+        """按 19.9 的口径把组合状态交给规则手册：flat 与 held 给占比，其余按 0/None。"""
+        rule_results = rules.evaluate(case.proposal, case.thesis, values, specs,
+                                      position_pct=state.position_pct or 0.0,
+                                      cash_pct=state.cash_pct)
+        return audit(facts, case.analysis, case.thesis, case.proposal, rule_results)
+
+    # —— 新闻与情绪：合成档案的窗口条目与宏观事实，双通道在场 ——
+    start = _AS_OF - datetime.timedelta(days=7)
+    headlines = JsonNews(_ROOT / "data" / "market", "synthetic").headlines(_TICKER, start, _AS_OF)
+    entries = [NewsEntry(id=f"N{i}", published=h.published.isoformat(), source=h.source,
+                         title=h.title, url=h.url)
+               for i, h in enumerate(headlines.items, start=1)]
+    social = JsonSocial(_ROOT / "data" / "market", "synthetic").posts(_TICKER, start, _AS_OF)
+    posts = [PostEntry(id=f"S{i}", published=p.published.isoformat(), source=p.source,
+                       text=p.text, tag=p.tag)
+             for i, p in enumerate(social.posts, start=1)]
+    macro_specs = load_macro(_ROOT / "data" / "macro.toml")
+    macro_port = JsonMacro(_ROOT / "data" / "market", "synthetic")
+    macro_facts, _unavailable = build_macro(
+        [macro_port.series(spec.alias, _AS_OF) for spec in macro_specs],
+        list(macro_specs), _AS_OF)
+    macro_values = {f.id: f.value for f in macro_facts}
+    news_analysis = NewsAnalysis(
+        signals=(
+            NewsSignal(item="N1", direction="positive", reading="评级与目标区间上调被视为基本面确认"),
+            NewsSignal(item="N2", direction="positive", reading="长期采购协议稳定成本端"),
+        ),
+        claims=(Claim(fact="macro_fed_funds", value=macro_values["macro_fed_funds"],
+                      reading="政策利率维持低位，对成长股估值压制有限"),),
+        stance="positive", confidence="medium",
+        narrative="新闻偏正面，宏观利率平稳；没有预测市场行情可用。")
+    sentiment_analysis = SentimentAnalysis(
+        band="neutral", score=5.0, confidence="medium",
+        signals=(
+            SentimentSignal(post="S1", direction="positive", reading="突破后持有意愿强"),
+            SentimentSignal(post="S2", direction="negative", reading="有人反弹中落袋为安"),
+        ),
+        narrative="多空声音相当，情绪中性偏暖。")
+
+    def evaluate_channels(news: NewsAnalysis,
+                          sentiment: SentimentAnalysis) -> list[Finding]:
+        """双通道在场时的完整审计（19.12 的 news= 与 sentiment= 关键字参数）。"""
+        rule_results = rules.evaluate(base.proposal, base.thesis, values, specs)
+        return audit(facts, base.analysis, base.thesis, base.proposal, rule_results,
+                     news=(entries, [], macro_facts, news),
+                     sentiment=(posts, sentiment))
+
+    # —— 教训：settle 审计用的 lesson_findings（19.13） ——
+    outcome = OutcomeRecord(
+        kind="outcome", run_id="r1", ticker=_TICKER, as_of=_AS_OF.isoformat(),
+        known_on="2026-09-20", holding_days=5, return_pct=2.5, benchmark="SYNUS",
+        benchmark_return_pct=1.0, alpha_pct=1.5, hit="target", lesson=None)
+    lesson = Lesson(text="趋势延续时让利润走完整个持有期，止损随结构上移保护利润",
+                    cites=("return_pct", "alpha_pct", "hit"))
+
+    print("版本 2.2 注入（组合状态、新闻与情绪引用、教训文字，基线案例应无任何发现）")
+    baselines: list[tuple[str, list[Finding]]] = [
+        ("flat 组合下的 Buy 提案", evaluate_state(base, flat_state)),
+        ("held 组合下的 Sell 提案", evaluate_state(sell_case, held_state)),
+        ("新闻与情绪的双通道读数", evaluate_channels(news_analysis, sentiment_analysis)),
+        ("无数字、引用结果字段的教训", lesson_findings(outcome, lesson)),
+    ]
+    for label, findings in baselines:
+        if findings:
+            print(f"  基线案例不干净（{label}：{_checks(findings)}）：先修案例再谈注入")
+            return False
+
+    # 六个故障（19.16）：一次只动一处。
+    bad_news_claim = news_analysis.model_copy(update={"claims": (
+        Claim(fact="macro_gdp", value=1.8, reading="经济增速高于预期"),)})
+    bad_post_cite = sentiment_analysis.model_copy(update={"signals": (
+        SentimentSignal(post="S1", direction="positive", reading="突破后持有意愿强"),
+        SentimentSignal(post="S99", direction="negative", reading="引用了不存在的帖子"),
+    )})
+    bad_band = sentiment_analysis.model_copy(update={"score": 9.5})   # 声称 neutral（4 到 6）
+    bad_lesson = lesson.model_copy(
+        update={"text": "这次拿到了 2.5 个百分点的超额收益，下次可以更早进场"})
+
+    rows: list[tuple[str, str, list[Finding]]] = [
+        ("组合从 flat 翻成 held 后的同一份 Buy 提案", "max_position_pct",
+         evaluate_state(base, held_state)),
+        ("组合从 held 翻成 flat 后的 Sell 提案", "sell_requires_position",
+         evaluate_state(sell_case, flat_state)),
+        ("新闻 claim 引用不存在的宏观事实 macro_gdp", "claim_cites_known_fact",
+         evaluate_channels(bad_news_claim, sentiment_analysis)),
+        ("情绪信号引用不存在的帖子 S99", "sentiment_signal_cites_known_post",
+         evaluate_channels(news_analysis, bad_post_cite)),
+        ("情绪分落在自己声称的情感带之外", "sentiment_score_matches_band",
+         evaluate_channels(news_analysis, bad_band)),
+        ("教训文字里带数字", "lesson_text_has_no_numbers", lesson_findings(outcome, bad_lesson)),
+    ]
+    misses = 0
+    for i, (label, check, findings) in enumerate(rows, start=1):
+        found = any(f.check == check for f in findings)
+        misses += not found
+        verdict = "发现" if found else f"漏报（实际触发：{_checks(findings) or '无'}）"
+        print(f"  {i:>2}  {label:<28} {check:<30} {verdict}")
+
+    band_edge = sentiment_analysis.model_copy(update={"score": 6.0})   # neutral 上界，两端含
+    variants: list[tuple[str, list[Finding]]] = [
+        ("held 小仓位组合下留有余量的 Buy 提案", evaluate_state(base, small_state)),
+        ("情绪分恰好压在 neutral 带的上界", evaluate_channels(news_analysis, band_edge)),
+    ]
+    false_alarms = 0
+    for i, (label, findings) in enumerate(variants, start=1):
+        clean = not findings
+        false_alarms += not clean
+        verdict = "无发现" if clean else f"误报（{_checks(findings)}）"
+        print(f"  {i:>2}  {label:<28} {'':<30} {verdict}")
+
+    print(f"结论：版本 2.2 故障 {len(rows) - misses}/{len(rows)} 被发现；"
           f"有效变体 {false_alarms}/{len(variants)} 误报")
     return misses == 0 and false_alarms == 0
 
