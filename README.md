@@ -1,229 +1,164 @@
 # InsightCrew
 
-A multi-agent data analyst that audits its own numbers before reporting them.
+A multi-agent trading assistant that audits every number before it reaches you.
 
-You ask a business question in natural language. Five agents profile the data, plan the analysis, write and run code, independently verify the result, and write a report. If the verification fails, the work goes back to the agent that can fix it. If the question cannot be answered from the data, the system says so instead of producing a number.
+Give it a ticker and a date. Six model-backed agents read the market facts, argue both sides, set a rating, and propose a trade. Code computes every fact, checks every cited number and every risk rule, and sends faulty work back to the agent that made it. Three judges then try to refute the proposal. If the proposal cannot be verified, or the judges will not accept it, the answer is `REVIEW` with the reason, and no rating.
 
-Group project for COMP5584 (LLM Agents), The Hong Kong Polytechnic University.
+Group project for COMP5584 (LLM Agents), The Hong Kong Polytechnic University. Not investment advice: the system executes, routes and simulates no order.
 
-## The problem
+## Quick start
 
-Ask an LLM for "East China revenue in Q3 2026" over an orders table and it will often write code that sums the `amount` column. The code runs. The answer looks reasonable. It is 14.8% too high, because revenue is meant to exclude coupons and refunds.
+You need [uv](https://docs.astral.sh/uv/getting-started/installation/), which also installs the right Python. Then, in this directory:
 
-| Calculation | Result | |
-|---|---|---|
-| `sum(amount)` | 1,189,734.57 | Wrong, and nothing fails |
-| `sum(amount - coupon)` | 1,150,599.46 | Still wrong |
-| `sum(amount - coupon) - sum(refund)` | 1,036,538.28 | Correct |
+```bash
+uv sync                      # once: builds .venv from uv.lock (needs network)
+uv run insightcrew serve     # opens the local web app at http://127.0.0.1:8765
+```
 
-Asking the same model to double-check does not help much: it reviews its work with the same assumptions that produced it. InsightCrew gives the checking to a separate agent that differs from the author in context, in implementation and in knowledge.
+Or run `./start.sh` (macOS, Linux) or `start.bat` (Windows), which check for uv, say how to install it if it is missing, and then run the two commands above.
+
+**No API key is needed to try it.** Without one, every run uses scripted model replies, and the page says so in a badge on every screen (`离线演示 · 脚本化模型`). Pick the `demo` scenario in the form: the audit rejects the Trader's first proposal, the Trader fixes it, and the judges accept it 2 to 1.
+
+**With a key**, copy `.env.example` to `.env` and set `DEEPSEEK_API_KEY`. Each run then calls DeepSeek and costs about 0.03 to 0.09 USD. Check the connection with `uv run insightcrew check`.
+
+The same from the command line:
+
+```bash
+uv run insightcrew analyze                   # the demo scenario (no key), or refuses without a ticker (key)
+uv run insightcrew analyze ACME --date 2026-09-30
+uv run insightcrew analyze THIN              # refused at intake: 40 bars, below the minimum of 60
+```
+
+Each run writes `runs/<run id>/` with `journal.jsonl` (the whole run), `report.md`, `board.json` and `replay.html`, a page that replays the run with no server.
+
+## The claim
+
+Ask a language model for a trade on a stock and it will give you one, with an entry, a stop and a size. The numbers look right. Some of them are misread from the data, some break any sensible risk limit, and nothing in the answer tells you which.
+
+InsightCrew defends one claim: **no number reaches the user unchecked, and no proposal that breaks a stated limit is delivered.** It does not claim to pick stocks well, and [docs/EVALUATION.md](docs/EVALUATION.md#7-what-these-results-do-not-show) says why it cannot.
 
 ## How it works
 
 ```mermaid
-flowchart LR
-    Q([Question]) --> P[Profiler]
-    P --> PL[Planner]
-    PL --> A[Analyst]
-    A --> C{Critic}
-    C -- "definition wrong" --> PL
-    C -- "numbers differ" --> A
-    C -- pass --> R[Reporter]
-    R --> O([Audited report])
+flowchart TD
+    Q([Ticker, date]) --> I{"Intake<br/>code"}
+    I -- out of scope --> D["REVIEW<br/>no rating"]
+    I --> L{"Ledger<br/>code, two paths"}
+    L -- paths disagree --> D
+    L --> T["Technical Analyst"]
+    T --> B["Bull and Bear<br/>debate"]
+    B --> M["Research Manager<br/>rating and thesis"]
+    M --> TR["Trader<br/>entry, stop, target, size"]
+    TR --> A{"Audit<br/>code: numbers and 14 rules"}
+    A -- "finding: rerun from the<br/>earliest stage at fault" --> T
+    A -- "same fault twice, or cap" --> D
+    A -- pass --> J{"Judges x3<br/>veto only"}
+    J -- "thesis rejected" --> M
+    J -- "levels rejected" --> TR
+    J -- "no quorum after revision" --> D
+    J -- "2 of 3 accept" --> R["Report<br/>code"]
+    D --> R
 ```
 
-| Agent | Backed by | Job |
+| Agent | Backed by | Does |
 |---|---|---|
-| Profiler | LLM | Explains what each column means and where the data is risky |
-| Planner | LLM | Breaks the question into steps and states the metric definition as structured fields |
-| Analyst | LLM + sandbox | Writes Python for the plan, runs it, repairs its own execution errors |
-| Critic | Deterministic code | Recomputes the value in SQL and checks the definition against a metric dictionary |
-| Reporter | Deterministic template | Reports the value, how it was verified, the confidence and the limits |
+| Intake | Code | Decides whether the request is in scope: a valid ticker, fresh data, enough history |
+| Ledger | Code | Computes 29 facts (prices, moving averages, RSI, ATR, MACD, Bollinger bands, ranges, returns), then recomputes each in SQL and stops if the two disagree |
+| Technical Analyst | Model | Reads the facts. Each claim cites a fact by ID and restates its value |
+| Bull and Bear Researchers | Model | Argue each side from the analyst's readings, not the raw data |
+| Research Manager | Model (stronger tier) | Sets the rating and states the thesis and what would invalidate it |
+| Trader | Model | Turns the thesis into entry, stop, target, size and horizon, within the stated risk limits |
+| Auditor | Code | Checks every restated value against the ledger and every proposal against 14 rules |
+| Judges: evidence, conservative, aggressive | Model, three instances | Each tries to refute the proposal from one angle. They can veto; they cannot change a number |
+| Reporter | Code | Renders the result. Computes nothing |
 
-Three ideas carry the design:
-
-1. **The verifier is not an LLM.** The Critic compares numbers with a tolerance and compares the plan with a rule dictionary. Its verdict is repeatable and does not depend on the model.
-2. **The metric definition is data, not prose.** The Planner must express it as boolean fields such as `subtract_refund`, so that code can check it.
-3. **Errors return to the layer that can fix them.** A wrong definition goes back to the Planner. A wrong calculation under a correct plan goes back to the Analyst.
-
-Agents share one blackboard, and every message between them is logged as a structured record. Full detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Quick start
-
-Requires Python 3.9 or later. There is nothing to install and no API key is needed.
-
-```bash
-python3 ask.py                                      # asks for a question; press Enter for the default
-python3 ask.py "2026年8月华南区的营收是多少？"         # South China revenue, August 2026
-python3 ask.py "2026年第三季度华东区的营收是多少？" --compare   # with and without the audit
-```
-
-On macOS or Linux you can also run `bash start.sh`. On Windows, double-click `start.bat` or use `python` in place of `python3`.
-
-Without an API key the system runs in offline mode. Orchestration, sandboxed execution, SQL recomputation, the dictionary check and the report are all real. Only the model's replies are scripted, and the script deliberately starts with the naive calculation so that the audit has something to catch.
-
-A run with `ask.py` writes three files to `runs/<timestamp>/` and opens the last one in a browser (add `--no-open` to skip that):
-
-| File | Content |
-|---|---|
-| `trace.jsonl` | Every message and event |
-| `blackboard.json` | Final state, including each version of the generated code and its value |
-| `report.html` | A timeline replay of the run |
-
-Ask questions in Chinese: the question parser recognises Chinese region and period names. Output is in Chinese too. The [glossary](docs/ARCHITECTURE.md#15-glossary) translates the terms.
-
-## What a run looks like
-
-The default question, offline. This is an excerpt of the console output with status lines and timings removed:
-
-```text
-[ Profiler -> Planner  ] PROFILE      画像卡：8 个字段 / 3 条风险
-[  Planner -> Analyst  ] PLAN         v1 计划：2 步，指标=营收
-  · 工具: 沙箱执行成功：a1 value=1,189,734.57 sum(amount)
-  · 工具: L2 独立复算（SQL 路径）：1,189,734.57 vs 执行结果 1,189,734.57 → 一致
-  · 工具: L3 口径校验（字典条目：营收，版本 2.3）：1/3 项满足
-[   Critic -> Planner  ] REVISE       驳回 a1：L3 / 口径不合规：扣除订单优惠券金额
-[  Planner -> Analyst  ] PLAN         根据驳回意见重规划 → v2 计划：3 步，指标=营收
-  · 工具: 沙箱执行成功：a2 value=1,036,538.28 sum(amount-coupon)-sum(refund)
-  · 工具: L2 独立复算（SQL 路径）：1,036,538.28 vs 执行结果 1,036,538.28 → 一致
-  · 工具: L3 口径校验（字典条目：营收，版本 2.3）：3/3 项满足
-[   Critic -> Reporter ] CRITIQUE     PASS（L2+L3）
-[ Reporter -> User     ] FINALIZE     报告已生成（置信度 高）
-```
-
-In the first round the Analyst's Python and the Critic's SQL agree on 1,189,734.57. Both are wrong, because both followed a plan that left out coupons and refunds. Recomputation alone would have passed it. The dictionary check finds one of three required rules met and rejects the plan. The second round passes both checks.
-
-## What you can ask
-
-A metric, optionally a region, and a period.
-
-| | Supported |
-|---|---|
-| Metric | Revenue (营收), order count (订单量), average order value (客单价), refund rate (退款率) |
-| Region | East, North or South China (华东, 华北, 华南), several of them, or the whole company (全公司) |
-| Period | Within 2026-06-01 to 2026-10-14: a quarter, a month, "last quarter", "last N months", or a full year |
-
-The system declines these, with a stated reason and no number:
-
-| Question | Reason given |
-|---|---|
-| Gross margin (毛利率) | The data has no cost column, and estimating is not allowed |
-| A 2025 period | Outside the data's date range |
-| Southwest region (西南) | No orders for that region in the data |
-| Online-channel revenue (线上渠道) | Channel breakdown is not implemented; answering would return the all-channel figure |
-| "Write me a poem" | Not a data question |
-
-Refusal has gaps. Some questions the system does not understand are answered anyway: see [Limitations](#limitations).
-
-## Using a real model
-
-Any OpenAI-compatible endpoint works.
-
-```bash
-cp .env.example .env        # then set IC_API_KEY, IC_BASE_URL, IC_MODEL
-python3 check_api.py        # shows the configuration and sends one test request
-python3 check_api.py --run  # also runs one question end to end
-```
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `IC_API_KEY` | empty | Empty means offline mode |
-| `IC_BASE_URL` | `https://api.deepseek.com/v1` | Endpoint |
-| `IC_MODEL` | `deepseek-chat` | Model name |
-| `IC_FORCE_OFFLINE` | off | Set to `1` to use the scripted model even with a key, for a repeatable demo |
-| `IC_MAX_TURNS` | 12 | Maximum rounds |
-| `IC_MAX_SECONDS` | 240 | Time limit, checked between rounds |
-| `IC_MAX_REPEAT` | 2 | Rejections of the same issues before the run stops |
-| `IC_SANDBOX_TIMEOUT` | 30 | Seconds per code execution |
-
-Environment variables take precedence over `.env`. With a real model the Profiler, Planner and Analyst are model-driven. The Critic and Reporter do not change.
+Each model role sees only the board keys it declares. The judges do not see the debate or each other. The Research Manager does not see the risk limits. The details, and the reasons, are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#4-agents).
 
 ## Results
 
-| Experiment | Result | Status |
-|---|---|---|
-| Error injection: 40 known-wrong answers and 10 correct ones given to the Critic | 40 of 40 rejected, 0 of 10 false alarms. 30 were caught only by the dictionary check. | Re-run 2026-11-18 |
-| Real model (`deepseek-chat`), 12 questions | 12 of 12. Seven passed first time, three were rejected once and then corrected, two were correctly declined. | Archived result, not re-run |
-| Offline ablation: full system, no Critic, single agent | 12 of 12, 2 of 12, 2 of 12 | Re-run 2026-11-18 |
+From [docs/EVALUATION.md](docs/EVALUATION.md). Every number comes from a command you can re-run or a journal in `insightcrew/evals/archive/`.
 
-The offline ablation demonstrates the mechanism, not model performance: the scripted first answer is wrong by design. [docs/EVALUATION.md](docs/EVALUATION.md) explains what each number shows, what it does not, and how to reproduce it.
-
-```bash
-python3 -m eval.inject_test          # audit sensitivity; no model needed
-python3 -m eval.run_eval --mode full # also: no_critic, single
-python3 -m eval.mock_online_test     # exercises the real-model code path against a local fake
-python3 -m eval.consistency_test     # metric dictionary and SQL implementation in sync
-python3 -m eval.online_eval          # 12 questions with a real model; needs an API key
-```
+| What | Result |
+|---|---|
+| Injected faults the audit catches (`eval inject`) | 19 of 19, and 0 false alarms on 6 valid edge cases |
+| Two indicator paths agree (`eval consistency`) | 277 data points × 29 outputs, all equal |
+| No fact uses a later bar (`eval pit`) | 864 facts checked |
+| Scripted scenarios: which gate catches which fault (`scenarios`) | 16 of 16 as expected |
+| Real-model runs on DeepSeek, final configuration | 5 of 5 delivered, about 100 s and 0.03 USD a run; the judges rejected one thesis and the revision was accepted |
+| Ablation on a real model: 4 cells × 4 configurations | No proposal broke a rule even with the audit off; the judges changed one rating in four cells |
 
 ## Course requirements
 
 | The brief asks for | Where it is answered |
 |---|---|
-| A clearly defined task | [The problem](#the-problem); [Architecture 1](docs/ARCHITECTURE.md#1-the-task) |
+| A clearly defined task | [Architecture 1](docs/ARCHITECTURE.md#1-the-task) |
 | Why a multi-agent approach | [Architecture 2](docs/ARCHITECTURE.md#2-why-more-than-one-agent) |
 | Role and responsibility of each agent | [Architecture 4](docs/ARCHITECTURE.md#4-agents) |
-| Information and tools available to each agent | [Architecture 4](docs/ARCHITECTURE.md#4-agents), including what each agent is not given |
-| How tasks are assigned or decomposed | [Architecture 5](docs/ARCHITECTURE.md#5-task-decomposition) |
-| How agents communicate | [Architecture 7](docs/ARCHITECTURE.md#7-communication-and-coordination) |
-| How the final output is produced | [Architecture 8 to 10](docs/ARCHITECTURE.md#8-verification-and-error-routing) |
+| Information and tools available to each agent | [Architecture 4](docs/ARCHITECTURE.md#4-agents), including what each agent is not shown |
+| How tasks are assigned or decomposed | [Architecture 5](docs/ARCHITECTURE.md#5-the-flow) |
+| How agents communicate | [Architecture 6](docs/ARCHITECTURE.md#6-communication-the-journal-and-the-board) |
+| How the final output is produced | [Architecture 7](docs/ARCHITECTURE.md#7-verification) and [8](docs/ARCHITECTURE.md#8-outcomes-and-refusals) |
 | A working, demonstrable implementation | [Quick start](#quick-start) |
-| Analysis, design rationale, limitations and failure cases | [Evaluation](docs/EVALUATION.md); [Architecture 12](docs/ARCHITECTURE.md#12-design-decisions) and [14](docs/ARCHITECTURE.md#14-known-limitations) |
+| Analysis, design rationale, limitations and failure cases | [Evaluation](docs/EVALUATION.md); [Architecture 11](docs/ARCHITECTURE.md#11-design-decisions) and [12](docs/ARCHITECTURE.md#12-known-limitations) |
 
-Of the designs the brief lists, the system uses role-based collaboration, a planner and executor, a shared workspace, multi-agent verification, tool-using agents, and routing of rejected work.
+Of the designs the brief lists, the system uses role-based collaboration, debate, a shared workspace (the board), multi-agent verification, and routing of rejected work to the agent at fault.
+
+## Limitations
+
+The main ones. The full list is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#12-known-limitations) and [docs/ROADMAP.md](docs/ROADMAP.md).
+
+- **The audit checks numbers and rules, not judgment.** A proposal can be correct, compliant and still a poor trade. The judges are other models and can share a blind spot.
+- **Nothing here measures decision quality.** The evaluation has tens of runs; the synthetic market carries no information by construction.
+- **The model may remember real prices.** The point-in-time rule controls what the tools return, not what the model learned in training.
+- **Real bars come from unofficial endpoints** (Yahoo, then Eastmoney) that can throttle or change.
+- **No portfolio yet.** The rules that need a position (`sell_requires_position`, `cash_sufficient`) see an empty account.
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `uv run insightcrew serve` | The local web app: start runs, watch them live, open past runs |
+| `uv run insightcrew analyze [TICKER] [--date D] [--scenario NAME]` | One run, printed as it goes |
+| `uv run insightcrew facts TICKER` | The ledger and data card. No model |
+| `uv run insightcrew replay runs/<id>` | Reruns a journal with no model and checks the result is identical |
+| `uv run insightcrew scenarios` | The 16 scripted scenarios, expected against actual |
+| `uv run insightcrew eval all` | Injection, consistency and point-in-time evaluations. No model |
+| `uv run insightcrew eval ablation` | The ablation on a real model. Costs about 0.5 USD |
+| `uv run insightcrew check` | Settings without the key, and what the configured models accept |
+| `uv run insightcrew fetch AAPL 0700.HK` | Downloads real daily bars; then add `--universe real` to `analyze` |
+| `uv run pytest` | 380 tests. No network, no key |
+
+**Without uv.** `python3 -m venv .venv`, then `.venv/bin/pip install -e .`, then `.venv/bin/insightcrew serve` (on Windows, `.venv\Scripts\`). This needs Python 3.12 or later and ignores `uv.lock`, so the package versions may differ from the ones tested. It was tried on Python 3.15.2, where pip chose newer minor versions, and the offline demo ran. The test tools are not installed this way.
 
 ## Repository layout
 
 ```text
-ask.py                 Main entry point: ask a question, see the run, open the replay
-run_demo.py            Non-interactive run of the default question
-check_api.py           Connectivity check for a real model
-config.py              All settings; reads .env
-agents/                Profiler, Planner, Analyst, Critic, Reporter
-core/
-  orchestrator.py      Control loop, error routing, limits, degraded output
-  blackboard.py        Shared state with versioned results
-  messages.py          Structured message log
-  sandbox.py           Restricted execution of generated code
-  llm.py               OpenAI-compatible client and offline switch
-  scripts.py           Scripted model replies for offline mode
-  question_parser.py   Question parsing and the scope gate
-tools/
-  metrics.py           SQL implementation of each metric, used only by the Critic
-  metric_dict.py       Metric dictionary access
-  data_tools.py        Schema summary and SQLite loading
-data/                  Synthetic CSV files, their generator, and the metric dictionary
-eval/                  Evaluation scripts and archived results
-ui/render_report.py    Builds report.html from a run directory
-docs/                  Architecture, evaluation, roadmap
+insightcrew.toml        Settings: model tiers, flow switches, budgets. No secrets
+insightcrew/
+  kernel/               Events, journal, board, budget, run_role: domain-free
+  domain/               Bars, symbols, indicators (two paths), ledger, rules, audit
+  roles/                Role declarations and their prompts (Chinese)
+  flows/                The analysis flow and its code stages
+  adapters/             Real, scripted and replayed models; CSV bars; Yahoo and Eastmoney downloads
+  app/                  Settings, wiring, CLI, report, run page, local web app
+  evals/                Scenarios, injection, consistency, point-in-time, ablation; archive/ of real-model journals
+data/
+  indicators.toml       Indicator declarations
+  rules.toml            The risk rulebook
+  market/synthetic/     Seeded synthetic bars; make_market.py regenerates them
+  scenarios/            16 scripted runs with expected outcomes
+tests/                  pytest
+docs/                   Architecture, evaluation, roadmap, and the build plan
 ```
-
-## Data
-
-`data/orders.csv` (1,200 orders) and `data/refunds.csv` (166 refunds) are synthetic. `data/make_data.py` regenerates them byte for byte with a fixed seed. They are synthetic so that the correct answer is known and each definition trap occurs at a known rate.
-
-To use other data, replace the two CSV files and `data/metric_dict.json`, keeping these columns:
-
-| Table | Columns |
-|---|---|
-| `orders.csv` | `order_id`, `order_date` (YYYY-MM-DD), `region`, `channel`, `amount`, `coupon`, `status` |
-| `refunds.csv` | `refund_id`, `order_id`, `refund_date`, `refund_amount`, `reason` |
-
-## Limitations
-
-The main ones. The full list, with evidence, is in [docs/EVALUATION.md](docs/EVALUATION.md#failure-cases) and [docs/ROADMAP.md](docs/ROADMAP.md).
-
-- **The audit does not check that the plan matches the question.** It verifies the number against the plan and the plan against the dictionary. A question the system misreads, such as "which region is higher", can be answered with high confidence.
-- **Only what can be recomputed is audited**: four metrics, filtered by region and time.
-- **The metric dictionary is written by hand** and is the final authority.
-- **The sandbox is a course-level safeguard**, not a security boundary.
-- **The evaluation set is small**: 12 questions, one model, one run each.
 
 ## Documentation
 
 | Document | Content |
 |---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Agents, information flow, verification, error routing, design decisions, comparison with related systems |
-| [docs/EVALUATION.md](docs/EVALUATION.md) | Experiments, results, failure cases, threats to validity |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Status, findings from the code examination, and what to do next |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The task, the agents and what each sees, the flow, verification, the journal, design decisions, limitations |
+| [docs/EVALUATION.md](docs/EVALUATION.md) | Offline evaluations, real-model runs, ablation, failure cases, what the results do not show |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | What was cut and what comes next |
 | [AGENTS.md](AGENTS.md) | Working rules for AI coding assistants in this repository |
+| [docs/BLUEPRINT.md](docs/BLUEPRINT.md), [docs/HANDOFF.md](docs/HANDOFF.md) | The build plan and its status board, kept as the record of how the system was built |
+
+Version 1 of this project, a data analyst over CSV tables, is kept under the git tag `v1-data-analyst`.
