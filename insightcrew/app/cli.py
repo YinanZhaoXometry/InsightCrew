@@ -27,6 +27,7 @@ from ..evals import run as eval_cmd
 from ..evals.scenarios import names as scenario_names
 from ..evals.scenarios import run_all, summary_line
 from ..flows import stages as flow_stages
+from ..flows.analyze import FlowConfig
 from ..flows.analyze import analyze as run_flow
 from ..flows.deps import Deps
 from ..kernel.board import Board
@@ -301,16 +302,23 @@ def fetch(
 
 @app.command(name="eval")
 def evaluate(
-    name: Annotated[str, typer.Argument(help="inject、consistency、pit、ablation，或 all")],
+    name: Annotated[str, typer.Argument(help="inject、consistency、pit、ablation、channels，或 all")],
 ) -> None:
-    """运行评测。all 跑其中不需要模型的三项；ablation 需要真实模型。"""
-    if name != "ablation":
+    """运行评测。all 跑其中不需要模型的三项；ablation 与 channels 需要真实模型。"""
+    if name not in ("ablation", "channels"):
         raise typer.Exit(eval_cmd.run(ROOT, name))
     settings = _settings()
     mode, _, reason = describe_models(settings)
     if mode != "model":
         raise typer.Exit(eval_cmd.run(ROOT, name, no_model_reason=reason))
-    raise typer.Exit(eval_cmd.run(ROOT, name, open_run=partial(open_run, settings), analyze=run_flow,
+    if name == "ablation":
+        raise typer.Exit(eval_cmd.run(ROOT, name, open_run=partial(open_run, settings), analyze=run_flow,
+                                      base=settings.flow))
+    real = _settings(run={"universe": "real"})          # AAPL 与 0700.HK 的格子用 real 数据集
+    def opener(request: dict[str, str], *, flow: FlowConfig | None = None,
+               universe: str = "synthetic") -> tuple[Run, Deps]:
+        return open_run(real if universe == "real" else settings, request, flow=flow)
+    raise typer.Exit(eval_cmd.run(ROOT, name, open_run=opener, analyze=run_flow,
                                   base=settings.flow))
 
 
