@@ -1,0 +1,72 @@
+# 工具指标声明（蓝图 19.11）。一张表是一个工具家族：技术分析师用 indicator(name, n)
+# 请求时，name 就是这里的表名，n 是 arg 声明的窗口参数（七个家族都是 "n"），
+# 取值必须在 min 到 max 之间（含两端）。声明由 adapters/declarations_tools.py 读入。
+# fn 是两条路径（domain/indicators.py 与 domain/recompute.py）里同名的函数；
+# inputs 只能取 open/high/low/close/volume；label 里的 {n} 占位符在返回时替换成实际窗口。
+# 计算口径与 indicators.toml 相同（蓝图 6.4）：EMA 用前 n 个值的简单平均作种子、k = 2/(n+1)；
+# RSI 与 ATR 用 Wilder 平滑；收益率以百分比计。历史不足时两条路径都返回空值，
+# 工具据此返回错误说明（以「数据不可用，不要编造。」结尾），而不是编一个数。
+# 表的顺序就是蓝图 19.11 列出家族的顺序。
+
+[sma]
+fn = "sma"
+inputs = ["close"]
+arg = "n"
+min = 2
+max = 250
+unit = "price"
+label = "{n}日简单均线"
+
+[ema]
+fn = "ema"
+inputs = ["close"]
+arg = "n"
+min = 2
+max = 250
+unit = "price"
+label = "{n}日指数均线"
+
+[rsi]
+fn = "rsi"
+inputs = ["close"]
+arg = "n"
+min = 2
+max = 60
+unit = "none"
+label = "{n}日相对强弱指数"
+
+[atr]
+fn = "atr"
+inputs = ["high", "low", "close"]
+arg = "n"
+min = 2
+max = 60
+unit = "price"
+label = "{n}日平均真实波幅"
+
+[ret_pct]
+fn = "ret_pct"
+inputs = ["close"]
+arg = "n"
+min = 1
+max = 250
+unit = "pct"
+label = "{n}日收益率"
+
+[highest]
+fn = "highest"
+inputs = ["high"]
+arg = "n"
+min = 2
+max = 252
+unit = "price"
+label = "{n}日最高价"
+
+[lowest]
+fn = "lowest"
+inputs = ["low"]
+arg = "n"
+min = 2
+max = 252
+unit = "price"
+label = "{n}日最低价"
