@@ -1,0 +1,239 @@
+{
+  "name": "risk_shrinks_size",
+  "about": "风险辩论一轮（risk_rounds=1）：激进、保守、中立依次发言，保守方建议把仓位降到 3%，交易员采纳后修订方案一次，审计通过后交付。",
+  "request": {
+    "ticker": "ACME",
+    "as_of": "2026-09-30"
+  },
+  "replies": {
+    "technical": [
+      {
+        "claims": [
+          {
+            "fact": "close",
+            "value": 230.85,
+            "reading": "收盘价站上三条均线，趋势向上"
+          },
+          {
+            "fact": "atr_14",
+            "value": 4.6492721823116705,
+            "reading": "日均真实波幅约 4.65 美元，波动可控"
+          },
+          {
+            "fact": "rsi_14",
+            "value": 61.77457618085354,
+            "reading": "相对强弱 61.8，动能偏多但未到超买"
+          },
+          {
+            "fact": "sma_20",
+            "value": 222.257,
+            "reading": "20 日均线在 50 日与 200 日之上，多头排列"
+          },
+          {
+            "fact": "macd_hist",
+            "value": 0.9812458670099371,
+            "reading": "MACD 柱为正，动能仍在释放"
+          }
+        ],
+        "narrative": "价格高于 20/50/200 日均线，MACD 为正且柱体为正，动能与趋势同向。波动以 ATR 衡量处于中等水平。总体读数支持顺势做多，但仓位与止损必须按风控约束执行。"
+      }
+    ],
+    "bull": [
+      {
+        "points": [
+          {
+            "text": "趋势结构完整：价格站上 20/50/200 日均线，且 20 日均线在 50 日之上",
+            "cites": [
+              "close",
+              "sma_20"
+            ]
+          },
+          {
+            "text": "MACD 高于信号线，柱体为正，动能仍在释放",
+            "cites": [
+              "macd",
+              "macd_hist"
+            ]
+          },
+          {
+            "text": "近 20 个交易日上涨约 9%，买方掌握主动",
+            "cites": [
+              "ret_20"
+            ]
+          }
+        ],
+        "rebuttal": "空方担心的回落风险由止损与仓位控制，短期的超买并不改变趋势方向。"
+      }
+    ],
+    "bear": [
+      {
+        "points": [
+          {
+            "text": "价格接近 20 日布林上轨，短期回调的概率不低",
+            "cites": [
+              "close",
+              "bb_upper_20"
+            ]
+          },
+          {
+            "text": "RSI 接近 62，若上攻失败则动能反转向下的幅度可能不小",
+            "cites": [
+              "rsi_14"
+            ]
+          }
+        ],
+        "rebuttal": "回调是入场机会而非趋势反转；方案以 ATR 定止损，回撤被限制在单笔风险上限之内。"
+      }
+    ],
+    "manager": [
+      {
+        "rating": "Buy",
+        "horizon_days": 20,
+        "points": [
+          {
+            "text": "顺势结构未破，20 日内有望沿均线继续上行",
+            "cites": [
+              "close",
+              "sma_20",
+              "rsi_14"
+            ]
+          },
+          {
+            "text": "MACD 柱体为正，动能支持持有期内的上涨",
+            "cites": [
+              "macd_hist"
+            ]
+          }
+        ],
+        "invalidation": [
+          "收盘跌破止损位",
+          "MACD 柱由正转负且持续三日",
+          "跌破 20 日均线且无法收复"
+        ],
+        "summary": "趋势与动能同向，顺势做多，以 ATR 定止损、以单笔风险上限定仓位。"
+      }
+    ],
+    "trader": [
+      {
+        "action": "Buy",
+        "entry": 230.85,
+        "stop": 225.96826420857275,
+        "target": 241.10164516199723,
+        "size_pct": 5.0,
+        "horizon_days": 20,
+        "cites": [
+          "close",
+          "atr_14"
+        ],
+        "rationale": "止损一个 ATR 略多，单笔风险约 0.11%，仓位 5%，收益风险比 2.2"
+      },
+      {
+        "action": "Buy",
+        "entry": 230.85,
+        "stop": 225.96826420857275,
+        "target": 241.10164516199723,
+        "size_pct": 3.0,
+        "horizon_days": 20,
+        "cites": [
+          "close",
+          "atr_14"
+        ],
+        "rationale": "采纳保守方意见：止损距市价仅约 1.05 倍 ATR，仓位降到 3%，单笔风险约 0.06%，价位不变"
+      }
+    ],
+    "risk.aggressive": [
+      {
+        "stance": "aggressive",
+        "critique": "趋势与动能同向，MACD 柱为正，5% 的仓位相对论点强度偏保守：正常回撤到 20 日均线 222.257 也只是回到均线，不破结构。建议把仓位提到 8%，让上行空间配得上论点。",
+        "size_pct": 8.0,
+        "stop": null,
+        "target": null,
+        "cites": [
+          "close",
+          "sma_20",
+          "macd_hist"
+        ],
+        "rebuttal": ""
+      }
+    ],
+    "risk.conservative": [
+      {
+        "stance": "conservative",
+        "critique": "止损 225.97 距入场只有约 1.05 倍 ATR，贴着正常波动，很容易被噪音扫掉；日均真实波幅 4.65 美元，一天的波动就接近止损距离。建议仓位降到 3%，把单笔风险压小，等回调到均线附近再加。",
+        "size_pct": 3.0,
+        "stop": null,
+        "target": null,
+        "cites": [
+          "atr_14",
+          "close"
+        ],
+        "rebuttal": "激进方说趋势同向没错，但 8% 的仓位把止损贴市的问题放大而不是解决：波动 4.65 美元时扫损再入场的成本更高。"
+      }
+    ],
+    "risk.neutral": [
+      {
+        "stance": "neutral",
+        "critique": "两位的分歧在仓位而不在方向：趋势证据与波动证据都成立。止损距离已在下限之上，价位不必动；仓位取两案之间偏保守一侧即可，等站稳 20 日均线再加不迟。",
+        "size_pct": null,
+        "stop": null,
+        "target": null,
+        "cites": [
+          "close",
+          "atr_14",
+          "sma_20"
+        ],
+        "rebuttal": "激进方低估了 1.05 倍 ATR 的止损被日常波动扫到的概率，保守方也承认趋势未破：缩小仓位、保留结构，两边都照顾到。"
+      }
+    ],
+    "judge.evidence": [
+      {
+        "accept": true,
+        "target": "none",
+        "critique": "修订后的引用与账本一致，仓位调整有事实依据。",
+        "cites": []
+      }
+    ],
+    "judge.conservative": [
+      {
+        "accept": true,
+        "target": "none",
+        "critique": "仓位降到 3% 后单笔风险约 0.06%，止损与失效条件具体。",
+        "cites": []
+      }
+    ]
+  },
+  "config": {
+    "flow": {
+      "debate_rounds": 1,
+      "audit": "on",
+      "judges": true,
+      "audit_rounds": 3,
+      "judge_rounds": 2,
+      "quorum": 2,
+      "risk_rounds": 1
+    },
+    "budget": {
+      "run_tokens": 0,
+      "roles": {}
+    }
+  },
+  "expect": {
+    "status": "delivered",
+    "reason": "ok",
+    "facts_and_rules": "verified",
+    "judgment": "accepted 2/3",
+    "calls": [
+      "technical",
+      "bull",
+      "bear",
+      "manager",
+      "trader",
+      "risk.aggressive",
+      "risk.conservative",
+      "risk.neutral",
+      "trader",
+      "judge.evidence",
+      "judge.conservative"
+    ]
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "name": "portfolio_flat_sell",
+  "about": "组合为空仓（flat_usd）：评级看空后交易员提议 Sell，被 sell_requires_position 拒绝（没有持仓可减），打回交易员后改为 Hold 交付。",
+  "request": {
+    "ticker": "ACME",
+    "as_of": "2026-09-30"
+  },
+  "replies": {
+    "technical": [
+      {
+        "claims": [
+          {
+            "fact": "close",
+            "value": 230.85,
+            "reading": "收盘价站上三条均线，趋势向上"
+          },
+          {
+            "fact": "atr_14",
+            "value": 4.6492721823116705,
+            "reading": "日均真实波幅约 4.65 美元，波动可控"
+          },
+          {
+            "fact": "rsi_14",
+            "value": 61.77457618085354,
+            "reading": "相对强弱 61.8，动能偏多但未到超买"
+          },
+          {
+            "fact": "sma_20",
+            "value": 222.257,
+            "reading": "20 日均线在 50 日与 200 日之上，多头排列"
+          },
+          {
+            "fact": "macd_hist",
+            "value": 0.9812458670099371,
+            "reading": "MACD 柱为正，动能仍在释放"
+          }
+        ],
+        "narrative": "价格高于 20/50/200 日均线，MACD 为正且柱体为正，动能与趋势同向。波动以 ATR 衡量处于中等水平。总体读数支持顺势做多，但仓位与止损必须按风控约束执行。"
+      }
+    ],
+    "bull": [
+      {
+        "points": [
+          {
+            "text": "趋势结构完整：价格站上 20/50/200 日均线，且 20 日均线在 50 日之上",
+            "cites": [
+              "close",
+              "sma_20"
+            ]
+          },
+          {
+            "text": "MACD 高于信号线，柱体为正，动能仍在释放",
+            "cites": [
+              "macd",
+              "macd_hist"
+            ]
+          }
+        ],
+        "rebuttal": "空方担心的回落风险由止损与仓位控制，短期的超买并不改变趋势方向。"
+      }
+    ],
+    "bear": [
+      {
+        "points": [
+          {
+            "text": "价格接近 20 日布林上轨，短期回调的概率不低",
+            "cites": [
+              "close",
+              "bb_upper_20"
+            ]
+          },
+          {
+            "text": "RSI 接近 62，若上攻失败则动能反转向下的幅度可能不小",
+            "cites": [
+              "rsi_14"
+            ]
+          }
+        ],
+        "rebuttal": "回调是入场机会而非趋势反转；方案以 ATR 定止损，回撤被限制在单笔风险上限之内。"
+      }
+    ],
+    "manager": [
+      {
+        "rating": "Underweight",
+        "horizon_days": 20,
+        "points": [
+          {
+            "text": "收盘 230.85 高出 20 日均线 222.257 约 3.9%，短期乖离偏大",
+            "cites": [
+              "close",
+              "sma_20"
+            ]
+          },
+          {
+            "text": "RSI 已到 61.8，动能虽在但短线过热，20 日内回落风险大于续涨",
+            "cites": [
+              "rsi_14"
+            ]
+          }
+        ],
+        "invalidation": [
+          "收盘回落到 20 日均线附近后企稳放量",
+          "RSI 回落到 50 下方后再度走强"
+        ],
+        "summary": "短线过热、乖离偏大，20 日内看淡一线；账上本就没有这只标的的持仓。"
+      }
+    ],
+    "trader": [
+      {
+        "action": "Sell",
+        "entry": null,
+        "stop": null,
+        "target": null,
+        "size_pct": 5.0,
+        "horizon_days": 20,
+        "cites": [
+          "close"
+        ],
+        "rationale": "评级看空：先卖出相当于 5% 权益的仓位锁定收益"
+      },
+      {
+        "action": "Hold",
+        "entry": null,
+        "stop": null,
+        "target": null,
+        "size_pct": 0.0,
+        "horizon_days": 20,
+        "cites": [
+          "close"
+        ],
+        "rationale": "组合里没有 ACME 持仓，Sell 无仓可减：改为 Hold，等回调企稳后再评估买入"
+      }
+    ],
+    "judge.evidence": [
+      {
+        "accept": true,
+        "target": "none",
+        "critique": "修订后的方案与评级和账面一致：空仓状态下不持有、不假装减仓。",
+        "cites": []
+      }
+    ],
+    "judge.conservative": [
+      {
+        "accept": true,
+        "target": "none",
+        "critique": "没有持仓就没有风险，Hold 合规。",
+        "cites": []
+      }
+    ]
+  },
+  "config": {
+    "flow": {
+      "debate_rounds": 1,
+      "audit": "on",
+      "judges": true,
+      "audit_rounds": 3,
+      "judge_rounds": 2,
+      "quorum": 2
+    },
+    "budget": {
+      "run_tokens": 0,
+      "roles": {}
+    },
+    "portfolio": {
+      "currency": "USD",
+      "cash": 10000.0,
+      "equity": 10000.0,
+      "positions": []
+    }
+  },
+  "expect": {
+    "status": "delivered",
+    "reason": "ok",
+    "facts_and_rules": "verified",
+    "judgment": "accepted 2/3",
+    "calls": [
+      "technical",
+      "bull",
+      "bear",
+      "manager",
+      "trader",
+      "trader",
+      "judge.evidence",
+      "judge.conservative"
+    ]
+  }
+}
