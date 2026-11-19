@@ -307,7 +307,7 @@ def test_acme_mild_uptrend(market: CsvMarket) -> None:
 # ---- 生成器 ----
 
 def _snapshot() -> dict[Path, bytes]:
-    return {path: path.read_bytes() for path in sorted(SYNTHETIC.iterdir())}
+    return {path: path.read_bytes() for path in sorted(SYNTHETIC.iterdir()) if path.is_file()}
 
 
 def test_generator_writes_the_same_bytes_twice() -> None:

@@ -91,6 +91,15 @@ def test_two_computation_paths_are_independent():
         assert all(top in sys.stdlib_module_names for top, _, _ in imports(path)), f"{name}.py 只用标准库"
 
 
+def test_two_fundamentals_paths_are_independent():
+    """基本面同样两条独立路径（BLUEPRINT 18.6）：互不 import，且只用标准库。"""
+    for name, other in (("fundamentals", "fundamentals_sql"), ("fundamentals_sql", "fundamentals")):
+        path = ROOT / "domain" / f"{name}.py"
+        seen = {x for _, target, imported in imports(path) for x in (target or "", imported)}
+        assert not any(other in x for x in seen), f"{name}.py 不允许引入 {other}"
+        assert all(top in sys.stdlib_module_names for top, _, _ in imports(path)), f"{name}.py 只用标准库"
+
+
 def test_roles_see_only_what_they_declare_and_judges_never_see_the_debate():
     from insightcrew.roles import ALL, JUDGES
     assert len({r.writes for r in ALL}) == len(ALL), "两个角色不能写同一个键"

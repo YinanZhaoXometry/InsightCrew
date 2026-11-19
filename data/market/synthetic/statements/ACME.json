@@ -1,0 +1,183 @@
+{
+  "source": "合成数据",
+  "currency": "USD",
+  "covers_to": "2026-12-31",
+  "rows": [
+    {
+      "concept": "revenue",
+      "period_end": "2023-12-31",
+      "period_days": 365,
+      "value": 820000000,
+      "filed": "2024-02-22",
+      "form": "10-K"
+    },
+    {
+      "concept": "net_income",
+      "period_end": "2023-12-31",
+      "period_days": 365,
+      "value": 61000000,
+      "filed": "2024-02-22",
+      "form": "10-K"
+    },
+    {
+      "concept": "eps_diluted",
+      "period_end": "2023-12-31",
+      "period_days": 365,
+      "value": 1.22,
+      "filed": "2024-02-22",
+      "form": "10-K"
+    },
+    {
+      "concept": "operating_cash_flow",
+      "period_end": "2023-12-31",
+      "period_days": 365,
+      "value": 95000000,
+      "filed": "2024-02-22",
+      "form": "10-K"
+    },
+    {
+      "concept": "total_assets",
+      "period_end": "2023-12-31",
+      "period_days": 0,
+      "value": 1310000000,
+      "filed": "2024-02-22",
+      "form": "10-K"
+    },
+    {
+      "concept": "total_liabilities",
+      "period_end": "2023-12-31",
+      "period_days": 0,
+      "value": 590000000,
+      "filed": "2024-02-22",
+      "form": "10-K"
+    },
+    {
+      "concept": "revenue",
+      "period_end": "2024-12-31",
+      "period_days": 365,
+      "value": 940000000,
+      "filed": "2025-02-20",
+      "form": "10-K"
+    },
+    {
+      "concept": "net_income",
+      "period_end": "2024-12-31",
+      "period_days": 365,
+      "value": 78000000,
+      "filed": "2025-02-20",
+      "form": "10-K"
+    },
+    {
+      "concept": "eps_diluted",
+      "period_end": "2024-12-31",
+      "period_days": 365,
+      "value": 1.55,
+      "filed": "2025-02-20",
+      "form": "10-K"
+    },
+    {
+      "concept": "operating_cash_flow",
+      "period_end": "2024-12-31",
+      "period_days": 365,
+      "value": 120000000,
+      "filed": "2025-02-20",
+      "form": "10-K"
+    },
+    {
+      "concept": "total_assets",
+      "period_end": "2024-12-31",
+      "period_days": 0,
+      "value": 1480000000,
+      "filed": "2025-02-20",
+      "form": "10-K"
+    },
+    {
+      "concept": "total_liabilities",
+      "period_end": "2024-12-31",
+      "period_days": 0,
+      "value": 640000000,
+      "filed": "2025-02-20",
+      "form": "10-K"
+    },
+    {
+      "concept": "revenue",
+      "period_end": "2025-12-31",
+      "period_days": 365,
+      "value": 1105000000,
+      "filed": "2026-02-19",
+      "form": "10-K"
+    },
+    {
+      "concept": "net_income",
+      "period_end": "2025-12-31",
+      "period_days": 365,
+      "value": 97000000,
+      "filed": "2026-02-19",
+      "form": "10-K"
+    },
+    {
+      "concept": "eps_diluted",
+      "period_end": "2025-12-31",
+      "period_days": 365,
+      "value": 1.92,
+      "filed": "2026-02-19",
+      "form": "10-K"
+    },
+    {
+      "concept": "operating_cash_flow",
+      "period_end": "2025-12-31",
+      "period_days": 365,
+      "value": 141000000,
+      "filed": "2026-02-19",
+      "form": "10-K"
+    },
+    {
+      "concept": "total_assets",
+      "period_end": "2025-12-31",
+      "period_days": 0,
+      "value": 1690000000,
+      "filed": "2026-02-19",
+      "form": "10-K"
+    },
+    {
+      "concept": "total_liabilities",
+      "period_end": "2025-12-31",
+      "period_days": 0,
+      "value": 705000000,
+      "filed": "2026-02-19",
+      "form": "10-K"
+    },
+    {
+      "concept": "revenue",
+      "period_end": "2025-12-31",
+      "period_days": 365,
+      "value": 1081000000,
+      "filed": "2026-08-14",
+      "form": "10-K/A"
+    },
+    {
+      "concept": "net_income",
+      "period_end": "2025-12-31",
+      "period_days": 365,
+      "value": 90000000,
+      "filed": "2026-08-14",
+      "form": "10-K/A"
+    },
+    {
+      "concept": "eps_diluted",
+      "period_end": "2025-12-31",
+      "period_days": 365,
+      "value": 1.78,
+      "filed": "2026-08-14",
+      "form": "10-K/A"
+    },
+    {
+      "concept": "revenue",
+      "period_end": "2025-12-31",
+      "period_days": 365,
+      "value": 1090000000,
+      "filed": "2026-11-05",
+      "form": "10-K/A"
+    }
+  ]
+}

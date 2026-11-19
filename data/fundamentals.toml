@@ -1,0 +1,86 @@
+# 基本面事实声明（BLUEPRINT 18.6）。表名是事实 ID；fn 与两条路径里的同名函数对应；
+# concepts 是年报行的概念；金额以百万计；formula 是给报告和模型看的公式文字，不会被求值。
+
+[revenue_fy]
+fn = "latest"
+concepts = ["revenue"]
+unit = "money"
+label = "营业收入"
+formula = "最近一个财年（期末日最大）的申报值；同财年多次申报取最晚一次的口径"
+
+[net_income_fy]
+fn = "latest"
+concepts = ["net_income"]
+unit = "money"
+label = "净利润"
+formula = "最近一个财年的申报值；同财年多次申报取最晚一次的口径"
+
+[eps_diluted_fy]
+fn = "latest"
+concepts = ["eps_diluted"]
+unit = "per_share"
+label = "稀释每股收益"
+formula = "最近一个财年的申报值；同财年多次申报取最晚一次的口径"
+
+[operating_cash_flow_fy]
+fn = "latest"
+concepts = ["operating_cash_flow"]
+unit = "money"
+label = "经营活动现金流"
+formula = "最近一个财年的申报值；同财年多次申报取最晚一次的口径"
+
+[total_assets_fy]
+fn = "latest"
+concepts = ["total_assets"]
+unit = "money"
+label = "总资产"
+formula = "最近一个财年期末的申报值；同财年多次申报取最晚一次的口径"
+
+[total_liabilities_fy]
+fn = "latest"
+concepts = ["total_liabilities"]
+unit = "money"
+label = "总负债"
+formula = "最近一个财年期末的申报值；同财年多次申报取最晚一次的口径"
+
+[revenue_yoy_pct]
+fn = "yoy_pct"
+concepts = ["revenue"]
+unit = "pct"
+label = "营业收入同比"
+formula = "（本财年 − 上一财年）÷ |上一财年| × 100；上一财年取与本财年相隔 330 到 400 天者"
+
+[net_income_yoy_pct]
+fn = "yoy_pct"
+concepts = ["net_income"]
+unit = "pct"
+label = "净利润同比"
+formula = "（本财年 − 上一财年）÷ |上一财年| × 100；上一财年取与本财年相隔 330 到 400 天者"
+
+[net_margin_pct]
+fn = "ratio_pct"
+concepts = ["net_income", "revenue"]
+unit = "pct"
+label = "净利率"
+formula = "净利润 ÷ 营业收入 × 100，同一财年"
+
+[liabilities_to_assets_pct]
+fn = "ratio_pct"
+concepts = ["total_liabilities", "total_assets"]
+unit = "pct"
+label = "资产负债率"
+formula = "总负债 ÷ 总资产 × 100，同一财年"
+
+[pe_fy]
+fn = "price_multiple"
+concepts = ["eps_diluted"]
+unit = "ratio"
+label = "市盈率（最近财年）"
+formula = "分析日收盘价 ÷ 最近财年稀释每股收益；申报货币与标的货币不同时不可用"
+
+[filing_age_days]
+fn = "filing_age"
+concepts = ["revenue"]
+unit = "days"
+label = "申报间隔"
+formula = "分析日 − 最近财年最晚一次申报日，单位天"
