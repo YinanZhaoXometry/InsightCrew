@@ -1,5 +1,10 @@
 """eval 命令的分发：按名字运行评测。WP7 填写，WP8 加入 ablation，WP19 加入 channels。
 
+WP37（BLUEPRINT 19.16）把版本 2.2 的块加进了三个离线评测自身：inject 多了组合规则、
+新闻与情绪引用和教训文字的注入块，consistency 多了工具家族与宏观变换的两路块，
+pit 多了新闻/社交/宏观版本/预测市场/教训/工具事实的时点块——`all` 的三项没变，
+新行随各评测自己打印。
+
 evals 不得 import app：root 由命令行传入；ablation 与 channels 要开真实模型的运行，
 开运行的函数、流程入口与设置里的流程配置由调用方交进来，没交就说明原因并以退出码 2 结束。
 all 按顺序跑不需要模型的三项（inject、consistency、pit），三项都退出 0 才退出 0；
@@ -33,6 +38,14 @@ def run(root: Path, name: str, *, open_run: Callable[..., tuple[Run, Deps]] | No
             return 2
         module = ablation if name == "ablation" else channels
         return asyncio.run(module.main(open_run, analyze, base))
+    if name == "v22":
+        # WP38 的脚手架（BLUEPRINT 19.16）：格子已定义，真实运行等 owner 的花费上限（问题 14/29）。
+        from .v22 import cells, no_spend_reason
+        print(f"v22 评测格子（{len(cells())} 个）：")
+        for cell in cells():
+            print(f"  {cell.name}: {cell.ticker} @{cell.as_of}（{cell.universe}）— {cell.about}")
+        print(no_spend_reason())
+        return 2
     return _dispatch(root, name)
 
 
@@ -44,5 +57,5 @@ def _dispatch(root: Path, name: str) -> int:
         return consistency.main(root)
     if name == "pit":
         return pit.main(root)
-    print(f"未知评测 {name!r}：可用 inject、consistency、pit、ablation、channels、all")
+    print(f"未知评测 {name!r}：可用 inject、consistency、pit、ablation、channels、v22、all")
     return 2

@@ -359,10 +359,10 @@ def backtest(
 
 @app.command(name="eval")
 def evaluate(
-    name: Annotated[str, typer.Argument(help="inject、consistency、pit、ablation、channels，或 all")],
+    name: Annotated[str, typer.Argument(help="inject、consistency、pit、ablation、channels、v22，或 all")],
 ) -> None:
     """运行评测。all 跑其中不需要模型的三项；ablation 与 channels 需要真实模型。"""
-    if name not in ("ablation", "channels"):
+    if name not in ("ablation", "channels", "v22"):
         raise typer.Exit(eval_cmd.run(ROOT, name))
     settings = _settings()
     mode, _, reason = describe_models(settings)
