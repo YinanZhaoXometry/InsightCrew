@@ -218,7 +218,7 @@ The confidence label has two parts, kept apart on purpose. **Facts and rules** i
 
 `Limits` adds a cap on model requests (40), on wall time and on each request's duration.
 
-The values in `insightcrew.toml` were set from the real-model runs ([EVALUATION.md](EVALUATION.md#2-real-model-runs)):
+The values in `insightcrew.toml` were set from the real-model runs ([EVALUATION.md](EVALUATION.md#3-real-model-runs)):
 
 - `budget.run_tokens = 220000`, about twice the largest run observed (107,145 tokens);
 - `limits.max_seconds = 900`, against a slowest run of 338 seconds.
@@ -248,7 +248,7 @@ With no API key, runs use `Script`, a model built on Pydantic AI's `FunctionMode
 | Judges veto and never edit | A judge that could change numbers would be an unaudited author |
 | Pydantic AI as the agent library | It does what this design needs (typed output, the retry, provider profiles, usage, a test double) and leaves control flow and state alone |
 | Declarations in TOML, validated into contracts at start-up | A mistyped rule or indicator is an error before the first run, not a surprise in the middle of one |
-| A real-model setting comes from measurement | The output ceilings, the judges' reasoning effort, the token budget and the time limit were each changed after reading real journals; [EVALUATION.md](EVALUATION.md#21-getting-the-system-to-work-on-a-real-model) |
+| A real-model setting comes from measurement | The output ceilings, the judges' reasoning effort, the token budget and the time limit were each changed after reading real journals; [EVALUATION.md](EVALUATION.md#4-what-the-real-runs-changed) |
 | Refuse rather than guess | Out of scope, unverifiable, contested or out of budget: `REVIEW` with the reason |
 
 Two decisions were the owner's: using maintained libraries instead of a standard-library-only kernel, and adding the live web app. The full list, with what each would cost to reverse, is in [BLUEPRINT.md section 4](BLUEPRINT.md#4-decisions).

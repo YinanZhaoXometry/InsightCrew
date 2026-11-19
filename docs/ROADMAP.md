@@ -40,6 +40,8 @@ In order of value for the claim the system makes:
 ## 4. Known rough edges
 
 - `start.bat` was written for Windows but has not been run on Windows.
+- A bar file with two rows for the same date is not rejected when it is read (`adapters/market_csv.py`), so `recompute.load` raises an uncaught `sqlite3.IntegrityError` on its primary key. The committed data has no duplicates and both fetchers write one row per date, but a hand-edited CSV could trigger it. The fix is to reject duplicate dates in the reader, naming the file and the date.
+- `_one_line` is defined twice, in `app/check.py` and `app/replay.py`.
 - Downloaded bars are not committed, so the two archived real-bar runs replay only after `uv run insightcrew fetch AAPL 0700.HK --years 3`.
 - Yahoo throttled every request from the development machine. Eastmoney works, but both are unofficial endpoints.
 - Instrument names from Eastmoney are in Chinese, and Yahoo's in English, so the same ticker can carry a different name depending on which source answered.
