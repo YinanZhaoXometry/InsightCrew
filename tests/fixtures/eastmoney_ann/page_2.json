@@ -1,0 +1,26 @@
+{
+  "data": {
+    "list": [
+      {
+        "notice_date": "2025-03-27 16:30",
+        "title": "2024 年度业绩公告",
+        "columns": [
+          {
+            "column_name": "年度业绩"
+          }
+        ],
+        "art_code": "AP6900096"
+      },
+      {
+        "notice_date": "2024-09-30 16:30",
+        "title": "2024 年中期报告",
+        "columns": [
+          {
+            "column_name": "中期报告"
+          }
+        ],
+        "art_code": "AP6900095"
+      }
+    ]
+  }
+}

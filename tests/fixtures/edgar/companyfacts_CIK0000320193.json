@@ -1,0 +1,162 @@
+{
+  "cik": 320193,
+  "entityName": "Apple Inc.",
+  "facts": {
+    "us-gaap": {
+      "RevenueFromContractWithCustomerExcludingAssessedTax": {
+        "label": "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "units": {
+          "USD": [
+            {
+              "end": "2024-09-30",
+              "val": 391000000000,
+              "form": "10-K",
+              "filed": "2024-11-01",
+              "start": "2023-10-01"
+            },
+            {
+              "end": "2024-09-30",
+              "val": 391400000000,
+              "form": "10-K/A",
+              "filed": "2025-01-15",
+              "start": "2023-10-01"
+            },
+            {
+              "end": "2025-09-30",
+              "val": 416000000000,
+              "form": "10-K",
+              "filed": "2025-11-01",
+              "start": "2024-09-29"
+            },
+            {
+              "end": "2025-06-30",
+              "val": 95000000000,
+              "form": "10-Q",
+              "filed": "2025-08-01",
+              "start": "2025-03-30"
+            },
+            {
+              "end": "2025-06-30",
+              "val": 95000000000,
+              "form": "10-K",
+              "filed": "2025-08-01",
+              "start": "2025-03-30"
+            },
+            {
+              "end": "2025-09-30",
+              "val": 416100000000,
+              "form": "10-K",
+              "filed": "2025-11-01",
+              "start": "2024-09-29"
+            }
+          ]
+        }
+      },
+      "Revenues": {
+        "label": "Revenues",
+        "units": {
+          "USD": [
+            {
+              "end": "2023-09-30",
+              "val": 383000000000,
+              "form": "10-K",
+              "filed": "2023-11-03",
+              "start": "2022-09-25"
+            }
+          ],
+          "CNY": [
+            {
+              "end": "2022-09-30",
+              "val": 1.0,
+              "form": "10-K",
+              "filed": "2022-11-01",
+              "start": "2021-09-26"
+            }
+          ]
+        }
+      },
+      "NetIncomeLoss": {
+        "label": "NetIncomeLoss",
+        "units": {
+          "USD": [
+            {
+              "end": "2024-09-30",
+              "val": 93700000000,
+              "form": "10-K",
+              "filed": "2024-11-01",
+              "start": "2023-10-01"
+            },
+            {
+              "end": "2025-09-30",
+              "val": 101000000000,
+              "form": "10-K",
+              "filed": "2025-11-01",
+              "start": "2024-09-29"
+            }
+          ]
+        }
+      },
+      "EarningsPerShareDiluted": {
+        "label": "EarningsPerShareDiluted",
+        "units": {
+          "USD/shares": [
+            {
+              "end": "2024-09-30",
+              "val": 6.01,
+              "form": "10-K",
+              "filed": "2024-11-01",
+              "start": "2023-10-01"
+            },
+            {
+              "end": "2025-09-30",
+              "val": 6.72,
+              "form": "10-K",
+              "filed": "2025-11-01",
+              "start": "2024-09-29"
+            }
+          ]
+        }
+      },
+      "NetCashProvidedByUsedInOperatingActivities": {
+        "label": "NetCashProvidedByUsedInOperatingActivities",
+        "units": {
+          "USD": [
+            {
+              "end": "2024-09-30",
+              "val": 118000000000,
+              "form": "10-K",
+              "filed": "2024-11-01",
+              "start": "2023-10-01"
+            }
+          ]
+        }
+      },
+      "Assets": {
+        "label": "Assets",
+        "units": {
+          "USD": [
+            {
+              "end": "2025-09-30",
+              "val": 365000000000,
+              "form": "10-K",
+              "filed": "2025-11-01"
+            }
+          ]
+        }
+      },
+      "Liabilities": {
+        "label": "Liabilities",
+        "units": {
+          "USD": [
+            {
+              "end": "2025-09-30",
+              "val": 310000000000,
+              "form": "10-K",
+              "filed": "2025-11-01"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
