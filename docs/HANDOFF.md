@@ -56,7 +56,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 17A | Version 2.1: SEC EDGAR and Eastmoney announcement adapters, with tests | done | 20 tests over synthetic saved responses (structure real, no real download): tag order per concept, span and form filters, duplicate keys keep the last, titles for 8-K items, paging and covers_from. 483 tests. |
 | 17B | Version 2.1: `fetch` downloads evidence | blocked | Code done, three checks green. The live acceptance run is blocked: Eastmoney's bars endpoint twice answered `Server disconnected without sending a response` (Yahoo 429 as before), so `fetch` exits 1 at the bars stage and the evidence downloads never start. `IC_SEC_CONTACT` **is** set in `.env` (key checked, value not read). Stopped per the network rule; the owner decides. |
 | 18 | Version 2.1: run page sections | done | Pipeline shows the two analyst stages when a run has them; the evidence area gains a channel-status line, a fundamentals table with the card, and an item list with signals; verified in the in-app browser for `channels_clean`, `uncovered` and `demo` (no channel → the page shows nothing new). 486 tests. |
-| 19 | Version 2.1: real-model runs with channels, `eval channels` | not started | Needs WP16, WP17B and the owner's agreement to spend |
+| 19 | Version 2.1: real-model runs with channels, `eval channels` | done | 13 real runs archived (one pilot + 12 evaluation), every journal replays 一致; no prompt fix was needed (the pilot journal showed clean channel outputs and substantive, not mechanical, dissents); `[flow] channels` stays unset. Total spend ≈ 0.5 USD of the 2 USD cap. |
 | 20 | Version 2.1: documents and packaging | not started | Needs everything else built or cut |
 
 **Work packages 0 to 12 are done: that is version 2.0, and it is a complete submission.** [ROADMAP.md](ROADMAP.md) lists its known issues and next steps. Work packages 13 to 20 are version 2.1, in [BLUEPRINT.md section 18](BLUEPRINT.md#18-version-21-evidence-channels).
@@ -1073,6 +1073,43 @@ Files changed: `insightcrew/app/assets/page.html` (two stages, three lanes, chan
 Committed: by path, then this file. See `git log`.
 
 For the next session: retry `fetch` once for WP17B; then WP19 (needs a key, present) and WP20.
+
+### 2026-11-19 evening · WP19 · building session (GLM, via ZCode)
+
+Result: done. One pilot run, no prompt fix needed, twelve evaluation runs, everything archived and replayable.
+
+**The pilot** (`runs/20261119-220223-ACME-2026-09-30-f983`, archived): ACME 2026-09-30, both channels, ended `review/contested` after 13 calls. The journal shows both new analysts performing cleanly — fundamentals produced 8 claims with every value copied exactly (including the restated figures) and a narrative that states the restatement; disclosures produced 3 well-reasoned signals; zero corrective retries; the audit found nothing. The judges' dissents were substantive (an unhandled pe_fy ≈ 129× as contrary evidence, a stop too close to the 20-day mean) — the kind of disagreement the debate exists for, not a prompt defect. **No prompt was changed**, per the rule that a fix must be tied to a journal defect.
+
+**`eval channels`** (4 cells × 3 configurations; per-cell run IDs in `insightcrew/evals/archive/channels.json`):
+
+| 配置 | 运行 | 交付 | REVIEW 率 | 每次返工 | 每次调用 | 每次 token | 每次成本 | 论点引用通道证据 | 发现（按检查项） |
+|---|---|---|---|---|---|---|---|---|---|
+| none | 4 | 3 | 25% | 0.25 | 8.25 | 53207 | 0.0198 | 0/14 | 无 |
+| fundamentals | 4 | 3 | 25% | 0.75 | 11.0 | 75336 | 0.0332 | 1/11 | 无 |
+| both | 4 | 3 | 25% | 1.0 | 12.5 | 96328 | 0.0482 | 3/14 | point_cites_claimed_fact×2 |
+
+What these numbers support, and what they do not (18.17 applies):
+
+- **The channels work end to end against a real model**: ACME cells read `fundamentals:available`/`disclosures:available`, the analysts' outputs passed the audit, thesis points did cite channel evidence (1/11 and 3/14), and the `point_cites_claimed_fact×2` findings in the `both` row show the widened audit catching and routing a real mis-citation — the mechanism, not the decision quality.
+- **The real-universe cells ran with both channels unavailable** (no evidence files on disk — WP17B is blocked on the network), so `both` on AAPL/0700.HK differs from `none` only by the two status lines. The run in `both/AAPL` ended contested; the run-to-run noise seen in WP8 makes nothing of that.
+- **Cost and rework rise with channels** (≈2.4× cost, ≈4× revisions in `both`); citation share stays low. Four cells per configuration cannot separate any of this from chance (12.4), so **`[flow] channels` stays unset in `insightcrew.toml`**: the submission's default behaviour remains that of version 2.0, with the channels available on request (`--channels`).
+
+Commands run, with the last lines of their output:
+
+- `uv run insightcrew check` → both tiers build and are priced.
+- Pilot and evaluation runs as above; `uv run insightcrew eval channels` → exit 0, table above, `每个格子的运行 ID 与汇总已写入 channels.json`.
+- Archives: the 13 journals copied under `insightcrew/evals/archive/<run id>/`; `IC_FORCE_OFFLINE=1 uv run insightcrew replay <dir>` for each → new `ok=13 bad=0`; then all 43 archive directories → `ok=43 bad=0`.
+- `uv run pytest -q` → `486 passed`. `uv run ruff check .` → `All checks passed!` `uv run pyright` → `0 errors, 0 warnings, 0 informations`. `scenarios` → `21` 相符.
+
+Spend: ≈0.5 USD in total (pilot ≈0.09, twelve runs ≈0.41, check probes negligible) against the 2 USD cap.
+
+Not run, and why: `eval ablation` again (WP8's stands); the channels evaluation on real evidence (WP17B blocked).
+
+Files created: `insightcrew/evals/channels.py`, `insightcrew/evals/archive/channels.json`, 13 archived journals. Edited: `insightcrew/evals/run.py` (`channels` dispatch), `insightcrew/app/cli.py` (the `eval` command passes a universe-aware opener), `insightcrew.toml` unchanged on purpose.
+
+Committed: by path, then this file. See `git log`.
+
+For the next session: WP20 (documents and packaging) — everything else is built or blocked; WP17B's live acceptance waits on the network or the owner's choice.
 
 ## 9. Prompts for starting a session
 
