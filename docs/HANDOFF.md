@@ -53,7 +53,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 14 | Version 2.1: statements, both paths, the fundamentals ledger, synthetic statements | done | Both paths agree at every swept date; acceptance numbers exact (940 / 1105 / 1081 with warnings / 1090 / NotCovered); generator deterministic. 424 tests. Owner settled questions 8 and 9. |
 | 15 | Version 2.1: disclosures adapter, synthetic items | done | 14 tests; window edges inclusive, undated dropped and counted, out-of-cover and missing file NotCovered, malformed SourceUnavailable; generator deterministic; the three acceptance numbers of 18.14 hold. 438 tests. |
 | 16 | Version 2.1: the offline system with channels; 21 scenarios | done | Real `evidence`, wiring, `--channels`, `facts` channels, the grown views and prompt paragraphs, two report sections, five scenarios, three evaluation blocks. 21 scenarios match; eval all prints both blocks; `uncovered`'s report verified; replay of a channel run 一致. 462 tests. |
-| 17A | Version 2.1: SEC EDGAR and Eastmoney announcement adapters, with tests | not started | Needs WP14 and WP15 |
+| 17A | Version 2.1: SEC EDGAR and Eastmoney announcement adapters, with tests | done | 20 tests over synthetic saved responses (structure real, no real download): tag order per concept, span and form filters, duplicate keys keep the last, titles for 8-K items, paging and covers_from. 483 tests. |
 | 17B | Version 2.1: `fetch` downloads evidence | not started | Needs WP17A and WP16. The live download needs `IC_SEC_CONTACT` and the owner's request. |
 | 18 | Version 2.1: run page sections | not started | Needs WP16. First to be cut. |
 | 19 | Version 2.1: real-model runs with channels, `eval channels` | not started | Needs WP16, WP17B and the owner's agreement to spend |
@@ -1008,6 +1008,30 @@ Notes:
 Committed: by path, then this file. See `git log`.
 
 For the next session: WP17A (adapters and tests, needs WP14/15 ✓), then WP17B (`fetch`, needs WP17A and WP16 ✓).
+
+### 2026-11-19 evening · WP17 part A · building session (GLM, via ZCode)
+
+Result: done. The two real-source adapters and their tests, entirely offline.
+
+Commands run, with the last lines of their output:
+
+- `uv run pytest -q` → `483 passed in 12.79s` (20 new: 13 edgar, 7 eastmoney_ann). `uv run ruff check .` → `All checks passed!` `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- Proof of 18.3: `scenarios` → `21` 相符; 30 archived journals → `replayed ok=30 bad=0`; `eval all` unchanged (`19/19`、`0/6`、`6/6`、`0/2`、`277 × 29`、`46 × 12`、`864`、`16`).
+
+Not run, and why: any live request — part A is offline by design; the live downloads are part B's acceptance, gated on `IC_SEC_CONTACT` and the owner's request.
+
+Unverified: that the real SEC and Eastmoney responses match the fixtures' shapes (the planning session probed both on 2026-11-19 and they answered; the fixtures encode that structure, trimmed).
+
+Files created: `insightcrew/adapters/edgar.py`, `insightcrew/adapters/eastmoney_ann.py`, `tests/test_edgar.py`, `tests/test_eastmoney_ann.py`, `tests/fixtures/edgar/` (3 files, synthetic), `tests/fixtures/eastmoney_ann/` (3 files).
+
+Notes:
+
+1. `download_statements` / `download_disclosures` return `(file_stem, json_content)` or `None` for a non-SEC filer; both take `today=` for deterministic tests, and raise `ValueError` before any request when the contact is empty (asserted: zero requests).
+2. One reading of 18.12 recorded: "a fiscal year keeps the first tag that reports it" is judged **per concept** — different concepts share a period end, and each keeps its own first tag. Tested by `test_a_fiscal_year_keeps_the_first_tag_that_reports_it` plus the balance tests.
+
+Committed: by path, then this file. See `git log`.
+
+For the next session: WP17B — `fetch` downloads evidence after bars.
 
 ## 9. Prompts for starting a session
 
