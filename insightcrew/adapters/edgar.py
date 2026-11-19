@@ -14,6 +14,8 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
+import httpx2
+
 from insightcrew import __version__
 
 from ..domain.market import SourceUnavailable
@@ -21,6 +23,11 @@ from ..domain.market import SourceUnavailable
 _TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 _FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 _SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
+
+
+def client(timeout: float = 60.0) -> httpx2.Client:
+    """证据下载共用的 HTTP 客户端。app 层不 import httpx2，client 由适配器层建。"""
+    return httpx2.Client(timeout=httpx2.Timeout(timeout))
 
 # 概念 →（按序尝试的 XBRL tag，单位）。一个概念只以表里的单位读取；换算过单位的行不取，
 # 该概念因此缺席，运行时成为一条不可用事实（18.12）。
