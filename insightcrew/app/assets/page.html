@@ -138,6 +138,8 @@
   .kv { display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; font-size:13px; margin:8px 0; }
   .kv dt { color:var(--muted); } .kv dd { margin:0; }
   .findings { margin:6px 0; padding-left:18px; } .findings li { margin:4px 0; }
+  .signals { margin:6px 0; padding-left:18px; } .signals li { margin:3px 0; }
+  .signals .mono { margin-right:4px; }
 
   .meter { height:8px; border-radius:999px; background:var(--lane); border:1px solid var(--line); overflow:hidden; margin-top:6px; }
   .meter i { display:block; height:100%; background:var(--accent); }
@@ -218,20 +220,32 @@
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const STAGES = [["intake", "范围闸门", "code"], ["ledger", "事实账本", "code"], ["technical", "技术分析", "model"],
+                ["fundamentals", "基本面分析", "model"], ["disclosures", "公告分析", "model"],
                 ["debate", "多空辩论", "model"], ["manager", "研究主管", "model"], ["trader", "交易员", "model"],
                 ["audit", "审计", "code"], ["judges", "评审", "model"], ["report", "报告", "code"]];
 const STAGE_NAME = Object.fromEntries(STAGES.map(([key, name]) => [key, name]));
+STAGE_NAME.evidence = "证据";
 const STAGE_ORDER = STAGES.map(([key]) => key);
-const ACTOR_STAGE = { intake: "intake", ledger: "ledger", technical: "technical", bull: "debate", bear: "debate",
+const CHANNEL_STAGES = { fundamentals: "fundamentals/status", disclosures: "disclosures/status" };
+const ACTOR_STAGE = { intake: "intake", ledger: "ledger", evidence: "ledger", technical: "technical",
+                      fundamentals: "fundamentals", disclosures: "disclosures", bull: "debate", bear: "debate",
                       manager: "manager", trader: "trader", audit: "audit" };
-const STAGE_LANE = { technical: "technical", debate: "bull", manager: "manager", trader: "trader" };
+const STAGE_LANE = { technical: "technical", fundamentals: "fundamentals", disclosures: "disclosures",
+                     debate: "bull", manager: "manager", trader: "trader" };
 const LANES = [["app", "系统", "code"], ["intake", "范围闸门", "code"], ["ledger", "事实账本", "code"],
-               ["technical", "技术分析师", "model"], ["bull", "多方研究员", "model"], ["bear", "空方研究员", "model"],
+               ["evidence", "证据", "code"],
+               ["technical", "技术分析师", "model"], ["fundamentals", "基本面分析师", "model"],
+               ["disclosures", "公告分析师", "model"],
+               ["bull", "多方研究员", "model"], ["bear", "空方研究员", "model"],
                ["manager", "研究主管", "model"], ["trader", "交易员", "model"], ["audit", "审计", "code"],
                ["judge.evidence", "证据评审", "model"], ["judge.conservative", "保守评审", "model"],
                ["judge.aggressive", "进取评审", "model"], ["flow", "流程", "code"]];
-const GROUP_NAME = { technical: "技术分析师", bull: "多方研究员", bear: "空方研究员", manager: "研究主管",
+const GROUP_NAME = { technical: "技术分析师", fundamentals: "基本面分析师", disclosures: "公告分析师",
+                     bull: "多方研究员", bear: "空方研究员", manager: "研究主管",
                      trader: "交易员", judge: "评审（三个视角）" };
+const CHANNEL_STATE = { available: "可用", empty: "窗口内没有公告", unavailable: "不可用" };
+const DIRECTION_TEXT = { positive: "正面", negative: "负面", neutral: "中性" };
+const STANCE_TEXT = { positive: "正面", mixed: "混合", neutral: "中性", negative: "负面" };
 const JUDGES = [["evidence", "证据评审"], ["conservative", "保守评审"], ["aggressive", "进取评审"]];
 const REASON = {
   invalid_ticker: "代码格式不正确", unknown_ticker: "代码不在数据集里", no_data: "该日期之前没有已收盘的行情",
@@ -418,11 +432,14 @@ function renderHeader() {
 
 function renderPipeline(events) {
   const { status, redo } = pipeline(events);
+  const board = fold(events);
   const chips = [];
-  STAGES.forEach(([key, name, kind], i) => {
+  let shown = 0;
+  STAGES.forEach(([key, name, kind]) => {
+    if (CHANNEL_STAGES[key] && !board[CHANNEL_STAGES[key]]) return;   // 这次运行没开这条通道
     let cls = status[key] || "idle";
     if (cls === "done" && redo[key]) cls = "revised";
-    if (i) chips.push(el("span", { class: "arrow" }, "→"));
+    if (shown++) chips.push(el("span", { class: "arrow" }, "→"));
     chips.push(el("span", { class: "stage " + cls, title: kind === "model" ? "由模型完成" : "由代码完成" },
       name, el("span", { class: "kind" }, kind === "model" ? "模型" : "代码"),
       redo[key] ? "↺" + redo[key] : null));
@@ -607,6 +624,55 @@ function renderTimeline(events) {
 
 function renderEvidence(events) {
   const board = fold(events), outcome = board["run/outcome"], kids = [el("h2", null, "证据")];
+  for (const [key, name] of [["fundamentals", "基本面"], ["disclosures", "公告"]]) {
+    const status = board[key + "/status"];
+    if (!status) continue;                       // 这次运行没开这条通道：一行都不加
+    const text = CHANNEL_STATE[status.state] || status.state;
+    kids.push(el("p", { class: "note" },
+      name + "通道：" + text + (status.state !== "available" && status.reason ? "（" + status.reason + "）" : "")));
+  }
+  const fundFacts = board["fundamentals/facts"];
+  if (fundFacts) {
+    const factMap = Object.fromEntries(fundFacts.map((fact) => [fact.id, fact]));
+    const claims = ((board["fundamentals/analysis"] || {}).claims) || [];
+    if (claims.length) {
+      kids.push(el("h3", null, "基本面事实（数值取自年报，经第二条路径复算）"),
+        table(["事实", "含义", "申报值", "申报日", "分析师的解读"], claims.map((claim) => {
+          const fact = factMap[claim.fact] || {};
+          return [el("span", { class: "mono" }, claim.fact), fact.label || "（没有这个基本面事实）",
+                  withUnit(fact.value, fact.unit), fact.as_of || "—", claim.reading || ""];
+        }), [2]));
+    }
+    const card = board["fundamentals/card"];
+    if (card) {
+      const notes = ["来源 " + card.source + "，申报货币 " + card.currency + "，最近财年期末 "
+        + card.fiscal_year_end + "，所引最晚申报 " + card.filed + "，" + card.rows + " 行"];
+      if (card.unavailable && card.unavailable.length)
+        notes.push("不可用：" + card.unavailable.map((u) => u.id + "（" + u.reason + "）").join("；"));
+      if (card.warnings && card.warnings.length) notes.push("重述提醒：" + card.warnings.join("；"));
+      kids.push(el("p", { class: "note" }, notes.join("。")));
+    }
+  }
+  const items = board["disclosures/items"];
+  if (items) {
+    kids.push(el("h3", null, "公告条目（来源原文，未经核验）"),
+      table(["编号", "发布日", "类别", "标题", "来源编号"], items.map((item) =>
+        [el("span", { class: "mono" }, item.id), item.published, item.kind, item.title,
+         el("span", { class: "mono" }, item.ref)])));
+    const dAnalysis = board["disclosures/analysis"];
+    if (dAnalysis) {
+      if (dAnalysis.signals && dAnalysis.signals.length) {
+        kids.push(el("ul", { class: "signals" }, dAnalysis.signals.map((signal) => el("li", null,
+          el("span", { class: "mono" }, signal.item), " "
+          + (DIRECTION_TEXT[signal.direction] || signal.direction) + "——" + signal.reading))));
+      }
+      kids.push(el("p", { class: "note" }, "窗口内公告合起来的基调："
+        + (STANCE_TEXT[dAnalysis.stance] || dAnalysis.stance) + "（把握：" + dAnalysis.confidence + "）"));
+    }
+    const dcard = board["disclosures/card"];
+    if (dcard) kids.push(el("p", { class: "note" }, "窗口 " + dcard.window_from + " 到 " + dcard.window_to
+      + "，" + dcard.items + " 条；丢弃无日期 " + dcard.dropped + " 条，截断 " + dcard.truncated + " 条"));
+  }
   const analysis = board["technical/analysis"];
   if (analysis && analysis.claims && analysis.claims.length) {
     const facts = Object.fromEntries((board["ledger/facts"] || []).map((fact) => [fact.id, fact]));

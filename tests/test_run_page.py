@@ -93,3 +93,45 @@ def test_csp_is_declared() -> None:
     assert 'http-equiv="Content-Security-Policy"' in ASSET
     assert "default-src 'none'" in ASSET
     assert "connect-src 'self'" in ASSET
+
+
+# ---- 证据通道（BLUEPRINT 18.11）：流水线两段、证据区两块、没开通道的运行一个都不出现 ----
+
+
+def _channel_events() -> list[Event]:
+    """在最小事件序列上补一次带通道的运行会写出的黑板键。"""
+    extra = [
+        Event(seq=7, ts="", type="artifact.written", actor="evidence", data={
+            "key": "fundamentals/status", "version": 1,
+            "value": {"channel": "fundamentals", "state": "available", "reason": ""}}),
+        Event(seq=8, ts="", type="artifact.written", actor="evidence", data={
+            "key": "fundamentals/facts", "version": 1,
+            "value": [{"id": "revenue_fy", "label": "营业收入（最近财年，截至 2025-12-31）",
+                       "value": 1081.0, "unit": "USD million", "as_of": "2026-08-14",
+                       "source": "fundamentals.latest", "bars_used": 0}]}),
+        Event(seq=9, ts="", type="artifact.written", actor="disclosures", data={
+            "key": "disclosures/items", "version": 1,
+            "value": [{"id": "D1", "published": "2026-09-22", "source": "合成数据",
+                       "kind": "股份回购", "title": "董事会批准股份回购计划", "ref": "ACME-0011"}]}),
+    ]
+    return _events() + extra
+
+
+def test_the_page_declares_the_channel_stages_and_sections() -> None:
+    assert "基本面分析" in ASSET and "公告分析" in ASSET          # 流水线的两段
+    assert "基本面分析师" in ASSET and "公告分析师" in ASSET      # 时间线的泳道
+    assert "fundamentals/status" in ASSET and "disclosures/items" in ASSET
+    assert "公告条目（来源原文，未经核验）" in ASSET and "基本面事实" in ASSET
+    assert "CHANNEL_STAGES" in ASSET                              # 没开的通道不加进流水线
+
+
+def test_channel_events_are_embedded() -> None:
+    payload = _embedded(render(_channel_events()))
+    keys = [e["data"]["key"] for e in payload["events"] if e["type"] == "artifact.written"]
+    assert "fundamentals/facts" in keys and "disclosures/items" in keys
+
+
+def test_a_channelless_run_embeds_no_channel_keys() -> None:
+    payload = _embedded(render(_events()))
+    keys = [e["data"]["key"] for e in payload["events"] if e["type"] == "artifact.written"]
+    assert not any(key.startswith(("fundamentals/", "disclosures/")) for key in keys)
