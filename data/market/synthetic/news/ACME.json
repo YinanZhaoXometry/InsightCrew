@@ -1,0 +1,55 @@
+{
+  "source": "合成数据",
+  "covers_from": "2025-01-01",
+  "covers_to": "2026-12-31",
+  "items": [
+    {
+      "published": "2025-03-14",
+      "source": "合成数据",
+      "title": "ACME 完成数据中心冷却系统首批交付",
+      "url": "https://example.com/news/n0001"
+    },
+    {
+      "published": "2026-09-18",
+      "source": "合成数据",
+      "title": "ACME 获批参与区域电网升级试点项目",
+      "url": "https://example.com/news/n0002"
+    },
+    {
+      "published": "2026-09-23",
+      "source": "合成数据",
+      "title": "ACME 管理层在机构调研中介绍第四季度排产计划",
+      "url": "https://example.com/news/n0003"
+    },
+    {
+      "published": "2026-09-24",
+      "source": "合成数据",
+      "title": "ACME 与主要供应商签署长期原料采购协议",
+      "url": "https://example.com/news/n0004"
+    },
+    {
+      "published": null,
+      "source": "合成数据",
+      "title": "未注明日期的转载快讯",
+      "url": "https://example.com/news/n0005"
+    },
+    {
+      "published": "2026-09-27",
+      "source": "合成数据",
+      "title": "研究机构上调 ACME 评级并调高目标区间",
+      "url": "https://example.com/news/n0006"
+    },
+    {
+      "published": "2026-09-30",
+      "source": "合成数据",
+      "title": "ACME 公布社区充电网络二期投资计划",
+      "url": "https://example.com/news/n0007"
+    },
+    {
+      "published": "2026-10-03",
+      "source": "合成数据",
+      "title": "ACME 宣布中部仓储扩建项目开工",
+      "url": "https://example.com/news/n0008"
+    }
+  ]
+}

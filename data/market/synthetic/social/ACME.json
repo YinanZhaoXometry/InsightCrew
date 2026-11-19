@@ -1,0 +1,56 @@
+{
+  "source": "合成数据",
+  "covers_from": "2025-01-01",
+  "covers_to": "2026-12-31",
+  "posts": [
+    {
+      "published": "2026-09-21",
+      "source": "合成数据",
+      "text": "ACME 今天放量突破，趋势走强，继续持有",
+      "url": "https://example.com/social/s0001",
+      "tag": "bullish"
+    },
+    {
+      "published": "2026-09-23",
+      "source": "合成数据",
+      "text": "看了采购协议的新闻，成本端这一下应该稳了",
+      "url": "https://example.com/social/s0002",
+      "tag": "none"
+    },
+    {
+      "published": "2026-09-25",
+      "source": "合成数据",
+      "text": "ACME 涨得有点急，我减了一半仓位落袋",
+      "url": "https://example.com/social/s0003",
+      "tag": "bearish"
+    },
+    {
+      "published": null,
+      "source": "合成数据",
+      "text": "未注明日期的跟帖",
+      "url": "https://example.com/social/s0004",
+      "tag": "none"
+    },
+    {
+      "published": "2026-09-28",
+      "source": "合成数据",
+      "text": "论坛都在传 ACME 要扩产，公告还没见到",
+      "url": "https://example.com/social/s0005",
+      "tag": "bullish"
+    },
+    {
+      "published": "2026-09-30",
+      "source": "合成数据",
+      "text": "季末收官，ACME 这个月的走势比大盘强一截",
+      "url": "https://example.com/social/s0006",
+      "tag": "none"
+    },
+    {
+      "published": "2026-10-02",
+      "source": "合成数据",
+      "text": "十月开门红，ACME 高开高走",
+      "url": "https://example.com/social/s0007",
+      "tag": "bullish"
+    }
+  ]
+}
