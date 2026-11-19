@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..domain.types import Analysis, Argument, Proposal, Thesis, Verdict
+from ..domain.types import Analysis, Argument, DisclosureAnalysis, Proposal, Thesis, Verdict
 from ..kernel.runtime import Role
 
 _DIR = Path(__file__).parent / "prompts"
@@ -51,6 +51,18 @@ TRADER = Role(
            "rules/limits", "audit/trader", "judges/on_levels"),
     writes="trader/proposal", output=Proposal, max_output_tokens=_QUICK_OUT)
 
+# 两个证据通道的分析师（BLUEPRINT 18.9）。只在通道打开且状态为 available 时被调用；
+# 各读各的证据，看不到价格事实、看不到彼此的输出。
+FUNDAMENTALS = Role(
+    "fundamentals", "quick", _prompt("fundamentals"),
+    reads=("ledger/instrument", "fundamentals/facts", "fundamentals/card", "audit/fundamentals"),
+    writes="fundamentals/analysis", output=Analysis, max_output_tokens=_QUICK_OUT)
+
+DISCLOSURES = Role(
+    "disclosures", "quick", _prompt("disclosures"),
+    reads=("ledger/instrument", "disclosures/items", "disclosures/card", "audit/disclosures"),
+    writes="disclosures/analysis", output=DisclosureAnalysis, max_output_tokens=_QUICK_OUT)
+
 LENSES = {
     "evidence": "证据。每个论点是否真的由它引用的事实推出？有没有被忽略的、指向相反方向的事实？",
     "conservative": "下行风险。正常波动是否就会触发止损？失效条件是否具体？判断错了的话，损失是否如方案所述？",
@@ -64,4 +76,4 @@ JUDGES = tuple(
          writes=f"judge.{lens}/verdict", output=Verdict, effort="low", max_output_tokens=_QUICK_OUT)
     for lens, brief in LENSES.items())
 
-ALL = (TECHNICAL, BULL, BEAR, MANAGER, TRADER, *JUDGES)
+ALL = (TECHNICAL, FUNDAMENTALS, DISCLOSURES, BULL, BEAR, MANAGER, TRADER, *JUDGES)

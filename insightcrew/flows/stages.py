@@ -12,19 +12,32 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 from ..domain import rules as rulebook
 from ..domain import symbols
 from ..domain.audit import audit as audit_numbers
 from ..domain.ledger import build_ledger, disagreements, recompute_ledger
 from ..domain.market import Bar, Instrument, InvalidTicker, NoData, SourceUnavailable, UnknownTicker
-from ..domain.types import Analysis, AuditStatus, Fact, Finding, Proposal, Scope, Thesis
+from ..domain.types import (
+    Analysis,
+    AnalysisSeq,
+    AuditStatus,
+    ChannelStatus,
+    DisclosureAnalysis,
+    Fact,
+    Finding,
+    Item,
+    Proposal,
+    Scope,
+    Thesis,
+)
 from ..kernel.runtime import Halt, Run
 from .deps import Deps
 
 _INTAKE_RULES = ("data_fresh", "min_history")
-_OWNERS = ("technical", "manager", "trader")
+_OWNERS = ("technical", "fundamentals", "disclosures", "manager", "trader")
+_CHANNELS = ("fundamentals", "disclosures")
 
 
 def _gate(run: Run, gate: str, detail: list[dict[str, Any]]) -> None:
@@ -127,22 +140,65 @@ def ledger(run: Run, deps: Deps) -> None:
     _gate(run, "ledger", [])
 
 
+# ---- 证据通道（BLUEPRINT 18.8）----
+
+
+def evidence(run: Run, deps: Deps, channels: tuple[Literal["fundamentals", "disclosures"], ...]) -> None:
+    """证据阶段。读取每个被点名的通道，写它的键，最后记一条 gate.checked（gate = "evidence"）。
+
+    WP13 的存根：还没有任何数据源接线（Deps.statements/disclosures 为 None，读取器也未建），
+    所以本包里被点名的通道一律记为不可用，此外不写任何键。WP16 接入真实的读取与两条路径。
+    """
+    for channel in channels:
+        run.board.put(f"{channel}/status",
+                      ChannelStatus(channel=channel, state="unavailable", reason="尚未接入数据源"),
+                      by="evidence")
+    _gate(run, "evidence", [])
+
+
+def channel_ready(run: Run, channel: str) -> bool:
+    """通道可用：状态键存在且 state 为 available。空、不可用或未打开都算没准备好。"""
+    if not run.board.has(f"{channel}/status"):
+        return False
+    return run.board.get(f"{channel}/status", ChannelStatus).state == "available"
+
+
 # ---- 审计 ----
 
 def audit(run: Run, deps: Deps) -> list[Finding]:
-    """L2 数字核对 + L3 规则检查。每次调用都重写 audit/* 各键，并记一条 gate.checked 事件。"""
+    """L2 数字核对 + L3 规则检查。每次调用都重写 audit/* 各键，并记一条 gate.checked 事件。
+
+    通道分析在板上才交给审计（18.8）：audit/fundamentals、audit/disclosures 和 audit/channels
+    只在对应的键存在时写，所以通道关闭的运行里审计写出的键与版本 2.0 相同。
+    """
     facts = run.board.get("ledger/facts", list[Fact])
     analysis = run.board.get("technical/analysis", Analysis)
     thesis = run.board.get("manager/thesis", Thesis)
     proposal = run.board.get("trader/proposal", Proposal)
 
+    fundamentals = None
+    if run.board.has("fundamentals/analysis"):
+        fundamentals = (run.board.get("fundamentals/facts", list[Fact]),
+                        run.board.get("fundamentals/analysis", Analysis))
+    disclosures = None
+    if run.board.has("disclosures/analysis"):
+        disclosures = (run.board.get("disclosures/items", list[Item]),
+                       run.board.get("disclosures/analysis", DisclosureAnalysis))
+
     rule_results = rulebook.evaluate(proposal, thesis, {f.id: f.value for f in facts}, deps.rules)
-    findings = audit_numbers(facts, analysis, thesis, proposal, rule_results)
+    findings = audit_numbers(facts, analysis, thesis, proposal, rule_results,
+                             fundamentals=fundamentals, disclosures=disclosures)
 
     run.board.put("audit/rules", rule_results, by="audit")
     run.board.put("audit/findings", findings, by="audit")
     for owner in _OWNERS:
+        if owner in _CHANNELS and not run.board.has(f"{owner}/analysis"):
+            continue
         run.board.put(f"audit/{owner}", [f for f in findings if f.owner == owner], by="audit")
+    if fundamentals is not None or disclosures is not None:
+        run.board.put("audit/channels",
+                      [AnalysisSeq(key=f"{c}/analysis", seq=run.board.seq(f"{c}/analysis"))
+                       for c in _CHANNELS if run.board.has(f"{c}/analysis")], by="audit")
     run.board.put("audit/status", AuditStatus(
         verdict="revise" if findings else "pass",
         proposal_seq=run.board.seq("trader/proposal"),
@@ -154,14 +210,22 @@ def audit(run: Run, deps: Deps) -> list[Finding]:
 
 
 def audited_current(run: Run) -> bool:
-    """黑板上的当前读数、论点、方案，是否就是审计通过的那一版（比较 audit/status 里记录的序号）。"""
+    """黑板上的当前读数、论点、方案，是否就是审计通过的那一版（比较 audit/status 里记录的序号）。
+
+    有通道分析时（audit/channels 存在），每个通道分析的当前序号也要与审计时一致（18.8）。
+    """
     board = run.board
     if not board.has("audit/status"):
         return False
     status = board.get("audit/status", AuditStatus)
-    return (status.verdict == "pass" and status.proposal_seq == board.seq("trader/proposal")
+    if not (status.verdict == "pass" and status.proposal_seq == board.seq("trader/proposal")
             and status.thesis_seq == board.seq("manager/thesis")
-            and status.analysis_seq == board.seq("technical/analysis"))
+            and status.analysis_seq == board.seq("technical/analysis")):
+        return False
+    if board.has("audit/channels"):
+        return all(entry.seq == board.seq(entry.key)
+                   for entry in board.get("audit/channels", list[AnalysisSeq]))
+    return True
 
 
 # ---- 报告 ----

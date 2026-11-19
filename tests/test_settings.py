@@ -142,3 +142,44 @@ def test_today_and_force_offline_from_environment(root: Path, monkeypatch: pytes
 
 def test_flag_can_pin_today(root: Path) -> None:
     assert load(root, today=date(2028, 3, 4)).today == date(2028, 3, 4)
+
+
+# ---- 证据通道的设置（BLUEPRINT 18.11）：[disclosures] 分节与 IC_SEC_CONTACT 根级变量 ----
+
+
+def test_disclosures_defaults_when_the_section_is_absent(root: Path) -> None:
+    s = load(root)                                    # fixture 的 TOML 不写 [disclosures]
+    assert s.disclosures.window_days == 90
+    assert s.disclosures.max_items == 30
+
+
+def test_disclosures_section_is_read_from_the_file(root: Path) -> None:
+    (root / "insightcrew.toml").write_text(
+        TOML + "\n[disclosures]\nwindow_days = 120\nmax_items = 10\n", encoding="utf-8")
+    s = load(root)
+    assert (s.disclosures.window_days, s.disclosures.max_items) == (120, 10)
+
+
+def test_disclosures_env_overrides_one_key(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("IC_DISCLOSURES__WINDOW_DAYS", "60")
+    s = load(root)
+    assert s.disclosures.window_days == 60 and s.disclosures.max_items == 30
+
+
+def test_unknown_key_in_disclosures_is_refused(root: Path) -> None:
+    (root / "insightcrew.toml").write_text(
+        TOML + "\n[disclosures]\nwindow_dayz = 60\n", encoding="utf-8")
+    with pytest.raises(Exception, match="window_dayz"):
+        load(root)
+
+
+def test_sec_contact_from_environment_is_masked(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("IC_SEC_CONTACT", "Zhang San zsan@example.com")
+    s = load(root)
+    assert s.sec_contact is not None
+    assert s.sec_contact.get_secret_value() == "Zhang San zsan@example.com"
+    assert "zsan@example.com" not in repr(s) and "zsan@example.com" not in str(s)
+
+
+def test_sec_contact_absent_is_none(root: Path) -> None:
+    assert load(root).sec_contact is None

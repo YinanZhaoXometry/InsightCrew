@@ -181,3 +181,34 @@ async def test_replay_reproduces_a_run_from_its_journal():
     assert o2 == o1
     assert run2.board.snapshot() == run1.board.snapshot()
     assert [e.type for e in journal.events] == [e.type for e in run1.journal.events]
+
+
+# ---- 证据通道（BLUEPRINT 18.8）：关着的时候一个键都不写；不可用的通道不发生模型调用 ----
+
+
+async def test_no_channel_writes_the_artifacts_of_version_20():
+    """channels 为空：黑板、事件类型序列、每个提示词都与 2.0 相同（兼容规则 18.3）。"""
+    o1, calls1, run1 = await go()
+    o2, calls2, run2 = await go(cfg=FlowConfig(channels=()))
+    assert o2 == o1 and calls2 == calls1
+    assert run2.board.snapshot() == run1.board.snapshot()
+    assert [e.type for e in run2.journal.events] == [e.type for e in run1.journal.events]
+    prompts1 = [e.data["prompt"] for e in run1.journal.events if e.type == "model.called"]
+    prompts2 = [e.data["prompt"] for e in run2.journal.events if e.type == "model.called"]
+    assert prompts2 == prompts1
+    assert not any(k.startswith(("fundamentals/", "disclosures/")) for k in run2.board.snapshot())
+    assert not any(e.type == "gate.checked" and e.data.get("gate") == "evidence"
+                   for e in run2.journal.events)
+
+
+async def test_unavailable_channels_make_no_model_call_and_behave_like_20():
+    """两个通道都被点名，但 evidence 判它们不可用：两个分析师都不被调用，结果与 2.0 相同。"""
+    o, calls, run = await go(cfg=FlowConfig(channels=("fundamentals", "disclosures")))
+    assert (o.status, o.facts_and_rules, o.judgment) == ("delivered", "verified", "accepted 2/3")
+    assert calls == ["technical", "bull", "bear", "manager", "trader", "judge.evidence",
+                     "judge.conservative"]                        # 7 次，与 clean 相同
+    assert run.board.get("fundamentals/status")["state"] == "unavailable"
+    assert run.board.get("disclosures/status")["state"] == "unavailable"
+    assert not run.board.has("fundamentals/facts") and not run.board.has("disclosures/items")
+    assert any(e.type == "gate.checked" and e.data.get("gate") == "evidence"
+               for e in run.journal.events)

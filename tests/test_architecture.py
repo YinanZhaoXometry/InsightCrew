@@ -101,10 +101,26 @@ def test_roles_see_only_what_they_declare_and_judges_never_see_the_debate():
         assert role.name == "trader" or "portfolio/state" not in role.reads
 
 
+def test_channel_analysts_read_only_their_own_evidence():
+    """两个新分析师各读各的证据（BLUEPRINT 18.9 的 withheld 表，WP13 的两行）。"""
+    from insightcrew.roles import DISCLOSURES, FUNDAMENTALS
+    assert set(FUNDAMENTALS.reads) == {"ledger/instrument", "fundamentals/facts",
+                                       "fundamentals/card", "audit/fundamentals"}
+    assert not {"ledger/facts", "ledger/card", "disclosures/items", "disclosures/analysis",
+                "technical/analysis"} & set(FUNDAMENTALS.reads), "基本面分析师不看价格事实与别人的输出"
+    assert set(DISCLOSURES.reads) == {"ledger/instrument", "disclosures/items",
+                                      "disclosures/card", "audit/disclosures"}
+    assert not {"ledger/facts", "ledger/card", "fundamentals/facts", "fundamentals/analysis",
+                "technical/analysis"} & set(DISCLOSURES.reads), "公告分析师不看任何事实与别人的输出"
+
+
 def test_every_contract_is_frozen_and_closed():
     from insightcrew.domain import types
     from insightcrew.roles import ALL
-    contracts = {r.output for r in ALL} | {types.Fact, types.Finding, types.Outcome}
+    contracts = ({r.output for r in ALL}
+                 | {types.Fact, types.Finding, types.Outcome, types.ChannelStatus,
+                    types.FundamentalsCard, types.Item, types.DisclosureCard, types.Signal,
+                    types.DisclosureAnalysis, types.AnalysisSeq})
     for contract in contracts:
         assert contract.model_config.get("frozen") is True, f"{contract.__name__} 必须不可变"
         assert contract.model_config.get("extra") == "forbid", f"{contract.__name__} 不得接受契约外的字段"

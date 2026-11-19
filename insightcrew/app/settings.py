@@ -2,9 +2,9 @@
 
 优先级：命令行旗标 > 进程环境 > .env（.env 只补充环境里没有的变量）> insightcrew.toml > 默认值。
 环境变量的形状：IC_<分节>__<字段> 覆盖文件里的一个键（如 IC_FLOW__JUDGES）；
-IC_BASE_URL、IC_API_KEY、IC_FORCE_OFFLINE、IC_TODAY 是根级变量。
+IC_BASE_URL、IC_API_KEY、IC_SEC_CONTACT、IC_FORCE_OFFLINE、IC_TODAY 是根级变量。
 未知键一律报错并点名：写错的配置要在启动时失败，而不是在运行中被悄悄忽略。
-密钥（IC_API_KEY）是 SecretStr，打印设置时不会出现。
+密钥（IC_API_KEY、IC_SEC_CONTACT）是 SecretStr，打印设置时不会出现。
 """
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ from ..flows.analyze import FlowConfig
 
 _PREFIX = "IC_"
 _DELIM = "__"
-_SECTIONS = ("run", "flow", "limits", "budget", "tiers")
-_ROOT_VARS = ("base_url", "api_key", "force_offline", "today")    # 不带分节的根级变量
+_SECTIONS = ("run", "flow", "limits", "budget", "tiers", "disclosures")
+_ROOT_VARS = ("base_url", "api_key", "sec_contact", "force_offline", "today")    # 不带分节的根级变量
 
 
 class _Section(BaseModel):
@@ -56,6 +56,13 @@ class TiersSection(_Section):
     deep: str
 
 
+class DisclosuresSection(_Section):
+    """公告通道的两个限制（BLUEPRINT 18.8）。带默认值：配置文件不写这一节也能跑。"""
+
+    window_days: int = 90                # 窗口长度：[as_of − window_days, as_of]
+    max_items: int = 30                  # 交给角色的条目上限，超过按新到旧截断
+
+
 class Settings(BaseSettings):
     """整个应用的一份只读配置。分节来自文件与环境，根级变量只来自环境。"""
 
@@ -67,8 +74,10 @@ class Settings(BaseSettings):
     limits: LimitsSection
     budget: BudgetSection
     tiers: TiersSection
+    disclosures: DisclosuresSection = DisclosuresSection()
     base_url: str | None = None          # 裸模型名用的 OpenAI 兼容端点
     api_key: SecretStr | None = None     # 裸模型名用的密钥；打印时显示为掩码
+    sec_contact: SecretStr | None = None     # IC_SEC_CONTACT：下载美股数据时自报的联系方式；打印时同样掩码
     force_offline: bool = False          # IC_FORCE_OFFLINE：忽略任何密钥，只运行离线演示
     today: date | None = None            # IC_TODAY：把"今天"钉住，离线演示在任何一天结果相同
 

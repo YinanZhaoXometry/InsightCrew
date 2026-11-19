@@ -10,6 +10,11 @@ judges = true
 audit_rounds = 3
 judge_rounds = 2
 quorum = 2
+# channels = ["fundamentals", "disclosures"]   # 证据通道；不写或留空 = 行为同 2.0（BLUEPRINT 18.8）
+
+[disclosures]                # 公告通道的窗口与条目上限（BLUEPRINT 18.8）
+window_days = 90
+max_items = 30
 
 [limits]
 max_requests = 40

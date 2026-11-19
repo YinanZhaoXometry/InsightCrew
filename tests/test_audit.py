@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -16,13 +17,16 @@ from insightcrew.domain.types import (
     Action,
     Analysis,
     Claim,
+    DisclosureAnalysis,
     Fact,
     Finding,
+    Item,
     Point,
     Proposal,
     Rating,
     RuleResult,
     RuleSpec,
+    Signal,
     Thesis,
 )
 
@@ -231,3 +235,147 @@ def test_findings_come_in_blueprint_order_with_a_message_each():
         "point_cites_claimed_fact", "horizon_in_range", "proposal_cites_known_fact",
         "horizon_matches_thesis", "stop_side"]
     assert all(f.message for f in findings)
+
+
+# ---- 证据通道（BLUEPRINT 18.10）。事实与条目全部手工构造；不给通道参数时行为同 2.0 ----
+
+
+def _fund_fact(fid: str, value: float) -> Fact:
+    return Fact(id=fid, label=fid, value=value, unit="USD million", as_of="2026-02-19",
+                source="fundamentals.latest", bars_used=0)
+
+
+_FUND_FACTS = [_fund_fact("revenue_fy", 1105.0), _fund_fact("net_income_fy", 97.0),
+               _fund_fact("net_margin_pct", 8.78), _fund_fact("eps_diluted_fy", 1.92)]
+
+
+def _signal(item: str, direction: Literal["positive", "negative", "neutral"] = "positive") -> Signal:
+    return Signal(item=item, direction=direction, reading="测试读数")
+
+
+_ITEMS = [Item(id="D1", published="2026-08-14", source="合成数据", kind="更正公告",
+               title="2025 财年年度报告的更正", ref="ACME-0010"),
+          Item(id="D2", published="2026-09-22", source="合成数据", kind="股份回购",
+               title="董事会批准股份回购计划", ref="ACME-0011"),
+          Item(id="D3", published="2026-10-15", source="合成数据", kind="业绩预告",
+               title="2026 年第三季度业绩预告", ref="ACME-0013")]
+
+
+def _items() -> list[Item]:
+    return [i.model_copy() for i in _ITEMS]
+
+
+def clean_fund_analysis() -> Analysis:
+    return Analysis(claims=(_claim("revenue_fy", 1105.0), _claim("net_income_fy", 97.0),
+                            _claim("net_margin_pct", 8.78)), narrative="测试叙述")
+
+
+def clean_disclosure_analysis() -> DisclosureAnalysis:
+    return DisclosureAnalysis(signals=(_signal("D1", "negative"), _signal("D2")),
+                              stance="mixed", confidence="medium", narrative="测试叙述")
+
+
+def run_audit_with_channels(analysis: Analysis | None = None,
+                            fund_analysis: Analysis | None = None,
+                            disclosure: DisclosureAnalysis | None = None,
+                            thesis: Thesis | None = None) -> list[Finding]:
+    """两个通道都在时的审计：基本面给事实与分析，公告给条目与读数。"""
+    return audit(_FACTS, analysis or clean_analysis(), thesis or clean_thesis(),
+                 clean_proposal(), clean_results(),
+                 fundamentals=(list(_FUND_FACTS), fund_analysis or clean_fund_analysis()),
+                 disclosures=(_items(), disclosure or clean_disclosure_analysis()))
+
+
+def test_channels_none_keeps_version_20_behaviour():
+    """不给 fundamentals/disclosures 参数：发现与 2.0 的 audit() 完全一致（只查 check/owner/subject）。"""
+    analysis = Analysis(claims=(_claim("close", 100.0), _claim("rsi_15", 5.0)),
+                        narrative="有一条引用了不存在的事实")
+    findings = audit(_FACTS, analysis, clean_thesis(), clean_proposal(), clean_results())
+    assert [(f.check, f.layer, f.owner, f.subject) for f in findings] == [
+        ("analysis_has_claims", "L2", "technical", "analysis"),
+        ("claim_cites_known_fact", "L2", "technical", "claims[1]")]
+
+
+def test_fundamentals_claim_checks_mirror_the_technical_ones():
+    bad = Analysis(claims=(_claim("revenue_fy", 1105.0), _claim("revenue_ttm", 9.9)),
+                   narrative="引用了不在基本面事实中的 revenue_ttm，又把 revenue 原样照抄")
+    found = of_check(run_audit_with_channels(fund_analysis=bad), "claim_cites_known_fact")
+    assert len(found) == 1
+    f = found[0]
+    assert f.owner == "fundamentals" and f.subject == "fundamentals.claims[1]"
+    value = of_check(run_audit_with_channels(fund_analysis=bad), "claim_value_matches_fact")
+    assert value == []                       # revenue_fy 照抄无误
+
+
+def test_fundamentals_misquoted_value_is_caught():
+    bad = Analysis(claims=(_claim("revenue_fy", 1105.0), _claim("net_income_fy", 97.0),
+                           _claim("net_margin_pct", 8.78), _claim("revenue_fy", 1138.15)),
+                   narrative="第四条 ×1.03")
+    found = of_check(run_audit_with_channels(fund_analysis=bad), "claim_value_matches_fact")
+    assert len(found) == 1
+    f = found[0]
+    assert f.owner == "fundamentals" and f.subject == "fundamentals.claims[3]"
+    assert f.limit == 1105.0 and f.actual == pytest.approx(1138.15)
+
+
+def test_fundamentals_claim_minimum_follows_the_fact_count():
+    """claims 的下限是 min(3, 基本面事实数)：3 条事实时 1 条 claim 也不够。"""
+    one = Analysis(claims=(_claim("revenue_fy", 1105.0),), narrative="只有一条")
+    found = of_check(run_audit_with_channels(fund_analysis=one), "analysis_has_claims")
+    assert len(found) == 1
+    assert found[0].owner == "fundamentals" and found[0].subject == "fundamentals.analysis"
+
+
+def test_disclosure_analysis_without_signals():
+    empty = DisclosureAnalysis(signals=(), stance="neutral", confidence="low", narrative="没有可解读的")
+    found = of_check(run_audit_with_channels(disclosure=empty), "disclosures_has_signals")
+    assert len(found) == 1
+    assert found[0].owner == "disclosures" and found[0].subject == "disclosures.analysis"
+
+
+def test_signal_citing_an_unknown_item():
+    ghost = DisclosureAnalysis(signals=(_signal("D1"), _signal("D99")), stance="positive",
+                               confidence="low", narrative="第二条引用了不存在的条目")
+    found = of_check(run_audit_with_channels(disclosure=ghost), "signal_cites_known_item")
+    assert len(found) == 1
+    assert found[0].owner == "disclosures" and found[0].subject == "disclosures.signals[1]"
+    assert "D99" in found[0].message
+
+
+def test_thesis_point_may_cite_a_fundamentals_fact_a_claim_cites():
+    thesis = clean_thesis().model_copy(
+        update={"points": (_point("收入创出新高", "net_income_fy"),)})
+    assert of_check(run_audit_with_channels(thesis=thesis), "point_cites_claimed_fact") == []
+
+
+def test_thesis_point_may_cite_an_item_a_signal_cites():
+    thesis = clean_thesis().model_copy(update={"points": (_point("刚宣布回购", "D2"),)})
+    assert of_check(run_audit_with_channels(thesis=thesis), "point_cites_claimed_fact") == []
+
+
+def test_thesis_point_citing_an_uncited_fundamentals_fact_is_a_finding():
+    """eps_diluted_fy 在基本面事实里，但没有被任何 claim 引用：论点不能直接引用。"""
+    thesis = clean_thesis().model_copy(update={"points": (_point("每股收益创新高", "eps_diluted_fy"),)})
+    found = of_check(run_audit_with_channels(thesis=thesis), "point_cites_claimed_fact")
+    assert len(found) == 1 and found[0].subject == "points[0]"
+
+
+def test_thesis_point_citing_an_uncited_item_is_a_finding():
+    """D3 在条目列表里，但没有信号解读过它：论点不能直接引用。"""
+    thesis = clean_thesis().model_copy(update={"points": (_point("业绩预告", "D3"),)})
+    found = of_check(run_audit_with_channels(thesis=thesis), "point_cites_claimed_fact")
+    assert len(found) == 1 and found[0].subject == "points[0]"
+
+
+def test_channel_findings_come_between_technical_claims_and_thesis_points():
+    bad_tech = Analysis(claims=(_claim("rsi_15", 50.0), _claim("close", 100.0), _claim("atr_14", 5.0)),
+                        narrative="技术面引用了不存在的事实")
+    bad_fund = Analysis(claims=(_claim("revenue_ttm", 9.9),), narrative="基本面同样")
+    ghost = DisclosureAnalysis(signals=(_signal("D99"),), stance="neutral", confidence="low",
+                               narrative="公告引用了不存在的条目")
+    findings = run_audit_with_channels(analysis=bad_tech, fund_analysis=bad_fund, disclosure=ghost)
+    assert [f.check for f in findings] == [
+        "claim_cites_known_fact",                                   # 技术面
+        "analysis_has_claims", "claim_cites_known_fact",            # 基本面
+        "signal_cites_known_item",                                  # 公告
+    ]                                                              # 论点没有问题

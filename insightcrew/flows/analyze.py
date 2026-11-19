@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from ..domain.types import Contract, Finding, Outcome, Verdict
 from ..kernel.runtime import Halt, Malformed, Role, Run, run_role
-from ..roles import BEAR, BULL, JUDGES, MANAGER, TECHNICAL, TRADER
+from ..roles import BEAR, BULL, DISCLOSURES, FUNDAMENTALS, JUDGES, MANAGER, TECHNICAL, TRADER
 from . import stages
 from .deps import Deps
 
@@ -26,6 +26,7 @@ class FlowConfig(Contract):
     audit_rounds: int = 3                     # 审计最多打回几次
     judge_rounds: int = 2                     # 评审最多几轮（即最多返工 judge_rounds - 1 次）
     quorum: int = 2
+    channels: tuple[Literal["fundamentals", "disclosures"], ...] = ()   # 打开的证据通道；空 = 行为同 2.0
 
 
 async def call(run: Run, role: Role) -> Any:
@@ -40,6 +41,17 @@ async def call(run: Run, role: Role) -> Any:
 
 async def _technical(run: Run, cfg: FlowConfig) -> None:
     await call(run, TECHNICAL)
+
+
+async def _fundamentals(run: Run, cfg: FlowConfig) -> None:
+    # 通道没被点名，或被 evidence 阶段判为不可用/空时，一次模型调用都不发生（BLUEPRINT 18.8）。
+    if "fundamentals" in cfg.channels and stages.channel_ready(run, "fundamentals"):
+        await call(run, FUNDAMENTALS)
+
+
+async def _disclosures(run: Run, cfg: FlowConfig) -> None:
+    if "disclosures" in cfg.channels and stages.channel_ready(run, "disclosures"):
+        await call(run, DISCLOSURES)
 
 
 async def _debate(run: Run, cfg: FlowConfig) -> None:
@@ -57,7 +69,8 @@ async def _trader(run: Run, cfg: FlowConfig) -> None:
 
 
 PIPELINE: tuple[tuple[str, Callable[[Run, FlowConfig], Awaitable[None]]], ...] = (
-    ("technical", _technical), ("debate", _debate), ("manager", _manager), ("trader", _trader))
+    ("technical", _technical), ("fundamentals", _fundamentals), ("disclosures", _disclosures),
+    ("debate", _debate), ("manager", _manager), ("trader", _trader))
 _ORDER = [name for name, _ in PIPELINE]
 
 
@@ -139,6 +152,8 @@ async def analyze(run: Run, request: dict[str, Any], deps: Any, cfg: FlowConfig 
     try:
         stages.intake(run, request, deps)               # 范围闸门：不在范围内直接 Halt
         stages.ledger(run, deps)                        # 事实账本：之后任何数字都必须来自这里
+        if cfg.channels:
+            stages.evidence(run, deps, cfg.channels)    # 证据通道：只有点名了才写任何通道键
         await run_from(run, cfg, "technical")
         verified = await pass_audit(run, cfg, deps)
         judgment = await scrutinise(run, cfg, deps) if cfg.judges else "not reviewed: judges disabled"

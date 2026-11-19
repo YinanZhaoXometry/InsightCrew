@@ -1,8 +1,8 @@
 """行情数据的契约、端口与数据错误。
 
 Bar 是普通冻结 dataclass：它持有真实的日期，只活在 domain 内部，不上黑板。
-Instrument 是契约（冻结且封闭）。四个错误按调用方必须做出的反应命名
-（见 BLUEPRINT 6.3），读取由 adapters 层实现。
+Instrument 是契约（冻结且封闭）。五个错误按调用方必须做出的反应命名
+（见 BLUEPRINT 6.3、18.5），读取由 adapters 层实现。
 """
 from __future__ import annotations
 
@@ -26,7 +26,12 @@ class NoData(Exception):
 
 
 class SourceUnavailable(Exception):
-    """数据源读不出来，与代码本身无关。→ Halt("source_unavailable")"""
+    """数据源读不出来，与代码本身无关。→ Halt("source_unavailable")（行情）或通道不可用（证据）"""
+
+
+class NotCovered(Exception):
+    """数据源没有这个标的，或覆盖不到这个日期/窗口。说明不了公司本身。→ 通道不可用，运行继续"""
+
 
 
 @dataclass(frozen=True)

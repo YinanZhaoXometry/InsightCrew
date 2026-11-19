@@ -25,6 +25,21 @@ def ledger(run: Run, deps: Any) -> None:
     run.board.put("rules/limits", [{"key": "max_risk_per_trade_pct", "limit": 1.0}], by="ledger")
 
 
+def evidence(run: Run, deps: Any, channels: tuple[str, ...]) -> None:
+    """证据阶段的双打：与真实存根一样，被点名的通道一律记为不可用（WP13 没有数据源）。"""
+    for channel in channels:
+        run.board.put(f"{channel}/status",
+                      {"channel": channel, "state": "unavailable", "reason": "尚未接入数据源"},
+                      by="evidence")
+    run.journal.append("gate.checked", actor="evidence", data={"gate": "evidence", "findings": 0})
+
+
+def channel_ready(run: Run, channel: str) -> bool:
+    if not run.board.has(f"{channel}/status"):
+        return False
+    return run.board.get(f"{channel}/status")["state"] == "available"
+
+
 def _finding(check: str, layer: Any, owner: Any, subject: str, message: str,
              limit: float | None = None, actual: float | None = None) -> Finding:
     return Finding(check=check, layer=layer, owner=owner, subject=subject, message=message,

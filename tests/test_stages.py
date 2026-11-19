@@ -11,7 +11,17 @@ import pytest
 from insightcrew.adapters.declarations import load_indicators, load_rules
 from insightcrew.adapters.market_csv import CsvMarket
 from insightcrew.adapters.scripted import Script
-from insightcrew.domain.types import Analysis, Proposal, Thesis
+from insightcrew.domain.types import (
+    Analysis,
+    AnalysisSeq,
+    ChannelStatus,
+    DisclosureAnalysis,
+    Fact,
+    Finding,
+    Item,
+    Proposal,
+    Thesis,
+)
 from insightcrew.flows import stages
 from insightcrew.flows.deps import Deps
 from insightcrew.kernel.board import Board
@@ -234,3 +244,102 @@ def test_report_stage_without_out_dir_does_nothing() -> None:
     deps = _deps()
     run = _run(deps)
     stages.report(run, deps)                        # out_dir 与 render 都是 None：什么都不发生
+
+
+# ---- 证据通道（BLUEPRINT 18.8）。WP13：evidence 是存根，被点名一律不可用 ----
+
+
+def test_evidence_stub_marks_named_channels_unavailable() -> None:
+    deps = _deps()
+    run = _run(deps)
+    stages.intake(run, {"ticker": "ACME", "as_of": "2026-09-30"}, deps)
+    stages.ledger(run, deps)
+    stages.evidence(run, deps, ("fundamentals", "disclosures"))
+    for channel in ("fundamentals", "disclosures"):
+        status = run.board.get(f"{channel}/status", ChannelStatus)
+        assert status.state == "unavailable" and status.reason
+        assert not stages.channel_ready(run, channel)
+        assert not run.board.has(f"{channel}/facts") and not run.board.has(f"{channel}/items")
+    assert _gates(run)[-1]["gate"] == "evidence"
+    _no_model_call(run)
+
+
+def test_channel_ready_is_false_without_a_status() -> None:
+    run = _run(_deps())
+    assert not stages.channel_ready(run, "fundamentals")    # 通道没被点名：连状态键都没有
+
+
+def test_audit_without_channel_analysis_writes_no_channel_keys() -> None:
+    """通道分析不在板上：审计写出的键与版本 2.0 相同（兼容规则 18.3）。"""
+    deps = _deps()
+    run = _run(deps)
+    _fill_pipeline(run, deps)
+    assert stages.audit(run, deps) == []
+    for key in ("audit/fundamentals", "audit/disclosures", "audit/channels",
+                "fundamentals/status", "disclosures/status"):
+        assert not run.board.has(key)
+
+
+def _fundamentals_on_board(run: Run, misquote: bool = False) -> None:
+    """放上一套互相一致的基本面事实与读数；misquote 时把第一条 claim 的数值放大 3%。"""
+    def fact(fid: str, value: float) -> Fact:
+        return Fact(id=fid, label=fid, value=value, unit="USD million",
+                    as_of="2026-02-19", source="fundamentals.latest", bars_used=0)
+
+    facts = [fact("revenue_fy", 1105.0), fact("net_income_fy", 97.0), fact("net_margin_pct", 8.78)]
+    claims = [{"fact": f.id, "value": f.value * (1.03 if misquote and i == 0 else 1.0),
+               "reading": "照抄事实"} for i, f in enumerate(facts)]
+    run.board.put("fundamentals/facts", facts, by="fundamentals")
+    run.board.put("fundamentals/analysis", Analysis.model_validate(
+        {"claims": claims, "narrative": "三条都说了。"}), by="fundamentals")
+
+
+def test_audit_checks_fundamentals_when_its_analysis_is_on_the_board() -> None:
+    deps = _deps()
+    run = _run(deps)
+    _fill_pipeline(run, deps)
+    _fundamentals_on_board(run, misquote=True)
+    findings = stages.audit(run, deps)
+    bad = [f for f in findings if f.owner == "fundamentals"]
+    assert [(f.check, f.subject) for f in bad] == [
+        ("claim_value_matches_fact", "fundamentals.claims[0]")]
+    assert run.board.get("audit/fundamentals", list[Finding]) == bad
+    channels = run.board.get("audit/channels", list[AnalysisSeq])
+    assert [(c.key, c.seq) for c in channels] == [("fundamentals/analysis",
+                                                   run.board.seq("fundamentals/analysis"))]
+    assert not run.board.has("audit/disclosures")            # 公告分析不在板上：不写
+
+
+def _disclosures_on_board(run: Run, ghost: bool = False) -> None:
+    items = [Item(id="D1", published="2026-09-22", source="合成数据", kind="股份回购",
+                  title="董事会批准股份回购计划", ref="ACME-0011")]
+    run.board.put("disclosures/items", items, by="disclosures")
+    signals = [{"item": "D99" if ghost else "D1", "direction": "positive", "reading": "回购通常偏正面"}]
+    run.board.put("disclosures/analysis", DisclosureAnalysis.model_validate(
+        {"signals": signals, "stance": "positive", "confidence": "medium", "narrative": "窗口内一条公告。"}),
+        by="disclosures")
+
+
+def test_audit_checks_disclosure_signals_against_the_item_list() -> None:
+    deps = _deps()
+    run = _run(deps)
+    _fill_pipeline(run, deps)
+    _disclosures_on_board(run, ghost=True)
+    findings = stages.audit(run, deps)
+    bad = [f for f in findings if f.owner == "disclosures"]
+    assert [(f.check, f.subject) for f in bad] == [
+        ("signal_cites_known_item", "disclosures.signals[0]")]
+    assert run.board.get("audit/disclosures", list[Finding]) == bad
+    assert [c.key for c in run.board.get("audit/channels", list[AnalysisSeq])] == [
+        "disclosures/analysis"]
+
+
+def test_audited_current_tracks_channel_analysis_versions() -> None:
+    deps = _deps()
+    run = _run(deps)
+    _fill_pipeline(run, deps)
+    _fundamentals_on_board(run)
+    stages.audit(run, deps)
+    assert stages.audited_current(run)                       # 通道分析也是通过审计的那一版
+    _fundamentals_on_board(run)                              # 重写一版：序号变了
+    assert not stages.audited_current(run)                   # 审计过期，方案必须重新过审计

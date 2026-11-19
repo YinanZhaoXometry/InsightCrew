@@ -54,7 +54,8 @@ class Analysis(Contract):
 
 class Point(Contract):
     text: str
-    cites: tuple[str, ...] = Field(description="支撑这一点的事实 ID，至少一个")
+    cites: tuple[str, ...] = Field(
+        description="支撑这一点的证据 ID，至少一个；可以是事实 ID（小写词）或公告条目 ID（D 加数字）")
 
 
 class Argument(Contract):
@@ -94,7 +95,7 @@ class Finding(Contract):
 
     check: str                    # 检查项或规则的键
     layer: Literal["L2", "L3"]
-    owner: Literal["technical", "manager", "trader"]
+    owner: Literal["technical", "fundamentals", "disclosures", "manager", "trader"]
     subject: str                  # 出问题的对象，例如 "claims[2]"、"proposal.stop"
     message: str
     limit: float | None = None
@@ -164,3 +165,73 @@ class AuditStatus(Contract):
     proposal_seq: int             # 通过审计时的 trader/proposal 事件序号
     thesis_seq: int               # 通过审计时的 manager/thesis 事件序号
     analysis_seq: int             # 通过审计时的 technical/analysis 事件序号
+
+
+# ---- 证据通道（BLUEPRINT 18.4）。仅在通道打开时上黑板，关闭时一个键都不写 ----
+
+
+class ChannelStatus(Contract):
+    """一个通道在本次运行中的状态。由代码设定，别的谁也不行。"""
+
+    channel: Literal["fundamentals", "disclosures"]
+    state: Literal["available", "empty", "unavailable"]
+    reason: str                   # 一句中文；available 时为空
+
+
+class FundamentalsCard(Contract):
+    """基本面数据卡：年报数据的画像，随事实一起上黑板（fundamentals/card）。"""
+
+    source: str                   # 数据来源名，例如 "合成数据"
+    currency: str                 # 申报货币，只作标签，从不换算
+    fiscal_year_end: str          # 最近一个财年的期末日（ISO）
+    filed: str                    # 所用申报里最晚的申报日（ISO）
+    rows: int                     # 读到的年度报表行数
+    unavailable: tuple[Unavailable, ...]   # 因缺项而算不出的事实
+    warnings: tuple[str, ...]     # 重述提醒，一句中文一段
+
+
+class Item(Contract):
+    """一条公告或申报文件。标题是来源原文，未经核验。"""
+
+    id: str                       # "D1"、"D2"……按交给角色的顺序编号
+    published: str                # 发布日（ISO）
+    source: str
+    kind: str                     # 类别，来源的说法
+    title: str
+    ref: str                      # 来源内部的编号，例如公告代码
+
+
+class DisclosureCard(Contract):
+    """公告数据卡：窗口与条目数的画像（disclosures/card）。"""
+
+    source: str
+    window_from: str              # 窗口起点（ISO）
+    window_to: str                # 窗口终点（ISO），即分析日
+    items: int                    # 窗口内的条目数（截断后）
+    dropped: int                  # 无日期而被丢弃的条目数
+    truncated: int                # 超出上限而被截掉的条目数
+
+
+class Signal(Contract):
+    """公告分析师对一条公告的读数。方向是判断，交给评审，不由代码核对。"""
+
+    item: str = Field(description="被解读的公告条目 ID（D 加数字），必须出现在给你的条目列表中")
+    direction: Literal["positive", "negative", "neutral"] = Field(description="这条公告对股价的指向")
+    reading: str = Field(description="你判断该方向的一句话依据，不要包含条目之外的数字")
+
+
+class DisclosureAnalysis(Contract):
+    """公告分析师的完整读数。"""
+
+    signals: tuple[Signal, ...] = Field(description="每条被解读的公告一个信号；没有可解读的公告时为空")
+    stance: Literal["positive", "mixed", "neutral", "negative"] = Field(description="窗口内公告合起来的基调")
+    confidence: Literal["low", "medium", "high"] = Field(description="你对这套读数的把握")
+    narrative: str = Field(description="整体判断，三到五句")
+
+
+class AnalysisSeq(Contract):
+    """audit/channels 里的一项：一个通道分析在审计运行时的事件序号。"""
+
+    key: str                      # 通道分析的板键，例如 "fundamentals/analysis"
+    seq: int                      # 审计运行时该键的当前事件序号
+
