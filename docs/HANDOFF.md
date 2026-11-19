@@ -54,7 +54,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 15 | Version 2.1: disclosures adapter, synthetic items | done | 14 tests; window edges inclusive, undated dropped and counted, out-of-cover and missing file NotCovered, malformed SourceUnavailable; generator deterministic; the three acceptance numbers of 18.14 hold. 438 tests. |
 | 16 | Version 2.1: the offline system with channels; 21 scenarios | done | Real `evidence`, wiring, `--channels`, `facts` channels, the grown views and prompt paragraphs, two report sections, five scenarios, three evaluation blocks. 21 scenarios match; eval all prints both blocks; `uncovered`'s report verified; replay of a channel run 一致. 462 tests. |
 | 17A | Version 2.1: SEC EDGAR and Eastmoney announcement adapters, with tests | done | 20 tests over synthetic saved responses (structure real, no real download): tag order per concept, span and form filters, duplicate keys keep the last, titles for 8-K items, paging and covers_from. 483 tests. |
-| 17B | Version 2.1: `fetch` downloads evidence | not started | Needs WP17A and WP16. The live download needs `IC_SEC_CONTACT` and the owner's request. |
+| 17B | Version 2.1: `fetch` downloads evidence | blocked | Code done, three checks green. The live acceptance run is blocked: Eastmoney's bars endpoint twice answered `Server disconnected without sending a response` (Yahoo 429 as before), so `fetch` exits 1 at the bars stage and the evidence downloads never start. `IC_SEC_CONTACT` **is** set in `.env` (key checked, value not read). Stopped per the network rule; the owner decides. |
 | 18 | Version 2.1: run page sections | not started | Needs WP16. First to be cut. |
 | 19 | Version 2.1: real-model runs with channels, `eval channels` | not started | Needs WP16, WP17B and the owner's agreement to spend |
 | 20 | Version 2.1: documents and packaging | not started | Needs everything else built or cut |
@@ -317,6 +317,7 @@ Gaps found while building (the plan warns about these; each stops the package th
 |---|---|---|---|---|
 | 8 | 2026-11-19 | 14, 15 | **Where synthetic evidence may live.** BLUEPRINT 18.7 puts evidence files at `data/market/<universe>/statements/<file_stem>.json` (and `disclosures/`). But WP2's test `tests/test_market.py::test_generator_writes_the_same_bytes_twice` snapshots `data/market/synthetic/` with `iterdir()` and asserts the entry set **equals exactly** the bars CSVs plus `universe.toml`; any subdirectory makes it fail (first as `IsADirectoryError`). The working rules forbid editing an existing test, and the blueprint's path is a name, which may not be changed without the owner. The two cannot both hold as written. | Owner, 2026-11-19: **agreed to the suggested fix.** `_snapshot()` lists files only (`path.is_file()`); applied. Evidence stays at the blueprint's path; the generator's own output set is still asserted exactly. |
 | 9 | 2026-11-19 | 14, 16 | **`pe_fy` under a currency mismatch.** 18.6: "`pe_fy` is unavailable when the statements' currency differs from the instrument's." `build_fundamentals` has the instrument and can withhold the fact (implemented). But `recompute_fundamentals(statements, close, as_of, specs)` has no instrument, so it computes a value for `pe_fy` that path 1 never emits, and `disagreements` (not to be changed) would report `pe_fy` as a one-sided disagreement and halt the run. | Owner, 2026-11-19: **agreed.** WP16's `evidence` passes `recompute_fundamentals` the specs with price-dependent declarations removed whenever the currencies differ; signatures and `disagreements` untouched. |
+| 11 | 2026-11-19 | 17B | **Who creates the `httpx2.Client`.** 18.12's adapters are "functions on `httpx2.Client`" and the tests pass one in, but nothing says where a production client comes from; `app` may not import `httpx2` (architecture test), and WP17B's file list holds only `app/fetch.py`. | Suggested: the three-line `client(timeout=60.0)` factory already added to `adapters/edgar.py` (WP17A's file, same session, no other owner); `fetch` imports it from there. If the owner prefers, it can move to `adapters/__init__.py` or a new small adapter module — say so and it moves. |
 | 10 | 2026-11-19 | 16 | **`facts` output vs WP5's exact-count assertion.** 18.11 requires `facts` to print, after the ledger, the fundamentals facts and card and the window's items (or the channel's state). WP5's `tests/test_cli.py::test_facts_prints_the_ledger_and_the_data_card` asserts the output holds **exactly 29 two-space-indented lines** (the ledger's 29 facts); the mandated new lines are indented the same way, so the count becomes 47. The working rules forbid editing an existing test; the blueprint's requirement and the assertion cannot both hold. | Owner, 2026-11-19: **agreed to the suggested fix.** The assertion now counts the ledger's own lines (`"indicators." in line`), still exactly 29; the channel lines are asserted by WP16's new `test_facts_prints_the_channels`. |
 
 ### Corrections to the blueprint
@@ -1032,6 +1033,25 @@ Notes:
 Committed: by path, then this file. See `git log`.
 
 For the next session: WP17B — `fetch` downloads evidence after bars.
+
+### 2026-11-19 evening · WP17 part B · building session (GLM, via ZCode)
+
+Result: **code done, live acceptance blocked on the network.**
+
+What was built: `fetch` now downloads evidence after bars, exactly as 18.12 says — bars are written first and never undone by an evidence failure; the exit code still depends on the bars alone; empty and failed downloads write nothing; files are written to a temporary name and renamed; US statements and filings come from the SEC (only when `IC_SEC_CONTACT` is set — it is, key checked, value not read), HK announcements from Eastmoney, and HK gets no statements file by design. One deviation to record: a three-line `client()` factory was added to `adapters/edgar.py` (WP17A's file, outside WP17B's list), because the architecture test forbids `app` from importing `httpx2` and the blueprint does not say who creates the client (question 11 below).
+
+Commands run, with the last lines of their output:
+
+- `uv run pytest -q` → `483 passed in 14.06s`. `uv run ruff check .` → `All checks passed!` `uv run pyright` → `0 errors, 0 warnings, 0 informations`.
+- `uv run insightcrew fetch AAPL 0700.HK --years 3` → `Yahoo 数据源不可用：HTTP 429（AAPL）；改用东方财富数据源。` then `数据源不可用，没有写入任何文件：连不上东方财富数据源：Server disconnected without sending a response.（AAPL）`, exit 1. Retried once (not a certificate error nor a 502): identical. Stopped there per the network rule; the evidence stage never ran.
+
+Not run, and why: `facts AAPL --universe real` and `facts 0700.HK --universe real` need the evidence files the blocked download would write; the bars themselves are already on this machine from WP9 (`data/market/real/`, ignored by git, last bar 2026-11-18).
+
+Unverified: the live SEC and Eastmoney-announcement endpoints from this code path (WP17A's tests cover the parsing; the planning session probed both endpoints on 2026-11-19 with 200s).
+
+Files changed: `insightcrew/app/fetch.py` (the evidence stage), `insightcrew/adapters/edgar.py` (the `client()` factory — the one file outside WP17B's list, see question 11).
+
+Committed: no, until the owner settles question 11 and the network.
 
 ## 9. Prompts for starting a session
 
