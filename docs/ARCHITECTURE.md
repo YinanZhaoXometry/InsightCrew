@@ -100,13 +100,15 @@ Each role is declared as data in `insightcrew/roles/__init__.py`: its prompt, th
 | Role | Model tier | Reads | Writes |
 |---|---|---|---|
 | Technical Analyst | quick | instrument, facts, data card, its own audit findings | `technical/analysis`: claims, each a fact ID, the value restated and a reading |
-| Bull Researcher | quick | instrument, analysis, the bear's argument | `bull/argument` |
-| Bear Researcher | quick | instrument, analysis, the bull's argument | `bear/argument` |
-| Research Manager | deep, high reasoning effort | instrument, data card, analysis, both arguments, its audit findings, judges' dissents on the thesis | `manager/thesis`: rating, points citing facts, horizon, invalidation |
+| Fundamentals Analyst (optional, channel) | quick | instrument, the fundamentals facts and card, its own audit findings | `fundamentals/analysis`: the same shape as the technical analysis, over annual figures |
+| Disclosure Analyst (optional, channel) | quick | instrument, the items in the window and the disclosure card, its own audit findings | `disclosures/analysis`: signals, each an item ID, a direction and a reading; stance and confidence |
+| Bull Researcher | quick | instrument, analysis, both channel analyses with their statuses, the bear's argument | `bull/argument` |
+| Bear Researcher | quick | instrument, analysis, both channel analyses with their statuses, the bull's argument | `bear/argument` |
+| Research Manager | deep, high reasoning effort | instrument, data card, analysis, both channel analyses with their statuses, both arguments, its audit findings, judges' dissents on the thesis | `manager/thesis`: rating, points citing fact IDs or item IDs, horizon, invalidation |
 | Trader | quick | instrument, facts, thesis, portfolio, risk limits, its audit findings, judges' dissents on the levels | `trader/proposal`: action, entry, stop, target, size, horizon, cited facts |
-| Judges: evidence, conservative, aggressive | quick, low reasoning effort | instrument, facts, analysis, thesis, proposal, risk limits, rule results | `judge.<lens>/verdict`: accept, or a target (thesis or levels), a critique and cited facts |
+| Judges: evidence, conservative, aggressive | quick, low reasoning effort | instrument, facts, analysis, both channel analyses and their raw evidence (facts and items), thesis, proposal, risk limits, rule results | `judge.<lens>/verdict`: accept, or a target (thesis or levels), a critique and cited facts |
 
-The Manager also reads `memory/lessons` and the Trader `portfolio/state`. Nothing writes either key yet, because memory and the portfolio were cut ([ROADMAP.md](ROADMAP.md)); a key that is absent is simply not rendered.
+The Manager also reads `memory/lessons` and the Trader `portfolio/state`. Nothing writes either key yet, because memory and the portfolio were cut ([ROADMAP.md](ROADMAP.md)); a key that is absent is simply not rendered. The same property is what makes the channels compatible: a role's `reads` may name keys that a run never writes, and the prompt is then exactly the version-2.0 prompt.
 
 The tiers are set in `insightcrew.toml`: quick is `deepseek:deepseek-flash`, deep is `deepseek:deepseek-v4-pro`. Changing the model is one line there.
 
@@ -119,13 +121,15 @@ The tiers are set in `insightcrew.toml`: quick is `deepseek:deepseek-flash`, dee
 | Research Manager | The risk limits, the portfolio | The rating is a view on the stock, not on what the account can afford |
 | Trader | The debate | It implements the thesis; it does not reopen it |
 | Judges | The debate, each other's verdicts, the history of audit findings | Independent verdicts need independent inputs |
+| Fundamentals Analyst | Price facts except through `pe_fy`, the items, the other analysts' output | It reads statements. Each analyst works from its own evidence |
+| Disclosure Analyst | Every fact, the other analysts' output | It reads what the company published |
 | Auditor (code) | All prose | It checks structured content only |
 
 The Trader is shown the risk limits. A limit is a constraint to meet, not something to infer, so hiding it would test nothing. Compliance is still decided by code.
 
 ## 5. The flow
 
-The flow is ordinary `async` Python in one file, `insightcrew/flows/analyze.py`, about 170 lines. It runs one role at a time, in this order: intake, ledger, technical, debate (bull then bear, one round by default), manager, trader, audit, judges, report.
+The flow is ordinary `async` Python in one file, `insightcrew/flows/analyze.py`, about 170 lines. It runs one role at a time, in this order: intake, ledger, evidence (only when channels are named), technical, fundamentals and disclosures analysts (only when their channel is available), debate (bull then bear, one round by default), manager, trader, audit, judges, report. The channels are a flow setting (`channels = ["fundamentals", "disclosures"]` or `--channels`); with none named, the run writes the artifacts and sends the prompts of version 2.0 — the property every compatibility proof rests on.
 
 Three rules, each with a test in `tests/test_flow.py`:
 
@@ -156,20 +160,25 @@ Everything a user sees is a projection of the journal: the board, `report.md`, t
 | Layer | What is checked | By | If it fails |
 |---|---|---|---|
 | L1 Context | Each role receives only its view | The runtime, by construction | n/a |
-| L2 Numbers | Claims match facts; citations exist; every fact agrees with an independent recomputation | Code | The owner revises; a recomputation disagreement stops the run |
+| L2 Numbers | Claims match facts; citations exist; every fact agrees with an independent recomputation — indicators and fundamentals alike; a cited announcement item exists and was published by the analysis date | Code | The owner revises; a recomputation disagreement stops the run |
 | L3 Rules | The proposal against 14 rules | Code | The Trader revises |
 | L4 Judgment | Whether the thesis follows from the evidence and the risk is acceptable | Three model judges, quorum of two | One revision, then `REVIEW` |
 
 **Facts, computed twice.** `data/indicators.toml` declares 29 facts: prices, volume, three simple and two exponential moving averages, RSI, ATR, MACD with signal and histogram, Bollinger bands, 20/60/252-day highs and lows, and 5/20/60-day returns. Path 1 (`domain/indicators.py`) computes them in Python for the ledger. Path 2 (`domain/recompute.py`) computes them in SQL over an in-memory SQLite table. The two share no code and import only the standard library. The ledger gate compares them on every run; `eval consistency` compares them over 277 data points.
 
+**Fundamentals, computed twice too.** When the `fundamentals` channel is open, `data/fundamentals.toml` declares 12 facts (revenue, net income, diluted EPS, operating cash flow, assets, liabilities, year-on-year growth, margins, leverage, price-to-earnings, filing age). Path 1 (`domain/fundamentals.py`, Python) and path 2 (`domain/fundamentals_sql.py`, SQL) again share no code. Figures are served as filed — a restated year answers at the version on file on the analysis date — in millions of the reporting currency, and nothing is converted across currencies (the price multiple is unavailable when they differ). `eval consistency` compares the two paths over 46 dates.
+
+**Disclosures are checked, not verified.** Code checks that every cited item exists in the window's list and was published on or before the analysis date. Whether a reading of an item is right is judgment, and goes to the judges. Item titles are the source's own wording and are printed only from the item list, never from a model's output.
+
 **Point in time.** Market data is reached only through `history(ticker, as_of)`, which returns settled bars dated on or before the date. There is no method that returns a later bar. A row with no close is an unsettled session and is dropped. Nothing is gap-filled.
 
 **The audit** (`domain/audit.py`) runs six L2 checks, then the rulebook:
 
-- the analysis has at least three claims;
+- the analysis has at least three claims (the fundamentals analysis at least three, or every fundamentals fact if there are fewer);
 - each claim cites a fact that exists;
 - each restated value is within 0.5 percent (or 0.01) of the fact;
-- each thesis point cites a fact that a claim cites;
+- a disclosure analysis has at least one signal, and each signal cites an item in the list;
+- each thesis point cites a fact some analyst claimed, or an item some signal read;
 - the thesis horizon is 1 to 60 days;
 - the proposal cites known facts, and its horizon matches the thesis.
 
@@ -234,7 +243,7 @@ The values in `insightcrew.toml` were set from the real-model runs ([EVALUATION.
 
 The page is the same file in both modes: with the events embedded (static) or streamed from the server (live). It shows a mode badge on every screen, so a scripted run never looks like a model's work. It also shows the pipeline, a timeline with one lane per actor in which every event can be opened to the prompt and reply, the result, the evidence tables, usage against the ceilings, and a price chart with the levels. Run data is inserted as text and never as markup, under a content security policy that blocks every external resource.
 
-With no API key, runs use `Script`, a model built on Pydantic AI's `FunctionModel` that answers from authored replies. A scripted run goes through the same agent, validation and retry as a real one. The 16 scenarios in `data/scenarios/` are scripted runs with expected outcomes; they are the offline demo and an executable specification.
+With no API key, runs use `Script`, a model built on Pydantic AI's `FunctionModel` that answers from authored replies. A scripted run goes through the same agent, validation and retry as a real one. The 21 scenarios in `data/scenarios/` are scripted runs with expected outcomes — five of them with both channels open, including one where the fundamentals analyst misquotes a fact and one where the disclosure analyst cites a ghost item; they are the offline demo and an executable specification.
 
 ## 11. Design decisions
 
@@ -260,6 +269,8 @@ Two decisions were the owner's: using maintained libraries instead of a standard
 - **No portfolio.** Position and cash are not modelled yet: every run sees an empty account, so `sell_requires_position` can never pass and `cash_sufficient` never applies.
 - **The model's memory is outside the point-in-time rule.** A model trained on later prices may know what happened. The two DeepSeek models state cutoffs of 2024-06 and 2023-10. These are the models' own claims and are unverified.
 - **Real bars come from unofficial endpoints.** Yahoo throttled every attempt from the development machine; the Eastmoney fallback works, but either can change without notice. Instrument names from Eastmoney are in Chinese.
+- **The channels ship off, and their real sources are only partly verified.** Twelve real-model runs cannot say that more evidence gives better decisions, so the default behaviour stays that of version 2.0. The SEC and Eastmoney-announcement adapters are tested against saved responses; the live downloads were blocked by the network during the build (see [ROADMAP.md](ROADMAP.md)), so the evaluation ran on synthetic evidence, and on real tickers the channels reported unavailable.
+- **Titles and signal directions are not verified**, only existence and dates. Whether an announcement says what the analyst thinks it says is judgment.
 - **One model family.** Every real-model result is from DeepSeek. Other providers that speak the OpenAI protocol should work through `IC_BASE_URL`, but none was tried.
 - **Small evaluation.** Tens of real-model runs. Enough to show the mechanism works, not to measure anything about trading.
 

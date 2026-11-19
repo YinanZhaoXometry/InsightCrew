@@ -4,7 +4,7 @@ Working rules for AI coding agents in this repository. People should start with 
 
 ## What this is
 
-InsightCrew version 2: a multi-agent trading assistant with an independent audit, for the COMP5584 group project. Given a ticker and a date, model roles (technical analyst, bull, bear, research manager, trader, three judges) produce a rating and a trade proposal. Code computes every fact twice, audits every cited number and every rule, and refuses with `REVIEW` when it cannot stand behind an answer.
+InsightCrew version 2: a multi-agent trading assistant with an independent audit, for the COMP5584 group project. Given a ticker and a date, model roles (technical analyst, bull, bear, research manager, trader, three judges — plus, when the evidence channels are switched on, a fundamentals analyst and a disclosure analyst) produce a rating and a trade proposal. Code computes every fact twice, audits every cited number and every rule, and refuses with `REVIEW` when it cannot stand behind an answer.
 
 - Python 3.12, managed by uv. The packages are those in `pyproject.toml` at the versions in `uv.lock`. **Do not add, remove or upgrade a package, or change `exclude-newer`, without the owner's agreement.**
 - Run every command from this directory, through `uv run`.
@@ -15,17 +15,18 @@ InsightCrew version 2: a multi-agent trading assistant with an independent audit
 ## Commands
 
 ```bash
-uv run insightcrew analyze [TICKER] [--date D] [--scenario NAME] [--universe U] [--no-judges] [--debate-rounds N] [--quiet] [--no-open]
+uv run insightcrew analyze [TICKER] [--date D] [--scenario NAME] [--universe U] [--channels fundamentals,disclosures] [--no-judges] [--debate-rounds N] [--quiet] [--no-open]
 uv run insightcrew serve [--port N] [--no-open]     # local web app on 127.0.0.1
-uv run insightcrew facts TICKER [--date D] [--universe U]
+uv run insightcrew facts TICKER [--date D] [--universe U]   # ledger + what each channel would read
 uv run insightcrew replay RUN_DIR                    # rerun from the journal with no model; expect 一致
-uv run insightcrew scenarios [NAME]                  # expect 16 lines ✓ … 相符
+uv run insightcrew scenarios [NAME]                  # expect 21 lines ✓ … 相符
 uv run insightcrew check                             # settings without the key; probes each tier (needs a key)
-uv run insightcrew fetch TICKER... [--years N]       # real bars into data/market/real/ (Yahoo, then Eastmoney)
-uv run insightcrew eval all                          # inject 19/19 and 0/6, consistency 277 × 29, pit 864 facts
+uv run insightcrew fetch TICKER... [--years N]       # real bars + evidence into data/market/real/ (Yahoo→Eastmoney; SEC, then Eastmoney announcements)
+uv run insightcrew eval all                          # inject 19/19+0/6 and 6/6+0/2, consistency 277×29 and 46×12, pit 864+16
 uv run insightcrew eval ablation                     # 16 real-model runs; needs a key; about 0.5 USD
+uv run insightcrew eval channels                     # 12 real-model runs across channel configurations; about 0.5 USD
 
-uv run pytest -q                                     # 380 tests; no network, no key
+uv run pytest -q                                     # 486 tests; no network, no key
 uv run ruff check .
 uv run pyright
 ```
@@ -38,10 +39,10 @@ These hold the design together. Do not break one as a side effect of another cha
 |---|---|---|
 | 1 | The Auditor, the ledger and the Reporter make no model call. `run_role` in `kernel/runtime.py` is the only place an agent runs. | `test_architecture` |
 | 2 | Judges may only veto. No judge output becomes a level or a rating. | The `Verdict` contract; `test_report` |
-| 3 | Every number in a report comes from the ledger or from an audited proposal. | `test_report` |
-| 4 | The two computation paths (`domain/indicators.py`, `domain/recompute.py`) share no code and use only the standard library, and an indicator exists only with both. | `test_architecture`; `test_ledger`; `eval consistency` |
+| 3 | Every number in a report comes from the ledger (`ledger/facts` or `fundamentals/facts`) or from an audited proposal. Text quoted from a source (an item's kind and title) is printed from `disclosures/items` under a heading that says it is the source's wording and unverified. | `test_report` |
+| 4 | The two computation paths (`indicators.py`/`recompute.py`, and `fundamentals.py`/`fundamentals_sql.py`) each share no code and use only the standard library, and an indicator or fundamentals fact exists only with both. | `test_architecture`; `test_ledger`, `test_fundamentals`; `eval consistency` |
 | 5 | A role sees exactly the keys in its `reads`. | `test_kernel`; `test_architecture` |
-| 6 | No bar or fact dated after the analysis date reaches any stage. | `test_market`, `test_ledger`, `eval pit` |
+| 6 | No bar, fact, filing or item dated after the analysis date reaches any stage. | `test_market`, `test_ledger`, `test_fundamentals`, `test_disclosures`, `eval pit` |
 | 7 | A proposal that fails the audit is not delivered and not shown to a judge. A revised proposal is audited again. | `test_flow` |
 | 8 | A finding goes to the earliest stage that owns it, and every later stage reruns. | `test_flow` |
 | 9 | Refuse rather than guess. A `review` report has no rating and no level. | `test_flow`, `test_report` |
@@ -52,6 +53,8 @@ These hold the design together. Do not break one as a side effect of another cha
 | 14 | No secret is written to the journal, a report or an exception message. | `test_models`, `test_settings`, `test_server` |
 | 15 | The web app listens on loopback only and runs one analysis at a time. The page inserts run data as text, never as markup. | `test_server`, `test_run_page` |
 | 16 | Every value that crosses a boundary is a frozen contract that rejects unknown fields. | `test_architecture` |
+| 17 | With no channel switched on, a run writes the artifacts and sends the prompts version 2.0 does. | `test_stages`, `scenarios`, replay of the archived journals |
+| 18 | A channel that could not be read is reported as unavailable, never as empty, and the roles that read it are told which. | `test_stages`, `test_report`, the scenarios `uncovered` and `quiet` |
 
 ## Things that will surprise you
 
@@ -64,6 +67,8 @@ These hold the design together. Do not break one as a side effect of another cha
 - **`replay` and `scenarios` run in a temporary directory** and leave nothing in `runs/`. `analyze` and `serve` write to `runs/`, which git ignores.
 - **Scenario numbers come from `facts`.** A scenario's claims must restate ledger values exactly, so regenerate them from `uv run insightcrew facts` after changing the synthetic data or an indicator.
 - **Yahoo throttles.** `fetch` falls back to Eastmoney. Tests never touch the network; they replay `tests/fixtures/`.
+- **The SEC is only called with `IC_SEC_CONTACT` set** in `.env`; without it `fetch` skips the SEC and says so. The channels default to off: `insightcrew.toml` deliberately sets none.
+- **The 30 version-2.0 archived journals were made before the prompts of bull, bear, manager and judge gained their channels paragraph** (WP16); the 13 version-2.1 journals after. They all replay; the prompts are not compared.
 - **Package installs on the owner's machine** can fail with a certificate error or HTTP 502 (a package-age block, or a conflict between two security tools). Do not retry, change versions or turn off verification; report it. The workspace rules describe the fix.
 
 ## Checking your work
@@ -78,7 +83,7 @@ Run the smallest relevant check, then widen it. Every change ends with the three
 | `flows/`, `app/wiring.py` | `scenarios`, `analyze --no-open`, and `replay` on the run it wrote |
 | `app/report.py`, `replay_html.py`, `assets/page.html`, `server.py` | `analyze --no-open` and open its `replay.html`; `serve` and start `demo` and `contested` |
 | `roles/`, `insightcrew.toml` `[tiers]` | `check`, then one real-model `analyze ACME` (costs money); read the journal |
-| Adapters for real bars | `tests/test_yahoo.py`, `tests/test_eastmoney.py`; a live `fetch` only when asked |
+| Adapters for real bars or evidence | `tests/test_yahoo.py`, `tests/test_eastmoney.py`, `tests/test_edgar.py`, `tests/test_eastmoney_ann.py`; a live `fetch` only when asked |
 
 Report which commands you ran and what they returned. If a check could not be run, say so and say what remains unverified.
 

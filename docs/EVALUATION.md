@@ -28,11 +28,11 @@ It does not evaluate whether the ratings are good trades. Section 7 explains why
 
 | Evaluation | Result |
 |---|---|
-| Fault injection (`eval inject`) | 19 of 19 injected faults caught; 0 of 6 valid variants flagged |
-| Two-path consistency (`eval consistency`) | 277 data points × 29 declared facts, all in agreement |
-| Point in time (`eval pit`) | 18 data points, 864 facts compared: adding later bars changes no fact, and no fact is dated after the analysis date |
-| Scenarios (`scenarios`) | 16 of 16 scripted runs end as specified |
-| Tests (`pytest`) | 380 passed |
+| Fault injection (`eval inject`) | 19 of 19 injected faults caught; 0 of 6 valid variants flagged. With both channels present: 6 of 6 channel faults caught; 0 of 2 valid variants flagged |
+| Two-path consistency (`eval consistency`) | 277 data points × 29 declared facts, all in agreement; fundamentals 46 dates × 12 facts, all in agreement |
+| Point in time (`eval pit`) | 18 data points, 864 facts compared: adding later bars changes no fact, and no fact is dated after the analysis date; channels: 16 data points, adding later filings and items changes no earlier fact or item |
+| Scenarios (`scenarios`) | 21 of 21 scripted runs end as specified (five with both channels open) |
+| Tests (`pytest`) | 486 passed |
 
 **Fault injection.** Starts from the passing board of the `clean` scenario and changes one thing at a time. Each fault must produce a finding with a specific check:
 
@@ -106,6 +106,24 @@ Five of five delivered, with no truncated reply and no corrective retry. A typic
 | `20261119-093533-0700.HK-2026-11-18-fdc0` | delivered | Underweight | 0 | 7 | 0 | 37,424 | 0.0322 | 96 |
 
 The AAPL run is a refusal, so the report shows no rating. The rating in brackets is the last thesis in the journal. Section 6 walks through why it was refused.
+
+## 3b. The channels on a real model (version 2.1)
+
+Version 2.1 added two optional evidence channels. One pilot run (ACME 2026-09-30, both channels) showed both new analysts producing clean output — every fundamentals value copied exactly including the restated figures, well-reasoned disclosure signals, zero corrective retries, no audit findings — so no prompt was changed. The judges' dissents in that run were substantive (an unhandled price-to-earnings of about 130× as contrary evidence; a stop too close to the 20-day mean), which is the disagreement the debate exists for.
+
+`uv run insightcrew eval channels` then ran 4 cells × 3 channel configurations. Per-cell run IDs are in `insightcrew/evals/archive/channels.json`; all twelve journals replay as 一致. The thirty version-2.0 journals above were made **before** the prompts of bull, bear, manager and judge gained their channels paragraph; these twelve, after.
+
+| Configuration | Runs | Delivered | REVIEW rate | Revisions per run | Calls per run | Tokens per run | Cost per run | Thesis points citing channel evidence | Findings by check |
+|---|---|---|---|---|---|---|---|---|---|
+| none | 4 | 3 | 25% | 0.25 | 8.25 | 53,207 | 0.0198 | 0/14 | none |
+| fundamentals | 4 | 3 | 25% | 0.75 | 11.0 | 75,336 | 0.0332 | 1/11 | none |
+| both | 4 | 3 | 25% | 1.0 | 12.5 | 96,328 | 0.0482 | 3/14 | `point_cites_claimed_fact` × 2 |
+
+What this shows, and what it does not:
+
+- **The mechanism works against a real model.** The ACME cells read the channels as available, the analysts' output passed the audit, thesis points did cite channel evidence, and the two `point_cites_claimed_fact` findings in the `both` row show the widened audit catching a real mis-citation and routing it back.
+- **The real-universe cells ran with both channels unavailable** — the live evidence downloads were blocked by the network during the build (ROADMAP), so no evidence files exist for real tickers and the channels report unavailable there. Those cells therefore differ from `none` only by the two status lines.
+- **Cost and rework rise with the channels** (about 2.4× cost in `both`); the citation share stays low; the REVIEW rate is unchanged. Four cells per configuration cannot separate any of that from chance (section 7), which is why `[flow] channels` is left unset in `insightcrew.toml`.
 
 ## 4. What the real runs changed
 
@@ -193,6 +211,10 @@ Judges with opposed lenses can push a thesis back and forth; the round cap ends 
 - **That the judges verify.** L4 is scrutiny, not proof. The three judges share a model and can share a blind spot.
 - **Anything about other models.** Every real-model result is from one DeepSeek pair.
 - **The value of the debate.** The ablation's effect is within the noise (section 5).
+- **That more evidence gives better decisions.** Twelve runs cannot show it (section 3b).
+- **That the items are news.** They are company filings and announcements. Media coverage and market commentary are not read.
+- **That a title or a signal is verified.** Code checks that an item exists and when it was published. It does not check what the item says, or what the analyst makes of it.
+- **The channels on real evidence.** The live downloads were blocked by the network; the real-ticker cells ran with the channels unavailable (section 3b).
 
 ## 8. Reproducing
 
@@ -204,5 +226,7 @@ Judges with opposed lenses can push a thesis back and forth; the round cap ends 
 | Replay an archived run | `IC_FORCE_OFFLINE=1 uv run insightcrew replay insightcrew/evals/archive/<run id>` | Nothing for synthetic tickers; the two real-bar runs need `uv run insightcrew fetch AAPL 0700.HK --years 3` first, because downloaded bars are not committed |
 | One real-model run | `uv run insightcrew analyze ACME --date 2026-09-30`, or `uv run insightcrew analyze AAPL --universe real` after `fetch` | `DEEPSEEK_API_KEY` in `.env`; about 0.03 USD |
 | The ablation | `uv run insightcrew eval ablation` | The key; about 0.5 USD and several minutes |
+| The channels evaluation | `uv run insightcrew eval channels` | The key; about 0.5 USD and several minutes |
+| One run with channels | `uv run insightcrew analyze ACME --channels fundamentals,disclosures` | The key; about 0.05 USD |
 
 A re-run with a real model will not reproduce the same ratings: the model is not deterministic, which is the noise section 5 describes. Replaying an archived journal reproduces the recorded run exactly.
