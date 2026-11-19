@@ -48,7 +48,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 12 | Local web app (`serve`) | done | Verified live in the browser: form starts a demo run, stream advances stages, same outcome and confidence lines as the CLI; THIN refuses; past runs open; clean shutdown. 409 covered by test. **Server rewritten by the planning session on 2026-11-19 08:50 and verified again.** |
 | 11 | Documents and packaging | done | README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP rewritten; `start.sh`, `start.bat`; a `git archive` zip unzipped into an empty directory passes `uv sync`, 380 tests and a keyless `analyze`. Session log entry "2026-11-19 10:05". |
 
-**Every work package is done.** What remains is outside the repository: the demo video, the slides and the contribution statement. [ROADMAP.md](ROADMAP.md) lists known issues and next steps.
+**Every work package is done.** [ROADMAP.md](ROADMAP.md) lists known issues and next steps.
 
 ## 3. The repository at handoff
 
@@ -736,7 +736,7 @@ Not run, and why: `start.bat` on Windows (no Windows machine). Building the zip 
 
 Committed: `dcb1001`, `8d57d74`, and this entry. Not pushed. The final zip is `../InsightCrew.zip` (outside the repository), built from the commit with this entry.
 
-For the next session: none in the repository. Outside it: demo video, slides, contribution statement.
+For the next session: none. Known issues and next steps are in ROADMAP.md.
 
 ## 9. Prompts for starting a session
 

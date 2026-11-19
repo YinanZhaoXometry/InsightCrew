@@ -484,7 +484,7 @@ Decided on 2026-11-18 by the coding assistant, at the owner's request to choose.
 | # | Decision | Reason | Cost to reverse |
 |---|---|---|---|
 | 4 | All invariant changes in section 10 are accepted. The Trader sees the risk limits. | A limit is a constraint and cannot be derived, so hiding it tests nothing. The check stays independent because the recomputation is hidden. | Low before phase 1. One prompt and one test after. |
-| 5 | Rulebook limits as in section 5: 1% risk per trade, 20% position, reward-to-risk 1.5, stop at least 1 × ATR(14), entry within 2 × ATR(14), data at most 10 days old | Conventional defaults that are easy to defend in a presentation. The staleness limit is TradingAgents'. | Trivial. Each is one number in `data/risk_rules.json`. |
+| 5 | Rulebook limits as in section 5: 1% risk per trade, 20% position, reward-to-risk 1.5, stop at least 1 × ATR(14), entry within 2 × ATR(14), data at most 10 days old | Conventional defaults. The staleness limit is TradingAgents'. | Trivial. Each is one number in `data/risk_rules.json`. |
 | 6 | Reports, console output and narratives in Chinese. Schema keys, ratings, actions, verdicts and rule keys in English. Documents in English. | Matches the current project rule. English enum values keep parsing independent of the prose language, as TradingAgents does. | Low. One instruction string and the report template. |
 | 7 | The name stays InsightCrew. Subtitle: a multi-agent trading assistant with an independent audit. | The repository, the remote and every document use it, and the audit is still the idea the name was chosen for. | Low, but it touches every document. |
 | 8 | Real bars from Yahoo Finance's chart endpoint, through `urllib` | The only source found that serves both US and Hong Kong tickers with no key and no dependency. Tested on 2026-11-18. | Low. The fetch script is the only code that knows the source. |
@@ -550,7 +550,6 @@ The rubric weights and the brief's requirements are quoted in [ROADMAP.md](ROADM
 | Implementation | 25% | Depends on the schedule | Graded on what runs. Phases 1 and 2 finished and tested score better than five phases half done. No dependencies and an offline demo help: the marker can run it. |
 | Problem formulation | 15% | Good | The task is concrete and its hard parts are named: ungrounded numbers, look-ahead, risk limits. The long-only, no-execution scope is stated. |
 | Analysis | 15% | The weakest area today | Needs real-model results. Offline rates are true by construction and show mechanism only. One day is scheduled for real-model runs, and no key is available yet. If that day is lost, the analysis rests on injection tests and scripted ablations, and must say so. |
-| Presentation | 15% | Good if rehearsed | A trace in which the audit rejects a proposal and the judges dissent is easy to show. The replay page gains its debate and judge lanes only in phase 3, so the demo may have to use the report and the console. |
 
 **What would lose marks, in order of likelihood.**
 
