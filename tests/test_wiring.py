@@ -197,8 +197,8 @@ def test_a_scenario_decides_the_channels_and_the_flag_is_ignored(settings: Setti
 
 
 def test_an_unknown_channel_is_refused(settings: Settings) -> None:
-    with pytest.raises(BadRequest, match="news"):
-        prepare(settings, ticker="ACME", channels=("news",))
+    with pytest.raises(BadRequest, match="nope"):     # news 自 v2.2 起是合法通道
+        prepare(settings, ticker="ACME", channels=("nope",))
 
 
 def test_build_deps_wires_the_evidence_ports(settings: Settings) -> None:

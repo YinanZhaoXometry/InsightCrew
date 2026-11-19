@@ -15,3 +15,6 @@
 - 这次运行可能打开基本面与公告两条证据通道：fundamentals/status、fundamentals/analysis、disclosures/status、disclosures/analysis 中的若干会到达；一项都没有就说明通道没有打开。
 - 状态为 unavailable 表示数据源没能回答，这既不支持也不反对任何方向，不要把它当作一方的论据；empty 表示窗口内确实没有任何公布。
 - 通道读数与技术读数的地位相同：引用时只能用其中被 claim 或被信号引用过的证据 id，不要自己引用原始事实或条目。
+
+新闻与情感（视图里没有这些键时，说明通道没有打开，不要提到它们）：
+- news/analysis 与 sentiment/analysis 是新闻与社交两位分析师的结论；news/status、sentiment/status 为 unavailable 时表示窗口没有覆盖或数据源不可用——这不是利好也不是利空，不要当作任何一方的证据，也不要引用它的结论。

@@ -7,6 +7,9 @@ subject 指出是哪个对象出了问题，message 是一句说明问题的中�
 """
 from __future__ import annotations
 
+from .macro import MarketEntry
+from .news import NewsAnalysis, NewsEntry, news_findings
+from .social import PostEntry, SentimentAnalysis, sentiment_findings
 from .types import (
     Action,
     Analysis,
@@ -36,20 +39,28 @@ def _fmt(x: float) -> str:
 def audit(facts: list[Fact], analysis: Analysis, thesis: Thesis, proposal: Proposal,
           rule_results: list[RuleResult], *,
           fundamentals: tuple[list[Fact], Analysis] | None = None,
-          disclosures: tuple[list[Item], DisclosureAnalysis] | None = None) -> list[Finding]:
-    """按蓝图 6.7 与 18.10 的顺序给出全部发现：先技术面 claim，再基本面 claim、公告信号，
-    然后论点、持有期、提案，最后把每条 fail 的规则变成 L3 发现。
+          disclosures: tuple[list[Item], DisclosureAnalysis] | None = None,
+          news: tuple[list[NewsEntry], list[MarketEntry], list[Fact], NewsAnalysis] | None = None,
+          sentiment: tuple[list[PostEntry], SentimentAnalysis] | None = None) -> list[Finding]:
+    """按蓝图 6.7 与 18.10 的顺序给出全部发现：先技术面 claim，再基本面 claim、公告信号、
+    新闻与情感信号，然后论点、持有期、提案，最后把每条 fail 的规则变成 L3 发现。
 
     fundamentals 与 disclosures 为 None 时（通道未开或未上黑板），行为与版本 2.0 完全一致。
+    news 与 sentiment 同理（19.12）：news = (条目, 预测市场, 宏观事实, 分析)，
+    sentiment = (帖子, 分析)；均为 None 时审计不新增任何检查。
     """
     known = {f.id: f for f in facts}
     fund_cited = {c.fact for c in fundamentals[1].claims} if fundamentals else set()
     item_cited = {s.item for s in disclosures[1].signals} if disclosures else set()
+    news_cited = {s.item for s in news[3].signals} if news else set()
+    post_cited = {s.post for s in sentiment[1].signals} if sentiment else set()
     return [
         *_claims(analysis, known),
         *(_fundamentals_claims(fundamentals) if fundamentals else []),
         *(_disclosure_signals(disclosures) if disclosures else []),
-        *_points(thesis, analysis, fund_cited, item_cited),
+        *(news_findings(news[0], news[1], news[2], news[3]) if news else []),
+        *(sentiment_findings(sentiment[0], sentiment[1]) if sentiment else []),
+        *_points(thesis, analysis, fund_cited | news_cited, item_cited | post_cited),
         *_horizon(thesis),
         *_proposal(proposal, thesis, known),
         *_rules(rule_results),

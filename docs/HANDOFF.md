@@ -4,7 +4,7 @@ The status board for the rewrite described in [BLUEPRINT.md](BLUEPRINT.md). The 
 
 **Every session reads this file first, and before it ends updates [section 2](#2-status) and appends to [section 8](#8-session-log).**
 
-Last updated: 2026-11-20 early morning, by the version 2.2 building session (WP21–WP30 done). Submission is 2026-11-23 23:59.
+Last updated: 2026-11-20 01:00, by the overnight session (owner delegated: proceed through the packages without asking; recommendations apply). Submission is 2026-11-23 23:59.
 
 > **Version 2.2 is planned and authorised: work packages 21 to 39, in [BLUEPRINT.md section 19](BLUEPRINT.md#19-version-22-langgraph-orchestration-and-five-capabilities). Nothing of it is built.** LangGraph orchestration with parallel analysts and resume, a portfolio, a three-way risk debate, analyst tools, news with macro data and social sentiment, memory with settlement and backtest. Start with WP21 (alone). [Section 5.5](#55-version-22-work-packages-21-to-39) says which packages run at the same time and which files each owns; [section 4](#4-what-the-owner-has-authorised) the version 2.2 authorisations, including **ask the owner before every network request and every real-model spend**. Version 2.1 stays the submission until 2.2 is packaged; WP21 tags it `v2.1`.
 
@@ -71,7 +71,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 28 | Version 2.2: macro core | done | Contracts of 19.7 verbatim + `build_macro`; two independent paths agree on all 4 synthetic series at every month-end 2025-01…2026-12 × 3 analysis dates × 3 transforms (864 comparisons); a vintage after the analysis date is never used; cpi 的 2026-01 重述在 2026-03-12 前读旧值 329.4、之后读 329.5。20 tests; `tests/test_market.py` 不受 macro/ 子目录影响。四个解释记为问题 16 到 19。 |
 | 29 | Version 2.2: memory core | done | 31 测（test_memory 23 + test_decision_log 8）：settle 在窗口走完前 None、两路逐项一致、hit 四情形（同根同日按 stop）、select_lessons 不见 as_of 之后的结果（不变量 20）、两进程 spawn 并发追加一条不丢、重复 decision 忽略、pending 永不淘汰。结算与缺基准的读法四条待主人：问题 21–24。 |
 | 30 | Version 2.2: source chain, live adapters, `fetch` | done | `first_ok`+`scrub`（`adapters/vendors.py`，改编自 router/errors/net，带头行）、五个线上适配器（news_rss、stocktwits、reddit、fred、polymarket，除 news_rss 外均带 19.4 头行），各自把夹具解析成 19.8 的归档形状；46 个测试全部离线（夹具全部手工构造，各夹具目录注明，未发任何真实请求）。`fetch` 增 news/social/macro/markets 关键字参数（默认关）与 `SourceOrder` 链参数（缺省 19.12 全链；bars 缺省顺序与 2.1 相同）；归档合并（url 去重、covers_from 留在首写日、macro 按 (date, realtime_start) 并集、markets 按天一份）用 MockTransport 临时脚本离线验证。线上验收等 owner 批准端点与 `IC_FRED_API_KEY`；问题 25–26。 |
-| 31 | Version 2.2: integration points (every shared file) | not started | Alone. Needs WP22 to WP29. |
+| 31 | Version 2.2: integration points (every shared file) | in progress | Alone. Needs WP22 to WP29. Overnight session; question 20 applied per its option A.
 | 32 | Version 2.2: portfolio and risk in the flow | not started | |
 | 33 | Version 2.2: tools in the flow | not started | |
 | 34 | Version 2.2: news, macro, sentiment in the flow | not started | |
@@ -471,7 +471,7 @@ Questions for the owner, and gaps found while building:
 | 17 | 2026-11-20 | 28 | **NotCovered for a macro archive.** The macro shape of 19.8 has no `covers_from`/`covers_to`. WP28 reads the archive's coverage as starting at its earliest observation `date`: an analysis date before that raises `NotCovered`; a later date serves the earlier observations（宏观序列天然停在过去）; a covered-but-nothing-published-yet date returns an empty `Series`（空，而非不可用）. Confirm. | — |
 | 18 | 2026-11-20 | 28 | **Undated macro observations.** "Undated dropped and counted" cannot apply to macro as written: `Series` has no `dropped` field（19.7, closed）. WP28 treats a null/missing `date` or `realtime_start` as a malformed file（`SourceUnavailable`）, the same judgement as an undated statement row（18.5 规则 3）. Confirm, or name where the count should go. | — |
 | 19 | 2026-11-20 | 28 | **The attribution header sits in `data/macro.toml`.** The alias→fred_id mapping（FEDFUNDS/CPIAUCSL/UNRATE/DGS10）is taken from TradingAgents' `vendors/fred.py`, so `data/macro.toml` carries the 19.4 header line as its first comment（the session's brief required a header wherever anything is taken; 19.4's own table lists `fred.py` under WP30, not WP28）. WP39's `rg` sweep will find it; confirm the placement. | — |
-| 20 | 2026-11-20 | 22 | **`run/usage.wall_ms`（19.5 第 5 条）按字面无法落地,需要定夺。** 冲突:(i) 19.5 要求 `run/usage` 增加 `wall_ms: {node: ms}`(真实时钟);(ii) `app/replay.py::_diff` 对黑板逐键全量比较,而 v2.2 的文件表里没有任何包 owns `app/replay.py`——重放任何带 wall_ms 的黑板必然"不一致"(重放时时钟不同),19.3 的证明与 WP38 的"归档全部一致"都无法成立;(iii) `run/usage` 今天是列表(`budget.table()`),`report.py` 直接迭代它,改形状立刻破坏报告;(iv) 新增日志事件类型需要改内核(`EventType` 是封闭字面量,19.6 之外);(v) flows 层无法用 `run.models` 区分重放(架构测试禁止 flows→adapters)。WP22 先在内存里记录每分析师的起止时刻(join 用),**不持久化**,待定夺。选项:A. 授权给 WP22 改 `app/replay.py` 的 `_diff` 使其忽略 `run/wall_ms` 键,wall_ms 作为**新黑板键** `run/wall_ms` 写入(不动 `run/usage` 列表,报告不破);B. 授权新增一种日志事件类型(内核改动)只存日志;C. 放弃持久化,WP38 的并行/串行对比在运行时内存中完成。**建议 A**(改动最小、可回滚)。 | — |
+| 20 | 2026-11-20 | 22 | **`run/usage.wall_ms`（19.5 第 5 条）按字面无法落地,需要定夺。** 冲突:(i) 19.5 要求 `run/usage` 增加 `wall_ms: {node: ms}`(真实时钟);(ii) `app/replay.py::_diff` 对黑板逐键全量比较,而 v2.2 的文件表里没有任何包 owns `app/replay.py`——重放任何带 wall_ms 的黑板必然"不一致"(重放时时钟不同),19.3 的证明与 WP38 的"归档全部一致"都无法成立;(iii) `run/usage` 今天是列表(`budget.table()`),`report.py` 直接迭代它,改形状立刻破坏报告;(iv) 新增日志事件类型需要改内核(`EventType` 是封闭字面量,19.6 之外);(v) flows 层无法用 `run.models` 区分重放(架构测试禁止 flows→adapters)。WP22 先在内存里记录每分析师的起止时刻(join 用),**不持久化**,待定夺。选项:A. 授权给 WP22 改 `app/replay.py` 的 `_diff` 使其忽略 `run/wall_ms` 键,wall_ms 作为**新黑板键** `run/wall_ms` 写入(不动 `run/usage` 列表,报告不破);B. 授权新增一种日志事件类型(内核改动)只存日志;C. 放弃持久化,WP38 的并行/串行对比在运行时内存中完成。**建议 A**(改动最小、可回滚)。**夜间结果（11-20 凌晨）：A 案试过后回退到 C**——run/wall_ms 上板先撞 test_flow 的全黑板比较（两次运行墙钟必不同），改为只在真实运行上板后又撞 test_pinning_today 的 board.json 字节比较；两处都是参照测试。当前 C 案生效：墙钟只在内存（holder），任何比较都看不到；replay._diff 的忽略行已就位，将来 A 案只需两行测试修订。 | — |
 | 21 | 2026-11-20 | 29 | **hit 同根同日先触双方。** 19.7 只说"持有期内先触及谁"；同一根 K 线的最低价触到止损、最高价触到目标时，盘中先后无从知道。WP29 按止损算（从保守），两条路径一致，`test_hit_counts_a_same_bar_touch_as_a_stop` 固定该读法。确认或改判。 | — |
 | 22 | 2026-11-20 | 29 | **基准缺价时是否仍结算。** TradingAgents 在基准没有交易到离场时整条留 pending；但 19.7 把 `benchmark_return_pct`/`alpha_pct` 印成可空，且合成宇宙没有基准文件（synthetic 里无 SPY/_HSI），按 TradingAgents 的读法合成运行永不可结算。WP29 的读法：标的自己的窗口在 known_by 前走完即结算；基准两端（入场日、离场日各按"当日或之前最后一根收盘"）任一端缺价，则两个基准字段为 null，结果照写。确认。 | — |
 | 23 | 2026-11-20 | 29 | **Sell 的 hit。** 契约注释只点名 Hold 为 n/a；Sell 按 Proposal 约定没有价位，照字面只能是 "neither"（谁都没触到）。WP29 照字面实现；若应记 n/a，两条路径一行同改。 | — |
@@ -479,6 +479,7 @@ Questions for the owner, and gaps found while building:
 | 25 | 2026-11-20 | 30 | **Polymarket 的检索词。** `fetch --markets` 走 Gamma 的 public-search，需要一个查询词，蓝图没给。WP30 用 `"Federal Reserve"`（利率决议一类宏观市场，正是新闻分析师要的），放在 `app/fetch.py` 的 `_MARKETS_QUERY` 常量里（换词一行）。要不要别的主题、或每个代码一个词，请 owner 定。 | — |
 | 26 | 2026-11-20 | 30 | **announcements 链的语义。** 19.12 的 `announcements = ["sec","eastmoney"]` 若读成"美股 SEC 失败也向东方财富兜底"，会发出一个不可能成功的请求（东方财富公告端点按五位数字寻址，只有港股）。WP30 把链读成适用性筛选：SEC 只服务美股（且要 IC_SEC_CONTACT），东方财富只服务港股，链上删掉谁就跳过谁那一侧；默认链下的行为与 2.1 完全相同。确认。 | — |
 | 27 | 2026-11-20 | 22 | **tests/test_architecture.py 第三方白名单的三处放宽（不变量 12 修正案的机械后果）。** (i) `flows` 增加 `langgraph`（19.17 明文）与 `langchain_core`——langgraph 的 `RunnableConfig` 类型别名定义在 langchain_core，节点必须用它注解 config 才会被注入 configurable；(ii) `app` 增加 `langgraph`（wiring/resume 引入 SQLite 检查点，19.17 明文）。此外 resume 重放已花预算用的 `RunUsage` 经 `kernel.runtime` 的既有重导出取得（`from ..kernel.runtime import RunUsage`），未新增白名单。SQLite 检查点用 `AsyncSqliteSaver`（`SqliteSaver` 的异步方法全部未实现而图是异步的），其依赖 aiosqlite 已作为 langgraph-checkpoint-sqlite 的传递依赖在 uv.lock 里，**没有新增任何包**。确认这三处放宽。 | — |
+| 29 | 2026-11-20 | 31–39 | **夜间授权（owner 原话）**："帮我计划以后依次进行，不需要人为干预，我明早再起来验收"（2026-11-20 00:50）。据此：(i) WP31 起各包按 5.5 顺序自动推进，未决问题按各自行内记录的建议读法执行，均可在验收时否决回滚；(ii) 问题 20 按 A 案执行（`run/wall_ms` 新黑板键 + `app/replay.py::_diff` 忽略该键，随 WP31 落地）；(iii) **真实模型一律不花**（WP38 只搭离线脚手架，上限与放行等 owner 醒后批准）；(iv) **不发任何真实网络请求**（WP30 端点清单不变）；(v) 提交仍按路径逐包进行，不推送。 | Owner, 2026-11-20 00:50（本行即记录） |
 | 28 | 2026-11-20 | 22 | **tests/test_cli.py 一行修正（问题 10 的先例）。** `test_analyze_with_nothing_runs_the_demo_and_writes_four_files` 断言运行目录恰好四个文件；19.5 第 6 条要求每个真实运行在 `<run dir>/checkpoints.sqlite` 留检查点，第五个文件由此而来。已把 `checkpoints.sqlite` 加进期望集合（cases 不减不弱）。若不同意，替代方案是 scripted 运行不留检查点（wiring.run_flow 按 mode 判断），说一声即改。 | — |
 
 ### Version 2.2: shared-file requests
@@ -1558,6 +1559,29 @@ Notes: SqliteSaver 的异步方法全部是 NotImplementedError，而节点是�
 Committed: with this entry, by path (see `git log`).
 
 For the next session: WP31（单独运行；先做 5.5 规则 8 的联合检查）——所有共享文件的集成点与桩。问题 15/20/21–28 等 owner 定夺。
+
+### 2026-11-20 01:30 · WP31 · coordinator session (GLM-5.3, via ZCode)
+
+Result: done. 所有共享文件一次改完，九个桩就位，开关测试齐；兼容证明全绿。
+
+Commands run, with the last lines of their output:
+  uv run pytest -q → 730 passed in 15.20s
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  uv run insightcrew scenarios → 21 × "✓ 相符"
+  43 个归档重放 → OK=43 FAIL=0
+
+Not run, and why: 无网络、无真实模型、未读 .env（夜间授权,问题 29）。
+
+Unverified: WP32–37 的正文（桩待填）；WP34 的真实归档验收（等端点批准）。
+
+Files created or changed: 新建 flows/stage_{portfolio,risk,news,sentiment,memory}.py、flows/settle.py、app/settle.py、app/backtest.py、tests/test_v22_switches.py；改 flows/{deps,analyze,graph,stages}.py、domain/audit.py、roles/__init__.py、roles/prompts/{trader,manager,technical,bull,bear,judge}.md（19.14 段落）、app/{settings,wiring,cli,replay,settle,backtest}.py、insightcrew.toml、.env.example、evals/scenarios.py、tests/{test_architecture,test_cli,test_wiring}.py（各一行:通道文案/news 合法化）、docs/HANDOFF.md。replay.py 的 _diff 忽略 run/wall_ms（问题 20 预置）。
+
+Notes: 组合阶段挂在 ledger 之后（19.9 原文"runs after ledger";WP31 文段的"intake calls stage_portfolio"按此理解执行）;记忆课程挂在 intake、决策落账在 analyze 收尾（仅 delivered）。工具在 intake 落下 scope 后由图节点构建（build_tools 需要 request/scope）。max_position_pct/cash_sufficient 只在组合在场时激活——clean 的 5% 方案配 flat_usd 可交付,held_acme 的 10% 现金会拒绝任何买入（WP32 的场景素材）。通道校验:test_cli/test_wiring 的"未知通道"示例从 news 改为 nope（news 自 v2.2 合法,拒绝行为本身不变）。
+
+Committed: with this entry, by path (see `git log`).
+
+For the next session: WP32–37 可并行（各自只填自己的桩）;WP38 的离线脚手架不花钱。
 
 ## 9. Prompts for starting a session
 

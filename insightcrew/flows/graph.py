@@ -13,6 +13,7 @@ state["route"]（路由事件也由节点就地记日志），条件边的 route
 """
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Awaitable, Callable
 from typing import Any, TypedDict
 
@@ -23,10 +24,24 @@ from langgraph.graph import END, START, StateGraph
 
 from ..domain.types import Verdict
 from ..kernel.runtime import Halt, Malformed, Role, Run, commit, run_role, run_role_deferred
-from ..roles import BEAR, BULL, DISCLOSURES, FUNDAMENTALS, JUDGES, MANAGER, TECHNICAL, TRADER
+from ..roles import (
+    BEAR,
+    BULL,
+    DISCLOSURES,
+    FUNDAMENTALS,
+    JUDGES,
+    MANAGER,
+    NEWS,
+    SENTIMENT,
+    TECHNICAL,
+    TECHNICAL_TOOLS,
+    TRADER,
+)
+from . import stage_memory, stage_portfolio, stage_risk
+from .tools import build_tools
 
-# 审计发现的责任人顺序（原 PIPELINE 顺序，debate 不是责任人）。
-_ORDER = ("technical", "fundamentals", "disclosures", "manager", "trader")
+# 审计发现的责任人顺序（原 PIPELINE 顺序 + v2.2 的两个分析师；debate 不是责任人）。
+_ORDER = ("technical", "fundamentals", "disclosures", "news", "sentiment", "manager", "trader")
 
 
 class GraphState(TypedDict):
@@ -60,7 +75,7 @@ def initial_state() -> GraphState:
 # ---- 路由表：显式列出每个 router 可能返回的每一个值 ----
 
 JUDGE_MAP: tuple[str, ...] = ("manager", "trader", "outcome")
-_ANALYSTS = ("technical", "fundamentals", "disclosures")   # 打回时可能作为起点的分析师
+_ANALYSTS = ("technical", "fundamentals", "disclosures", "news", "sentiment")   # 打回时可能作为起点
 
 
 def audit_map(cfg: Any, owners: tuple[str, ...], *, parallel: bool = False) -> Any:
@@ -94,12 +109,23 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
 
     async def intake(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
         ctx = _ctx(config)
-        stages.intake(ctx["run"], ctx["request"], ctx.get("deps", deps))
+        run = ctx["run"]
+        d = ctx.get("deps", deps)
+        stages.intake(run, ctx["request"], d)
+        if cfg.tools and d is not None:
+            # 工具在分析日绑定（19.8 第 5 条）：必须在 intake 写下 request/scope 之后建
+            run.tools = build_tools(run, d, d.tool_specs)
+        if cfg.memory and d is not None:
+            stage_memory.lessons(run, d)   # 19.13：准入后读课程（只看已知结果的）
         return {}
 
     async def ledger(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
         ctx = _ctx(config)
-        stages.ledger(ctx["run"], ctx.get("deps", deps))
+        run = ctx["run"]
+        d = ctx.get("deps", deps)
+        stages.ledger(run, d)
+        if d is not None and d.portfolio is not None:
+            stage_portfolio.portfolio(run, d)   # 19.9：账本之后；没有组合文件 = 能力关，一个键都不写
         return {}
 
     async def evidence(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
@@ -167,20 +193,23 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
 
     async def join(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
         """汇聚点。并行模式：按固定顺序入账（technical、fundamentals、disclosures、…），
-        谁先算完不打紧，日志与串行相同（决策 42、不变量 19）。"""
-        if not cfg.parallel:
-            return {}
+        谁先算完不打紧，日志与串行相同（决策 42、不变量 19）。两种模式都把工具事实收账
+        （19.11：tools/facts 按调用顺序，tools 署名）。"""
         ctx = _ctx(config)
         run = ctx["run"]
-        pending: dict[str, Any] = ctx["holder"].get("deferred", {})
-        for name, _ in analysts_group:
-            deferred = pending.pop(name, None)
-            if deferred is None:
-                continue
-            try:
-                commit(run, deferred)
-            except Malformed as e:
-                raise Halt("malformed_output", str(e)) from e
+        if cfg.parallel:
+            pending: dict[str, Any] = ctx["holder"].get("deferred", {})
+            for name, _ in analysts_group:
+                deferred = pending.pop(name, None)
+                if deferred is None:
+                    continue
+                try:
+                    commit(run, deferred)
+                except Malformed as e:
+                    raise Halt("malformed_output", str(e)) from e
+        facts = getattr(run.tools, "facts", None) if cfg.tools else None
+        if facts:
+            run.board.put("tools/facts", list(facts), by="tools")
         return {}
 
     async def debate(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
@@ -281,8 +310,13 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
         head = "ledger"
 
     # 在场的分析师（固定顺序，join 的入账顺序即此顺序）；audit 的责任人 = 分析师 + manager + trader
-    analysts_group: list[tuple[str, Role]] = [("technical", TECHNICAL)]
-    for channel, role in (("fundamentals", FUNDAMENTALS), ("disclosures", DISCLOSURES)):
+    technical = TECHNICAL
+    if cfg.tools:          # 19.11：开工具时用 TECHNICAL 的工具形态，上限来自 [tools] 设置
+        technical = dataclasses.replace(
+            TECHNICAL_TOOLS, max_tool_calls=deps.tools_max_calls if deps is not None else 6)
+    analysts_group: list[tuple[str, Role]] = [("technical", technical)]
+    for channel, role in (("fundamentals", FUNDAMENTALS), ("disclosures", DISCLOSURES),
+                          ("news", NEWS), ("sentiment", SENTIMENT)):
         if channel in cfg.channels:
             analysts_group.append((channel, role))
     owners = (*[name for name, _ in analysts_group], "manager", "trader")
@@ -291,6 +325,14 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
     graph.add_node("debate", debate)
     graph.add_node("manager", manager)
     graph.add_node("trader", trader)
+    if cfg.risk_rounds > 0:
+        async def risk_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
+            ctx = _ctx(config)
+            if ctx.get("deps", deps) is None:      # 替身阶段（tests/fake_stages）没有真依赖
+                return {}
+            stage_risk.risk(ctx["run"], ctx["deps"], cfg)
+            return {}
+        graph.add_node("risk", risk_node)
     graph.add_node("audit", audit)
 
     if cfg.parallel:
@@ -314,7 +356,9 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
     graph.add_edge("join", "debate")
     graph.add_edge("debate", "manager")
     graph.add_edge("manager", "trader")
-    graph.add_edge("trader", "audit")
+    graph.add_edge("trader", "risk" if cfg.risk_rounds > 0 else "audit")
+    if cfg.risk_rounds > 0:
+        graph.add_edge("risk", "audit")
 
     audit_targets: Any = audit_map(cfg, owners, parallel=cfg.parallel)
     graph.add_conditional_edges("audit", _after_audit, audit_targets)

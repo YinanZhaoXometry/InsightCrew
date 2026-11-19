@@ -30,15 +30,23 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver  # 不变量 12：a
 
 from insightcrew import __version__
 
+from ..adapters.decision_log import DecisionLog
 from ..adapters.declarations import load_fundamentals, load_indicators, load_rules
+from ..adapters.declarations_macro import load_macro
+from ..adapters.declarations_tools import load_tool_indicators
 from ..adapters.disclosures_json import JsonDisclosures
+from ..adapters.macro_json import JsonMacro
 from ..adapters.market_csv import CsvMarket
 from ..adapters.models import Tiers, build
+from ..adapters.news_json import JsonNews
+from ..adapters.portfolio_json import load_portfolio
 from ..adapters.scripted import Replay, Script
+from ..adapters.social_json import JsonSocial
 from ..adapters.statements_json import JsonStatements
 from ..adapters.store_fs import new_run_dir
 from ..domain import symbols
 from ..domain.market import InvalidTicker, MarketData, NoData, SourceUnavailable, UnknownTicker
+from ..domain.portfolio import Portfolio
 from ..domain.portfolio import fingerprint as portfolio_fingerprint
 from ..domain.types import Outcome, Scope
 from ..evals.scenarios import Scenario, load_one
@@ -66,11 +74,12 @@ class BadRequest(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class Job:
-    """一份确定的任务：请求、它用的场景（没有则为 None）、流程配置。"""
+    """一份确定的任务：请求、它用的场景（没有则为 None）、流程配置、组合文件路径。"""
 
     request: dict[str, str]
     scenario: Scenario | None
     flow: FlowConfig
+    portfolio_path: str = ""          # --portfolio PATH；空 = 用 [portfolio] path 或没有组合
 
 
 # ---- 时钟与适配器 ----
@@ -100,7 +109,22 @@ def build_deps(settings: Settings) -> Deps:
                 disclosures=JsonDisclosures(ROOT / "data" / "market", universe),
                 fundamentals=load_fundamentals(ROOT / "data" / "fundamentals.toml"),
                 disclosure_window_days=settings.disclosures.window_days,
-                disclosure_max_items=settings.disclosures.max_items)
+                disclosure_max_items=settings.disclosures.max_items,
+                news=JsonNews(ROOT / "data" / "market", universe),
+                social=JsonSocial(ROOT / "data" / "market", universe),
+                macro=JsonMacro(ROOT / "data" / "market", universe),
+                decision_log=DecisionLog(ROOT / settings.memory.path,
+                                         max_entries=settings.memory.max_entries),
+                tool_specs=load_tool_indicators(ROOT / "data" / "tool_indicators.toml"),
+                tools_max_calls=settings.tools.max_tool_calls,
+                macro_specs=load_macro(ROOT / "data" / "macro.toml"),
+                news_window_days=settings.news.window_days,
+                news_max_items=settings.news.max_items,
+                sentiment_window_days=settings.sentiment.window_days,
+                sentiment_max_posts=settings.sentiment.max_posts,
+                macro_max_rows=settings.macro.max_rows,
+                memory_same_ticker=settings.memory.same_ticker,
+                memory_other_ticker=settings.memory.other_ticker)
 
 
 # ---- 模型来源 ----
@@ -138,11 +162,67 @@ def _models(settings: Settings, scenario: Scenario | None,
     return Script({}), "scripted", dict(_SCRIPTED)        # 没有回复的剧本：第一次模型调用就以 model_unavailable 停下
 
 
+def _portfolio_for(settings: Settings, given: str, scenario: Scenario | None) -> Portfolio | None:
+    """组合从哪来：--portfolio PATH > 场景文件内联（19.15）> [portfolio] path > 没有。"""
+    if given:
+        return load_portfolio(_abspath(given))
+    if scenario is not None and scenario.config.portfolio:
+        return Portfolio.model_validate(scenario.config.portfolio)
+    if settings.portfolio.path:
+        return load_portfolio(_abspath(settings.portfolio.path))
+    return None
+
+
+def _abspath(path: str) -> Path:
+    p = Path(path)
+    return p if p.is_absolute() else ROOT / p
+
+
+class _ReplayLog:
+    """重放用的决策日志替身（决策 44）：课程按日志原样奉还，写入一概丢弃。"""
+
+    def __init__(self, lessons: list[Any], status: dict[str, Any]) -> None:
+        self.journaled_lessons, self.journaled_status = lessons, status
+
+    def records(self) -> list[Any]:
+        return []          # 原始决策日志不在日志里；课程已按记忆阶段的原样给出
+
+    def append(self, record: Any) -> bool:
+        return False       # 重放不写决策日志（19.13）
+
+
+class _ScenarioLog:
+    """场景内联的决策记录（19.15）：只读；场景是一次检查，不写真实日志。"""
+
+    def __init__(self, rows: list[Any]) -> None:
+        self._rows = rows
+
+    def records(self) -> list[Any]:
+        return list(self._rows)
+
+    def append(self, record: Any) -> bool:
+        return False
+
+
+def _replay_deps(deps: Deps, replay: tuple[Event, ...]) -> Deps:
+    """重放的端口替换：组合与课程取自被重放日志的黑板投影。"""
+    board = Board.fold(replay).snapshot()
+    updates: dict[str, Any] = {"decision_log": _ReplayLog(board.get("memory/lessons", []),
+                                                          board.get("memory/status",
+                                                                    {"state": "none_known",
+                                                                     "reason": ""}))}
+    if "portfolio/input" in board:
+        updates["portfolio"] = Portfolio.model_validate(board["portfolio/input"])
+    return dataclasses.replace(deps, **updates)
+
+
 # ---- 第一步：把用户输入变成任务 ----
 
 def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: str = "",
             judges: bool | None = None, debate_rounds: int | None = None,
-            channels: tuple[str, ...] | None = None, parallel: bool | None = None) -> Job:
+            channels: tuple[str, ...] | None = None, parallel: bool | None = None,
+            portfolio: str = "", risk_rounds: int | None = None,
+            tools: bool | None = None, memory: bool | None = None) -> Job:
     """命令行与网页的共同入口。空字符串与 None 表示"没有给"。
 
     请求：场景自带的请求打底，用户给的代码与日期覆盖它。
@@ -169,22 +249,31 @@ def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: 
     names = None if chosen is not None else tuple(_channel_names(channels))
     overrides = {key: value for key, value in
                  (("judges", judges), ("debate_rounds", debate_rounds), ("channels", names),
-                  ("parallel", parallel))
+                  ("parallel", parallel), ("risk_rounds", risk_rounds), ("tools", tools))
                  if value is not None}
+    if memory is not None:
+        overrides["memory"] = memory
+    if settings.memory.enabled:
+        overrides.setdefault("memory", True)         # [memory] enabled 是文件级的默认开
     return Job(request=request, scenario=chosen,
-               flow=FlowConfig.model_validate({**base.model_dump(), **overrides}))
+               flow=FlowConfig.model_validate({**base.model_dump(), **overrides}),
+               portfolio_path=portfolio)
 
 
-_CHANNEL_NAMES = ("fundamentals", "disclosures")
+_CHANNEL_NAMES = ("fundamentals", "disclosures", "news", "sentiment", "macro")
 
 
 def _channel_names(channels: tuple[str, ...] | None) -> tuple[str, ...]:
-    """把 --channels 的名字校验成通道名；未知名在这里拒绝，不等到运行里。"""
+    """把 --channels 的名字校验成通道名；未知名在这里拒绝，不等到运行里。
+    macro 需要同时点名 news（19.12：宏观证据随新闻通道一起收集）。"""
     if channels is None:
         return ()
     unknown = [name for name in channels if name not in _CHANNEL_NAMES]
     if unknown:
-        raise BadRequest(f"未知的证据通道：{'、'.join(unknown)}。可用：fundamentals、disclosures。")
+        raise BadRequest(f"未知的证据通道：{'、'.join(unknown)}。"
+                         "可用：fundamentals、disclosures、news、sentiment、macro。")
+    if "macro" in channels and "news" not in channels:
+        raise BadRequest("宏观通道（macro）需要与 news 一起点名：宏观证据随新闻通道一起收集。")
     deduped = [name for name in _CHANNEL_NAMES if name in channels]
     return tuple(deduped)
 
@@ -207,7 +296,8 @@ def _iso_date(text: str) -> str:
 
 def open_run(settings: Settings, request: dict[str, Any], *, scenario: Scenario | None = None,
              replay: tuple[Event, ...] | None = None, flow: FlowConfig | None = None,
-             batch: Budget | None = None, runs_dir: Path | None = None) -> tuple[Run, Deps]:
+             batch: Budget | None = None, runs_dir: Path | None = None,
+             portfolio: str = "") -> tuple[Run, Deps]:
     """建运行目录、装配依赖、选模型来源、写 run.started。返回 Run 与代码阶段的 Deps。
 
     request 至少有 "ticker"，可以有 "as_of"（ISO 日期）；不成立时抛 BadRequest，此时什么都没有创建。
@@ -222,6 +312,11 @@ def open_run(settings: Settings, request: dict[str, Any], *, scenario: Scenario 
         request["as_of"] = _iso_date(str(request["as_of"]))
 
     deps = build_deps(settings)
+    deps = dataclasses.replace(deps, portfolio=_portfolio_for(settings, portfolio, scenario))
+    if replay is not None:
+        deps = _replay_deps(deps, replay)          # 决策 44：组合与课程按日志供给，重放不读外部文件
+    elif scenario is not None and scenario.config.memory:
+        deps = dataclasses.replace(deps, decision_log=_ScenarioLog(scenario.config.memory))
     models, mode, names = _models(settings, scenario, replay)
 
     # 实际生效的预算上限：场景可以收紧它（预算用尽的两个场景靠这个）。记进 run.started，回放才能复原。

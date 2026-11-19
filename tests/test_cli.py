@@ -159,8 +159,8 @@ def test_eval_all_runs_the_three_offline_evaluations(runs: Path) -> None:
 
 
 def test_an_unknown_channel_name_is_refused(runs: Path) -> None:
-    code, output = _invoke("analyze", "ACME", "--channels", "news", "--no-open")
-    assert code == 2 and "news" in output
+    code, output = _invoke("analyze", "ACME", "--channels", "nope", "--no-open")   # news 自 v2.2 起合法
+    assert code == 2 and "nope" in output
 
 
 def test_channels_flag_on_a_scenario_run_says_it_is_ignored(runs: Path) -> None:

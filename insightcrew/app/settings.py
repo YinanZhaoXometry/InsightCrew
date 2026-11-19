@@ -22,8 +22,9 @@ from ..flows.analyze import FlowConfig
 
 _PREFIX = "IC_"
 _DELIM = "__"
-_SECTIONS = ("run", "flow", "limits", "budget", "tiers", "disclosures")
-_ROOT_VARS = ("base_url", "api_key", "sec_contact", "force_offline", "today")    # 不带分节的根级变量
+_SECTIONS = ("run", "flow", "limits", "budget", "tiers", "disclosures",
+             "portfolio", "memory", "news", "sentiment", "macro", "tools", "sources")
+_ROOT_VARS = ("base_url", "api_key", "sec_contact", "fred_api_key", "force_offline", "today")
 
 
 class _Section(BaseModel):
@@ -63,6 +64,52 @@ class DisclosuresSection(_Section):
     max_items: int = 30                  # 交给角色的条目上限，超过按新到旧截断
 
 
+# ---- 版本 2.2 的新分节（BLUEPRINT 19.15）：默认全关 ----
+
+
+class PortfolioSection(_Section):
+    path: str = ""                       # 组合文件的路径；空 = 没有组合
+
+
+class MemorySection(_Section):
+    enabled: bool = False                # 记忆开关；false 时一个键都不写
+    path: str = "runs/memory/decisions.jsonl"   # 决策日志
+    same_ticker: int = 5                 # 同代码保留的课程数
+    other_ticker: int = 3                # 其他代码保留的课程数
+    holding_days: int = 5                # 结算用的持有期（K 线根数）
+    max_entries: int = 0                 # 日志上限；0 = 不限。只淘汰已结算的成对记录
+
+
+class NewsSection(_Section):
+    window_days: int = 7                 # 新闻窗口长度（自然日）
+    max_items: int = 20                  # 交给角色的条目上限
+
+
+class SentimentSection(_Section):
+    window_days: int = 7                 # 社交窗口长度（自然日）
+    max_posts: int = 30                  # 交给角色的帖子上限
+
+
+class MacroSection(_Section):
+    series: list[str] = ["fed_funds", "cpi", "unemployment", "us10y"]   # 读哪些宏观序列
+    max_rows: int = 40                   # 每序列至多交给角色多少行
+
+
+class ToolsSection(_Section):
+    max_tool_calls: int = 6              # 技术分析师一次调用里最多真正执行几次工具
+
+
+class SourcesSection(_Section):
+    """数据源链（BLUEPRINT 19.12）：每类数据按序尝试，逐个落到可用的那一个。"""
+
+    bars: list[str] = ["yahoo", "eastmoney"]
+    announcements: list[str] = ["sec", "eastmoney"]
+    news: list[str] = ["google_rss", "yahoo_rss"]
+    social: list[str] = ["stocktwits", "reddit"]
+    macro: list[str] = ["fred"]
+    markets: list[str] = ["polymarket"]
+
+
 class Settings(BaseSettings):
     """整个应用的一份只读配置。分节来自文件与环境，根级变量只来自环境。"""
 
@@ -75,9 +122,17 @@ class Settings(BaseSettings):
     budget: BudgetSection
     tiers: TiersSection
     disclosures: DisclosuresSection = DisclosuresSection()
+    portfolio: PortfolioSection = PortfolioSection()
+    memory: MemorySection = MemorySection()
+    news: NewsSection = NewsSection()
+    sentiment: SentimentSection = SentimentSection()
+    macro: MacroSection = MacroSection()
+    tools: ToolsSection = ToolsSection()
+    sources: SourcesSection = SourcesSection()
     base_url: str | None = None          # 裸模型名用的 OpenAI 兼容端点
     api_key: SecretStr | None = None     # 裸模型名用的密钥；打印时显示为掩码
     sec_contact: SecretStr | None = None     # IC_SEC_CONTACT：下载美股数据时自报的联系方式；打印时同样掩码
+    fred_api_key: SecretStr | None = None    # IC_FRED_API_KEY：FRED 宏观序列的密钥；缺省时 FRED 不可用
     force_offline: bool = False          # IC_FORCE_OFFLINE：忽略任何密钥，只运行离线演示
     today: date | None = None            # IC_TODAY：把"今天"钉住，离线演示在任何一天结果相同
 

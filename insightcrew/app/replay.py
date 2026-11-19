@@ -110,14 +110,18 @@ def _restored(data: dict[str, Any], settings: Settings) -> Settings:
 
 
 def _diff(before: dict[str, Any], after: dict[str, Any], outcome: Outcome) -> list[str]:
-    """结果四项与黑板快照的差异；空列表表示一致。"""
+    """结果四项与黑板快照的差异；空列表表示一致。
+
+    run/wall_ms 例外（问题 20 的 A 案，BLUEPRINT 19.5 第 5 条）：每分析师墙钟是真实时钟，
+    重放不可能复现，比较时忽略；2.2 之前的日志里没有这个键，同样不受影响。
+    """
     problems: list[str] = []
     original = before.get("run/outcome") or {}
     for field in _FIELDS:
         replayed = getattr(outcome, field)
         if original.get(field) != replayed:
             problems.append(f"结果 {field}：原 {original.get(field)!r}，重放 {replayed!r}")
-    for key in sorted(set(before) | set(after)):
+    for key in sorted((set(before) | set(after)) - {"run/wall_ms"}):
         if key not in after:
             problems.append(f"黑板 {key}：重放缺失")
         elif key not in before:

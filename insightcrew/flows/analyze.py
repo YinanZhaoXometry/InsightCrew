@@ -26,7 +26,11 @@ class FlowConfig(Contract):
     judge_rounds: int = 2                     # 评审最多几轮（即最多返工 judge_rounds - 1 次）
     quorum: int = 2
     parallel: bool = True                     # 分析师并行（--serial 关掉）；两种模式的日志相同（不变量 19）
-    channels: tuple[Literal["fundamentals", "disclosures"], ...] = ()   # 打开的证据通道；空 = 行为同 2.0
+    channels: tuple[Literal["fundamentals", "disclosures", "news", "sentiment", "macro"], ...] = ()
+    # ^ 打开的证据通道；空 = 行为同 2.0。macro 需要点名 news（prepare 处拒绝只开 macro 的组合）。
+    risk_rounds: int = 0                      # 三方风险辩论的轮数；0 = 不加 risk 节点（19.10）
+    tools: bool = False                       # 技术分析师可用 indicator 工具（19.11）
+    memory: bool = False                      # 记忆：开运行读课程、交付后记决策（19.13）
 
 
 async def call(run: Run, role: Role) -> Any:
@@ -41,11 +45,13 @@ async def call(run: Run, role: Role) -> Any:
 
 async def drive(run: Run, request: dict[str, Any], deps: Any, cfg: FlowConfig | None = None, *,
                 checkpointer: Any = None, thread_id: str | None = None,
-                resume: bool = False) -> Outcome:
+                resume: bool = False, wall_on_board: bool = False) -> Outcome:
     """analyze 的可续跑形式：真实运行由 app 层带着检查点与线程 ID 调它（BLUEPRINT 19.5 第 6 条）。
 
     checkpointer 与 thread_id 一起给出时，图在检查点处留档；resume=True 表示输入为 None、
-    从既有检查点继续（续跑前的状态由 app/resume.py 从日志重建）。
+    从既有检查点继续（续跑前的状态由 app/resume.py 从日志重建）。wall_on_board 只在真实
+    运行（wiring 的检查点入口）为 True：把每分析师墙钟写成黑板键 run/wall_ms（问题 20 的
+    A 案）。analyze 自身不写它——两次运行的墙钟必然不同，参照测试比较完整黑板时不能看到它。
     """
     cfg = cfg or FlowConfig()
     holder: dict[str, Any] = {}                # 结果从这里取回：ainvoke 会浅拷贝 configurable，但不会拷贝这个字典本身
@@ -64,6 +70,12 @@ async def drive(run: Run, request: dict[str, Any], deps: Any, cfg: FlowConfig | 
         outcome = _degrade(run, halt)
     run.board.put("run/outcome", outcome, by="flow")
     run.board.put("run/usage", run.budget.table(), by="flow")
+    if wall_on_board and holder.get("wall_ms"):
+        # 每分析师墙钟（19.5 第 5 条；问题 20 的 A 案）：独立黑板键，replay 的比对忽略它。
+        run.board.put("run/wall_ms", holder["wall_ms"], by="flow")
+    if cfg.memory and outcome.status == "delivered":
+        from . import stage_memory
+        stage_memory.record(run, deps)                  # 19.13：交付的运行追加一条决策；重放端口是空写替身
     stages.report(run, deps)                            # 报告只读黑板，不计算
     run.journal.append("run.finished", actor="flow", data={"status": outcome.status,
                                                            "reason": outcome.reason})

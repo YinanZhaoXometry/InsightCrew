@@ -29,10 +29,12 @@ class BudgetSpec(Contract):
 
 
 class Config(Contract):
-    """场景的流程与预算覆盖。"""
+    """场景的流程与预算覆盖；v2.2 起可带内联组合与记忆记录（BLUEPRINT 19.15）。"""
 
     flow: FlowConfig = FlowConfig()
     budget: BudgetSpec = BudgetSpec()
+    portfolio: dict[str, Any] | None = None     # 内联组合（Portfolio 的 JSON）；None = 没有
+    memory: list[dict[str, Any]] | None = None  # 内联决策/结果记录，替代真实决策日志
 
 
 class Expect(Contract):

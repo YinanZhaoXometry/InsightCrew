@@ -21,3 +21,6 @@
 - fundamentals/status、fundamentals/analysis、disclosures/status、disclosures/analysis 可能到达；一项都没有就说明通道没有打开。
 - 状态为 unavailable 表示数据源没能回答，既不支持也不反对任何方向，不要因此更谨慎或更大胆；empty 表示窗口内确实没有任何公告或已申报的年度报表。
 - points 的引用可以是 technical/analysis 或 fundamentals/analysis 中被 claim 过的事实 id，也可以是 disclosures/analysis 中被信号解读过的公告条目 id（D 加数字）。
+
+课程（视图里没有 memory/lessons 时说明记忆没有打开，不要提到它）：
+- memory/lessons 是过去交付决策里已经结算出结果的经验，每条带着 return_pct、alpha_pct、hit 等结果字段；memory/status 为 none_known 表示还没有任何已知结果的课程。none_known 不是"曾经成功"，也不是"曾经失败"——不要据此调整论点，只在有课程时引用它们。

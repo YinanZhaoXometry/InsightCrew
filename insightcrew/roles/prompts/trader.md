@@ -17,3 +17,7 @@
 - cites：定价时依据的事实 id。
 - 先定止损，再按限额反推仓位。
 - audit/trader 不为空时，只改正被指出的问题，与之无关的部分保持不变。
+
+组合与风险（视图里没有这些键时，说明它们没有打开，按原来的方式定价）：
+- portfolio/state 的 state 有四种：not_provided（没有组合文件）、flat（当前没有这个标的的持仓）、held（有持仓）、unavailable（组合货币与标的货币不一致，读不出仓位）。任何一种都不许当成另一种来猜；unavailable 时不要引用仓位或现金数字。
+- risk/aggressive、risk/neutral、risk/conservative 是三位风险评审对当前方案的意见（RiskView）。它们在视图里时：读他们的 critique 与 cites，只修正确实成立的问题；建议的 size_pct、stop、target 只是意见，采纳与否由你依据事实与限额决定，并在 rationale 里说明。修订只有一次。

@@ -11,10 +11,50 @@ audit_rounds = 3
 judge_rounds = 2
 quorum = 2
 # channels = ["fundamentals", "disclosures"]   # 证据通道；不写或留空 = 行为同 2.0（BLUEPRINT 18.8）
+#                                             # v2.2 另可点名 news、sentiment、macro（macro 需同时点名 news）
+# risk_rounds = 1                             # 三方风险辩论的轮数；不写 = 关（BLUEPRINT 19.10）
+# tools = true                                # 技术分析师的 indicator 工具；不写 = 关（19.11）
+# memory = true                               # 记忆：读课程、交付后记决策；不写 = 关（19.13）
 
 [disclosures]                # 公告通道的窗口与条目上限（BLUEPRINT 18.8）
 window_days = 90
 max_items = 30
+
+# ---- 版本 2.2（BLUEPRINT 19.15）：默认全关。WP38 之后才可能由 owner 打开 ----
+
+[portfolio]                  # 组合文件（19.9）；不写 path = 没有组合
+path = ""
+
+[memory]                     # 记忆（19.13）
+enabled = false
+path = "runs/memory/decisions.jsonl"
+same_ticker = 5
+other_ticker = 3
+holding_days = 5
+max_entries = 0              # 0 = 不限
+
+[news]                       # 新闻通道（19.12）
+window_days = 7
+max_items = 20
+
+[sentiment]                  # 社交情感通道（19.12）
+window_days = 7
+max_posts = 30
+
+[macro]                      # 宏观序列（19.12）；序列表在 data/macro.toml
+series = ["fed_funds", "cpi", "unemployment", "us10y"]
+max_rows = 40
+
+[tools]                      # 分析师工具（19.11）
+max_tool_calls = 6
+
+[sources]                    # 数据源链（19.12）：每类按序尝试
+bars = ["yahoo", "eastmoney"]
+announcements = ["sec", "eastmoney"]
+news = ["google_rss", "yahoo_rss"]
+social = ["stocktwits", "reddit"]
+macro = ["fred"]
+markets = ["polymarket"]
 
 [limits]
 max_requests = 40

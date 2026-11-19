@@ -110,8 +110,10 @@ def test_roles_see_only_what_they_declare_and_judges_never_see_the_debate():
     for judge in JUDGES:
         assert not {"bull/argument", "bear/argument"} & set(judge.reads)
         assert not any(k.startswith("judge.") for k in judge.reads), "评审看不到彼此的结论"
+        assert not any(k.startswith("risk/") for k in judge.reads), "评审不读风险辩论（19.10）"
     for role in ALL:
-        assert role.name == "trader" or "portfolio/state" not in role.reads
+        may_see_portfolio = role.name == "trader" or role.name.startswith("risk.")
+        assert may_see_portfolio or "portfolio/state" not in role.reads
 
 
 def test_channel_analysts_read_only_their_own_evidence():

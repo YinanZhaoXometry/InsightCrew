@@ -7,6 +7,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..domain.memory import Lesson
+from ..domain.news import NewsAnalysis
+from ..domain.risk import RiskView
+from ..domain.social import SentimentAnalysis
 from ..domain.types import Analysis, Argument, DisclosureAnalysis, Proposal, Thesis, Verdict
 from ..kernel.runtime import Role
 
@@ -17,7 +21,9 @@ _DEEP_OUT = 12000
 
 
 def _prompt(name: str, **fill: str) -> str:
-    text = (_DIR / f"{name}.md").read_text(encoding="utf-8")
+    """读一份提示词。以 <!-- 开头的行是版权署名（BLUEPRINT 19.4），模型永远看不到。"""
+    lines = (_DIR / f"{name}.md").read_text(encoding="utf-8").splitlines()
+    text = "\n".join(line for line in lines if not line.startswith("<!--"))
     for key, value in fill.items():
         text = text.replace("{" + key + "}", value)
     return text.rstrip() + "\n\n" + (_DIR / "_common.md").read_text(encoding="utf-8").rstrip()
@@ -28,10 +34,24 @@ TECHNICAL = Role(
     reads=("ledger/instrument", "ledger/facts", "ledger/card", "audit/technical"),
     writes="technical/analysis", output=Analysis, max_output_tokens=_QUICK_OUT)
 
-# 证据通道的键（BLUEPRINT 18.9）：插在 technical/analysis 之后。通道关闭时这些键不上黑板，
+# 证据通道的键（BLUEPRINT 18.9、19.12）：插在 technical/analysis 之后。通道关闭时这些键不上黑板，
 # Board.view 跳过缺席的键，所以不开通道的运行提示词与版本 2.0 逐字相同。
 _CHANNELS_BRIEF = ("fundamentals/status", "fundamentals/analysis",
-                   "disclosures/status", "disclosures/analysis")
+                   "disclosures/status", "disclosures/analysis",
+                   "news/status", "news/analysis",
+                   "sentiment/status", "sentiment/analysis")
+
+NEWS = Role(
+    "news", "quick", _prompt("news"),
+    reads=("ledger/instrument", "news/items", "news/card", "news/status",
+           "macro/facts", "macro/markets", "macro/status", "audit/news"),
+    writes="news/analysis", output=NewsAnalysis, max_output_tokens=_QUICK_OUT)
+
+SENTIMENT = Role(
+    "sentiment", "quick", _prompt("sentiment"),
+    reads=("ledger/instrument", "sentiment/posts", "sentiment/card",
+           "sentiment/status", "audit/sentiment"),
+    writes="sentiment/analysis", output=SentimentAnalysis, max_output_tokens=_QUICK_OUT)
 
 BULL = Role(
     "bull", "quick", _prompt("bull"),
@@ -51,11 +71,43 @@ MANAGER = Role(
     writes="manager/thesis", output=Thesis, effort="high",
     max_output_tokens=_DEEP_OUT)
 
+_RISK_KEYS = ("risk/aggressive", "risk/neutral", "risk/conservative")
+
+RISK_AGGRESSIVE = Role(
+    "risk.aggressive", "quick", _prompt("risk_aggressive"),
+    reads=("ledger/instrument", "ledger/facts", "manager/thesis", "trader/proposal",
+           "portfolio/state", "rules/limits", *_RISK_KEYS),
+    writes="risk/aggressive", output=RiskView, max_output_tokens=_QUICK_OUT)
+
+RISK_NEUTRAL = Role(
+    "risk.neutral", "quick", _prompt("risk_neutral"),
+    reads=("ledger/instrument", "ledger/facts", "manager/thesis", "trader/proposal",
+           "portfolio/state", "rules/limits", *_RISK_KEYS),
+    writes="risk/neutral", output=RiskView, max_output_tokens=_QUICK_OUT)
+
+RISK_CONSERVATIVE = Role(
+    "risk.conservative", "quick", _prompt("risk_conservative"),
+    reads=("ledger/instrument", "ledger/facts", "manager/thesis", "trader/proposal",
+           "portfolio/state", "rules/limits", *_RISK_KEYS),
+    writes="risk/conservative", output=RiskView, max_output_tokens=_QUICK_OUT)
+
 TRADER = Role(
     "trader", "quick", _prompt("trader"),
     reads=("ledger/instrument", "ledger/facts", "manager/thesis", "portfolio/state",
-           "rules/limits", "audit/trader", "judges/on_levels"),
+           "rules/limits", "audit/trader", "judges/on_levels", *_RISK_KEYS),
     writes="trader/proposal", output=Proposal, max_output_tokens=_QUICK_OUT)
+
+REFLECTOR = Role(
+    "reflector", "quick", _prompt("reflector"),
+    reads=("settle/decision", "settle/outcome"),
+    writes="settle/lesson", output=Lesson, max_output_tokens=_QUICK_OUT)
+
+# 技术分析师的两种声明（19.11）：不开工具时与 2.1 相同；开工具时多一个 indicator 工具。
+# max_tool_calls 的实际值来自 [tools] 设置，装配处（wiring）用 dataclasses.replace 换入。
+TECHNICAL_TOOLS = Role(
+    "technical", "quick", _prompt("technical"),
+    reads=TECHNICAL.reads, writes=TECHNICAL.writes, output=Analysis,
+    tools=("indicator",), max_tool_calls=6, max_output_tokens=_QUICK_OUT)
 
 # 两个证据通道的分析师（BLUEPRINT 18.9）。只在通道打开且状态为 available 时被调用；
 # 各读各的证据，看不到价格事实、看不到彼此的输出。
@@ -83,4 +135,7 @@ JUDGES = tuple(
          writes=f"judge.{lens}/verdict", output=Verdict, effort="low", max_output_tokens=_QUICK_OUT)
     for lens, brief in LENSES.items())
 
-ALL = (TECHNICAL, FUNDAMENTALS, DISCLOSURES, BULL, BEAR, MANAGER, TRADER, *JUDGES)
+# TECHNICAL_TOOLS 是 TECHNICAL 的开工具形态（同一个角色、同一个键），不单独计入 ALL。
+ALL = (TECHNICAL, FUNDAMENTALS, DISCLOSURES, NEWS, SENTIMENT,
+       BULL, BEAR, RISK_AGGRESSIVE, RISK_NEUTRAL, RISK_CONSERVATIVE,
+       MANAGER, TRADER, REFLECTOR, *JUDGES)

@@ -19,6 +19,7 @@ from ..domain import symbols
 from ..domain.audit import audit as audit_numbers
 from ..domain.fundamentals_ledger import build_fundamentals, recompute_fundamentals
 from ..domain.ledger import build_ledger, disagreements, recompute_ledger
+from ..domain.macro import MarketEntry
 from ..domain.market import (
     Bar,
     Instrument,
@@ -28,6 +29,9 @@ from ..domain.market import (
     SourceUnavailable,
     UnknownTicker,
 )
+from ..domain.news import NewsAnalysis, NewsEntry
+from ..domain.portfolio import PortfolioState
+from ..domain.social import PostEntry, SentimentAnalysis
 from ..domain.types import (
     Analysis,
     AnalysisSeq,
@@ -44,11 +48,13 @@ from ..domain.types import (
     Thesis,
 )
 from ..kernel.runtime import Halt, Run
+from . import stage_news, stage_sentiment
 from .deps import Deps
 
 _INTAKE_RULES = ("data_fresh", "min_history")
-_OWNERS = ("technical", "fundamentals", "disclosures", "manager", "trader")
-_CHANNELS: tuple[Literal["fundamentals", "disclosures"], ...] = ("fundamentals", "disclosures")
+_OWNERS = ("technical", "fundamentals", "disclosures", "news", "sentiment", "manager", "trader")
+_CHANNELS: tuple[Literal["fundamentals", "disclosures", "news", "sentiment"], ...] = (
+    "fundamentals", "disclosures", "news", "sentiment")
 
 
 def _gate(run: Run, gate: str, detail: list[dict[str, Any]]) -> None:
@@ -154,9 +160,11 @@ def ledger(run: Run, deps: Deps) -> None:
 # ---- 证据通道（BLUEPRINT 18.8）----
 
 
-def evidence(run: Run, deps: Deps, channels: tuple[Literal["fundamentals", "disclosures"], ...]) -> None:
-    """证据阶段。按 fundamentals、disclosures 的固定顺序读取每个被点名的通道，
-    写它的键，最后记一条 gate.checked（gate = "evidence"）。
+def evidence(run: Run, deps: Deps,
+             channels: tuple[Literal["fundamentals", "disclosures", "news", "sentiment", "macro"], ...]
+             ) -> None:
+    """证据阶段。按 fundamentals、disclosures、news（含宏观）、sentiment 的固定顺序
+    读取每个被点名的通道，写它的键，最后记一条 gate.checked（gate = "evidence"）。
 
     通道读不到绝不停下运行（BLUEPRINT 决策 35）：不可用就写明原因，继续；
     唯一的例外是基本面两条计算路径的分歧——那是代码的 bug，停机核对。
@@ -174,8 +182,12 @@ def evidence(run: Run, deps: Deps, channels: tuple[Literal["fundamentals", "disc
             close = ledger["close"].value if "close" in ledger else None
             close_date = date.fromisoformat(card.last_bar)
             _fundamentals(run, deps, scope.ticker, instrument, close, close_date, as_of)
-        else:
+        elif channel == "disclosures":
             _disclosures(run, deps, scope.ticker, as_of)
+        elif channel == "news":
+            stage_news.evidence(run, deps, channels)     # news 通道同时覆盖宏观（19.12）
+        else:
+            stage_sentiment.evidence(run, deps, channels)
     _gate(run, "evidence", [])
 
 
@@ -264,13 +276,21 @@ def channel_ready(run: Run, channel: str) -> bool:
 def audit(run: Run, deps: Deps) -> list[Finding]:
     """L2 数字核对 + L3 规则检查。每次调用都重写 audit/* 各键，并记一条 gate.checked 事件。
 
-    通道分析在板上才交给审计（18.8）：audit/fundamentals、audit/disclosures 和 audit/channels
-    只在对应的键存在时写，所以通道关闭的运行里审计写出的键与版本 2.0 相同。
+    通道分析在板上才交给审计（18.8）：audit/<owner> 与 audit/channels 只在对应的键存在时写，
+    所以通道关闭的运行里审计写出的键与版本 2.0 相同。版本 2.2（19.11、19.12）：claim 的
+    查证池是 ledger/facts ∪ tools/facts ∪ macro/facts；news 与 sentiment 的分析以关键字参数
+    交给 domain.audit；规则评估拿到 portfolio/state 的 position_pct/cash_pct（19.9）。
     """
-    facts = run.board.get("ledger/facts", list[Fact])
+    ledger_facts = run.board.get("ledger/facts", list[Fact])
     analysis = run.board.get("technical/analysis", Analysis)
     thesis = run.board.get("manager/thesis", Thesis)
     proposal = run.board.get("trader/proposal", Proposal)
+
+    pool = list(ledger_facts)                                   # claim 查证池（不变量 21）
+    if run.board.has("tools/facts"):
+        pool += run.board.get("tools/facts", list[Fact])
+    if run.board.has("macro/facts"):
+        pool += run.board.get("macro/facts", list[Fact])
 
     fundamentals = None
     if run.board.has("fundamentals/analysis"):
@@ -280,10 +300,27 @@ def audit(run: Run, deps: Deps) -> list[Finding]:
     if run.board.has("disclosures/analysis"):
         disclosures = (run.board.get("disclosures/items", list[Item]),
                        run.board.get("disclosures/analysis", DisclosureAnalysis))
+    news = None
+    if run.board.has("news/analysis"):
+        news = (run.board.get("news/items", list[NewsEntry]),
+                run.board.get("macro/markets", list[MarketEntry]),
+                run.board.get("macro/facts", list[Fact]),
+                run.board.get("news/analysis", NewsAnalysis))
+    sentiment = None
+    if run.board.has("sentiment/analysis"):
+        sentiment = (run.board.get("sentiment/posts", list[PostEntry]),
+                     run.board.get("sentiment/analysis", SentimentAnalysis))
 
-    rule_results = rulebook.evaluate(proposal, thesis, {f.id: f.value for f in facts}, deps.rules)
-    findings = audit_numbers(facts, analysis, thesis, proposal, rule_results,
-                             fundamentals=fundamentals, disclosures=disclosures)
+    state = (run.board.get("portfolio/state", PortfolioState)
+             if run.board.has("portfolio/state") else None)
+    position_pct = state.position_pct if state is not None and state.state in ("flat", "held") else 0.0
+    cash_pct = state.cash_pct if state is not None and state.state in ("flat", "held") else None
+
+    rule_results = rulebook.evaluate(proposal, thesis, {f.id: f.value for f in pool}, deps.rules,
+                                      position_pct=position_pct, cash_pct=cash_pct)
+    findings = audit_numbers(pool, analysis, thesis, proposal, rule_results,
+                             fundamentals=fundamentals, disclosures=disclosures,
+                             news=news, sentiment=sentiment)
 
     run.board.put("audit/rules", rule_results, by="audit")
     run.board.put("audit/findings", findings, by="audit")

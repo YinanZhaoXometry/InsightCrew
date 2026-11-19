@@ -34,11 +34,13 @@ from ..kernel.board import Board
 from ..kernel.budget import Budget
 from ..kernel.events import Event, Journal
 from ..kernel.runtime import Run
+from . import backtest as backtest_cmd
 from . import check as check_cmd
 from . import fetch as fetch_cmd
 from . import replay as replay_cmd
 from . import resume as resume_cmd
 from . import server as server_cmd
+from . import settle as settle_cmd
 from .settings import Settings, load
 from .wiring import ROOT, BadRequest, Job, build_deps, describe_models, open_run, prepare, write_page
 from .wiring import run_flow as run_flow_with_checkpoints
@@ -78,7 +80,13 @@ def analyze(
     scenario: Annotated[str, typer.Option("--scenario", help="用预先写好的回复跑一个场景")] = "",
     universe: Annotated[str, typer.Option("--universe", help="数据集名字，默认取设置文件")] = "",
     channels: Annotated[str, typer.Option(
-        "--channels", help="打开的证据通道，逗号分隔：fundamentals、disclosures")] = "",
+        "--channels", help="打开的证据通道，逗号分隔：fundamentals、disclosures、news、sentiment、macro")] = "",
+    portfolio: Annotated[str, typer.Option(
+        "--portfolio", help="组合文件（JSON），如 data/portfolios/held_acme.json；不给则用设置里的")] = "",
+    risk_rounds: Annotated[int | None, typer.Option(
+        "--risk-rounds", min=0, help="三方风险辩论的轮数；0 = 关")] = None,
+    tools: Annotated[bool, typer.Option("--tools", help="技术分析师可用 indicator 工具")] = False,
+    memory: Annotated[bool, typer.Option("--memory", help="读过去的课程、交付后记决策")] = False,
     no_judges: Annotated[bool, typer.Option("--no-judges", help="跳过模型评审")] = False,
     debate_rounds: Annotated[int | None, typer.Option("--debate-rounds", min=0, help="辩论轮数")] = None,
     serial: Annotated[bool, typer.Option("--serial", help="分析师按顺序跑，不并行（日志与并行相同）")] = False,
@@ -91,8 +99,11 @@ def analyze(
     try:
         job = prepare(settings, ticker=ticker, as_of=date, scenario=scenario,
                       judges=False if no_judges else None, debate_rounds=debate_rounds,
-                      channels=names, parallel=False if serial else None)
-        run, deps = open_run(settings, job.request, scenario=job.scenario, flow=job.flow)
+                      channels=names, parallel=False if serial else None,
+                      portfolio=portfolio, risk_rounds=risk_rounds,
+                      tools=True if tools else None, memory=True if memory else None)
+        run, deps = open_run(settings, job.request, scenario=job.scenario, flow=job.flow,
+                             portfolio=job.portfolio_path)
     except BadRequest as e:
         _fail(str(e))
     except OSError as e:
@@ -308,9 +319,42 @@ def check() -> None:
 def fetch(
     tickers: Annotated[list[str], typer.Argument(help="一个或多个代码")],
     years: Annotated[int, typer.Option("--years", min=1, help="下载几年的日线")] = 3,
+    news: Annotated[bool, typer.Option("--news", help="同时下载新闻归档（需联网，会先征得同意）")] = False,
+    social: Annotated[bool, typer.Option("--social", help="同时下载社交帖子归档")] = False,
+    macro: Annotated[bool, typer.Option("--macro", help="同时下载 FRED 宏观序列（需 IC_FRED_API_KEY）")] = False,
+    markets: Annotated[bool, typer.Option("--markets", help="同时下载 Polymarket 预测市场当日快照")] = False,
 ) -> None:
-    """下载真实行情到 data/market/real/（连同各自的基准指数）。"""
-    raise typer.Exit(fetch_cmd.run(_settings(), tuple(tickers), years))
+    """下载真实行情到 data/market/real/（连同各自的基准指数），可再下载线上数据归档。"""
+    raise typer.Exit(fetch_cmd.run(_settings(), tuple(tickers), years,
+                                   news=news, social=social, macro=macro, markets=markets))
+
+
+@app.command()
+def settle(
+    known_by: Annotated[str, typer.Option("--known-by", help="结算到哪一天（YYYY-MM-DD）；缺省用今天")] = "",
+) -> None:
+    """结算持有期已走完的决策，并让反思者写下课程（19.13）。"""
+    try:
+        raise typer.Exit(settle_cmd.run(_settings(), known_by))
+    except NotImplementedError as e:
+        _fail(str(e))
+
+
+@app.command()
+def backtest(
+    tickers: Annotated[list[str], typer.Argument(help="一个或多个代码")],
+    from_date: Annotated[str, typer.Option("--from", help="起始日（YYYY-MM-DD）")],
+    to_date: Annotated[str, typer.Option("--to", help="结束日（YYYY-MM-DD）")],
+    every: Annotated[int, typer.Option("--every", min=1, help="每几个交易日分析一次")] = 5,
+    run_id: Annotated[str, typer.Option("--run-id", help="续跑用的批次名；同名的批次接着跑")] = "",
+    yes: Annotated[bool, typer.Option("--yes", help="真实模型下的回测需要显式确认")] = False,
+) -> None:
+    """按交易日网格回测：逐日先结算再分析，记忆开着（19.13）。"""
+    try:
+        raise typer.Exit(backtest_cmd.run(_settings(), tuple(tickers), from_date, to_date,
+                                          every, run_id, yes))
+    except NotImplementedError as e:
+        _fail(str(e))
 
 
 @app.command(name="eval")
