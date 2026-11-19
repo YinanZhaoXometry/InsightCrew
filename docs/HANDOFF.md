@@ -624,7 +624,7 @@ Files created or changed: `insightcrew/flows/stages.py`, `insightcrew/app/wiring
 
 After the report, the owner answered two questions: move the key to `.env`, and commit by path to `v2` without pushing. Done: `.env` holds the key and `.env.example` is back to its committed text; `tests/test_scenarios.py` now loads its settings with `force_offline=True`, so that no test can build a real model from `.env`; the three checks were run again with `.env` present (`360 passed in 11.40s`, ruff clean, pyright 0 errors). No real-model call was made.
 
-Committed: yes, on `v2`, by path, not pushed. The hash is in the status-board commit that follows it.
+Committed: `049cf70`, on `v2`, by path, not pushed.
 
 For the next session: WP8. Every run without a scenario now calls the real model and costs money; start with `uv run insightcrew check`. The seven differences from the blueprint's text are still waiting for the owner (open questions).
 
