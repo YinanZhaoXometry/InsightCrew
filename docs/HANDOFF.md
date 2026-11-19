@@ -72,12 +72,12 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 29 | Version 2.2: memory core | done | 31 测（test_memory 23 + test_decision_log 8）：settle 在窗口走完前 None、两路逐项一致、hit 四情形（同根同日按 stop）、select_lessons 不见 as_of 之后的结果（不变量 20）、两进程 spawn 并发追加一条不丢、重复 decision 忽略、pending 永不淘汰。结算与缺基准的读法四条待主人：问题 21–24。 |
 | 30 | Version 2.2: source chain, live adapters, `fetch` | done | `first_ok`+`scrub`（`adapters/vendors.py`，改编自 router/errors/net，带头行）、五个线上适配器（news_rss、stocktwits、reddit、fred、polymarket，除 news_rss 外均带 19.4 头行），各自把夹具解析成 19.8 的归档形状；46 个测试全部离线（夹具全部手工构造，各夹具目录注明，未发任何真实请求）。`fetch` 增 news/social/macro/markets 关键字参数（默认关）与 `SourceOrder` 链参数（缺省 19.12 全链；bars 缺省顺序与 2.1 相同）；归档合并（url 去重、covers_from 留在首写日、macro 按 (date, realtime_start) 并集、markets 按天一份）用 MockTransport 临时脚本离线验证。线上验收等 owner 批准端点与 `IC_FRED_API_KEY`；问题 25–26。 |
 | 31 | Version 2.2: integration points (every shared file) | in progress | Alone. Needs WP22 to WP29. Overnight session; question 20 applied per its option A.
-| 32 | Version 2.2: portfolio and risk in the flow | not started | |
-| 33 | Version 2.2: tools in the flow | not started | |
-| 34 | Version 2.2: news, macro, sentiment in the flow | not started | |
-| 35 | Version 2.2: memory, `settle`, `backtest` | not started | |
-| 36 | Version 2.2: report, page, `serve` | not started | |
-| 37 | Version 2.2: evaluations | not started | |
+| 32 | Version 2.2: portfolio and risk in the flow | done | Overnight session. stage_risk 正文（每轮 aggressive→conservative→neutral→trader，同步签名经线程桥跑异步内核）、stage_portfolio 仅文档句更新；五场景全 ✓ 相符（预存 21 个逐一验证亦 ✓）；test_stage_portfolio_risk.py 8 项绿；43/43 归档重放一致；本包文件 ruff/pyright 干净。两条第 7 节请求（v22_switches 的 risk 桩断言、wiring 的组合指纹）；全量 `scenarios` 仍被 WP34 的 macro_clean 挡住（WP34 的请求行）。 | |
+| 33 | Version 2.2: tools in the flow | done | Overnight session. Script 学会恰两键 {"tool","args"} 的回答（内核包装真执行、结果送回）、Replay 原样重放录制的工具调用；两场景 tools_clean、tools_out_of_range 均 ✓ 相符（tools/facts 形状缺口由协调者按 §7 请求修复：板键存完整 Fact、模型仍收四键；xfail 标记已摘）。 |
+| 34 | Version 2.2: news, macro, sentiment in the flow | done | Overnight session. stage_news/stage_sentiment 正文：窗口、上限、显式缺席、宏观双路径复算、markets 的 fetched_on 规则；四场景 news_clean、news_uncovered、sentiment_clean、macro_clean 均 ✓ 相符（stages.audit 的宏观键守卫由协调者按 §7 请求补上）。真实归档的 facts 验收仍等 WP30 端点批准。 |
+| 35 | Version 2.2: memory, `settle`, `backtest` | done | Overnight session. stage_memory 正文（lessons：重放替身的 journaled_lessons 原样奉还（决策 44）、场景内联字典行先校验再 select_lessons、空时写 none_known；record：交付运行按黑板组 DecisionRecord，替身写入为空操作）；flows/settle：待决逐条两路核对六个计算字段，一致才落账（分歧保持待决并汇报），基准经同一行情端口读（宇宙没有 SPY/_HSI 时两端无价、结果照算——问题 22 的读法），每个新结果在 runs/memory/settle/<id>/ 开小运行跑 reflector、lesson_findings 审计通过才把教训随结果一次 resolve 落账（问题 31 的读法），复盘不可用或审计不过则结果照落、教训留空；settle/backtest 命令落地（真实模型没有 --yes 拒绝、退出码 2；进度 progress.json 原子写、同 --run-id 续跑跳过已完成格子、批次预算超限即停、收尾把 to 结一遍、按评级汇总笔数/已结算/平均收益/平均超额/先触止损/目标）。两场景 ✓（memory_lessons 只见分析日前的教训、memory_record 空起点照常交付）；tests/test_memory_flow.py 8 项 + tests/test_backtest.py 7 项绿（三日期网格 08-03/08-10/08-17、先结算后分析、不变量 20 逐格核对、同 --run-id 复跑不做新事、batch_tokens=15000 停后加预算续跑补第三格）；test_memory/test_decision_log 原样绿；本包文件 ruff/pyright 干净；21 个既有场景逐一 ✓、归档重放抽 1 个一致（43/43 由 WP36 当夜全量验证）。遗留：test_v22_switches 的 memory 项因 WP29 决策日志锁文件先于 _write 建目录而挂（第 7 节 WP35 请求行）；问题 31（resolve 与教训的次序）、32（场景空 memory 的 falsy 缝）。 |
+| 36 | Version 2.2: report, page, `serve` | done | Overnight session. 六个新节全部按键驱动（组合状态/风险三方意见（只立场与批评）/工具事实进事实表并标注/新闻与宏观（预测市场单列"来源原话，未经核验"）/社交情感/用到的课程；run/wall_ms 在板上才画墙钟——问题 20 的 C 案下从不出现，分支已备）；页面：news/sentiment/risk 流水线段与泳道、ACTOR_STAGE/KEY_STAGE 映射、并行分析师组（≥2 位时并列成框、无箭头）、墙钟标签、镜像报告的证据区块、表单五字段（组合文件/风险轮数/工具/记忆/通道多选）经 prepare/open_run 透传，坏组合文件 422 且回复不带路径；replay_html.py 无需改动。本包文件 pytest 71 项绿、ruff/pyright 干净、页面 JS 过 node --check；demo 与 uncovered 的报告新旧模块逐字节相同；21 个既有场景逐一 ✓ 相符；43/43 归档重放一致；新增 13 场景中 12 个的报表已实跑核对（portfolio×3、risk×2、sentiment_clean、news_uncovered、memory×2、tools_out_of_range、news_clean、tools_clean——守卫修复落地后最后两个转绿）；仅 macro_clean 仍被挡：刚刚落地的 stages.audit 守卫把 `board.get("macro/facts", [])` 的第二参（应为类型）写成了列表，macro 键在板即 `TypeAdapter([])` 崩（该行的修正属 stages.py 的 owner）；宏观区块的报表在单元测试里以手造板键验证。续跑标记未做：日志没有续跑标记事件（按指示跳过）。全仓 pytest 的失败全在他人文件（见日志）。 |
+| 37 | Version 2.2: evaluations | done | Overnight session (问题 29 授权)。`eval all` 打印全部新行并退出 0：inject 加版本 2.2 块（组合状态翻转 ×2、新闻 claim 引未知宏观事实、情绪信号引未知帖、情绪分出带、教训带数字——6/6 发现、0/2 误报）；consistency 加工具块（7 家族 × 3 分析日 × 3 窗口 = 63 次调用，flows/tools 内部两路 + evals 独立复算 recompute 比对）与宏观块（4 序列 × 3 变换 × 8 分析日 = 96 点，macro vs macro_sql）；pit 加六块（新闻 9、社交 9、宏观 91 含 cpi 两次重述逐日 329.4→329.5/337.0→337.2、预测市场 6（fetched_on==as_of，评测自建临时档案、就地实现 19.8 规则，与 WP34 的 stage_news._markets 同一条规则各持一份）、教训 5（含边界日成员断言）、工具 63（漏 bar 检查，诚实端口 vs 无视 as_of 的坏端口同答案））。新测试 16 项（tests/test_inject.py、test_consistency.py、test_pit.py，各含伪造分歧/泄漏的检出用例）。run.py 仅 docstring（`all` 三项未变，新行随各评测打印）。 |
 | 38 | Version 2.2: real-model runs and ablation | not started | Spending only after the owner's yes and cap. |
 | 39 | Version 2.2: documents, notices, packaging | not started | Alone. |
 
@@ -481,6 +481,9 @@ Questions for the owner, and gaps found while building:
 | 27 | 2026-11-20 | 22 | **tests/test_architecture.py 第三方白名单的三处放宽（不变量 12 修正案的机械后果）。** (i) `flows` 增加 `langgraph`（19.17 明文）与 `langchain_core`——langgraph 的 `RunnableConfig` 类型别名定义在 langchain_core，节点必须用它注解 config 才会被注入 configurable；(ii) `app` 增加 `langgraph`（wiring/resume 引入 SQLite 检查点，19.17 明文）。此外 resume 重放已花预算用的 `RunUsage` 经 `kernel.runtime` 的既有重导出取得（`from ..kernel.runtime import RunUsage`），未新增白名单。SQLite 检查点用 `AsyncSqliteSaver`（`SqliteSaver` 的异步方法全部未实现而图是异步的），其依赖 aiosqlite 已作为 langgraph-checkpoint-sqlite 的传递依赖在 uv.lock 里，**没有新增任何包**。确认这三处放宽。 | — |
 | 29 | 2026-11-20 | 31–39 | **夜间授权（owner 原话）**："帮我计划以后依次进行，不需要人为干预，我明早再起来验收"（2026-11-20 00:50）。据此：(i) WP31 起各包按 5.5 顺序自动推进，未决问题按各自行内记录的建议读法执行，均可在验收时否决回滚；(ii) 问题 20 按 A 案执行（`run/wall_ms` 新黑板键 + `app/replay.py::_diff` 忽略该键，随 WP31 落地）；(iii) **真实模型一律不花**（WP38 只搭离线脚手架，上限与放行等 owner 醒后批准）；(iv) **不发任何真实网络请求**（WP30 端点清单不变）；(v) 提交仍按路径逐包进行，不推送。 | Owner, 2026-11-20 00:50（本行即记录） |
 | 28 | 2026-11-20 | 22 | **tests/test_cli.py 一行修正（问题 10 的先例）。** `test_analyze_with_nothing_runs_the_demo_and_writes_four_files` 断言运行目录恰好四个文件；19.5 第 6 条要求每个真实运行在 `<run dir>/checkpoints.sqlite` 留检查点，第五个文件由此而来。已把 `checkpoints.sqlite` 加进期望集合（cases 不减不弱）。若不同意，替代方案是 scripted 运行不留检查点（wiring.run_flow 按 mode 判断），说一声即改。 | — |
+| 30 | 2026-11-20 | 37 | **pit 预测市场块的读取规则各持一份。** 仓库没有 markets 合成档案（WP34 的读取器又只读仓库数据目录，而评测要读自建临时档案），故 `evals/pit.py::_markets_rows` 按 19.8 原文就地实现 fetched_on==分析日 的规则，与 `flows/stage_news.py::_markets` 同一条规则两处各一份（pit 的 docstring 已注明同改约定）。建议读法：保持两份（读取器是私有函数，WP34 仍在改）；若 owner 想收敛，可在 WP39 前把它挪进 domain 或 adapters 一处，两个调用方同改。 | — |
+| 31 | 2026-11-20 | 35 | **settle 的落账与教训写回次序。** 任务书的字面次序是"先 log.resolve(路径 1 的记录)，复盘通过后把教训写回该记录"；但 DecisionLog.resolve 对同一 (as_of, ticker) 是一次性的（第二条 outcome 被忽略），日志也没有更新接口，"先落账再写回"在该冻结 API 下不可能。WP35 的读法：先复盘、lesson_findings 审计，通过则把 lesson 放进路径 1 的 OutcomeRecord 后**一次性** resolve（教训随结果同条落账）；复盘不可用或审计不过则 resolve 一条 lesson=null 的结果（结果不丢，下次结算不会重来）。确认这个次序。附带一读：flows.settle.settle 与 app 两命令在桩签名之后只加了带默认值的关键字参数（holding_days、models、runs_root、limits、output_mode、note / runs_root、settle_root），cli 的调用形状不变——测试与续跑需要这些注入点。 | — |
+| 32 | 2026-11-20 | 35 | **场景 `memory: []` 的 falsy 缝。** wiring.open_run 以 `scenario.config.memory` 为真值决定换不换 _ScenarioLog：空列表为假，于是"记忆开、内联记录从空开始"的场景会落到**真实**决策日志上（读取它、交付后还写入它），场景命令每次都会污染 runs/memory/decisions.jsonl。WP35 的 memory_record 因此放了一条**只有 pending 决策**的内联记录（无结果即无教训，语义等于空起点，_ScenarioLog 生效、写入为空操作）。若 owner 更想要字面的空列表，需把 wiring 的条件改成 `is not None`（一行，WP31 的文件，随本条定夺一并改）。 | — |
 
 ### Version 2.2: shared-file requests
 
@@ -488,6 +491,13 @@ A core or integration package that needs a change in a shared file writes it her
 
 | Date | From WP | File | Change | Why | Applied by |
 |---|---|---|---|---|---|
+| 2026-11-20 | 34 | `insightcrew/flows/stages.py` | `audit` 里 news 元组的两行改为守卫读取：`run.board.get("macro/markets", list[MarketEntry]) if run.board.has("macro/markets") else []`，`macro/facts` 同样处理（`news/items`/`news/analysis` 与 sentiment 元组不必动：它们与 news/analysis 同生共死）。 | 只要 `news/analysis` 在板而 macro 键缺席，`board.get` 就 KeyError：news 单开（场景 `news_clean`）或 macro 开而宇宙没有 markets 档案（场景 `macro_clean`，合成宇宙就没有）都触发，且 `insightcrew scenarios` 命令在 `macro_clean` 处整体中止。19.8 第 4 条不允许 macro 关时写 macro 键，所以无法从 WP34 一侧修。 | |
+| 2026-11-20 | 34 | `tests/test_v22_switches.py` | `test_news_and_macro_on_write_unavailable_statuses` 与 `test_sentiment_on_writes_unavailable_status` 断言的是 WP34 桩（注释自认"WP34 的桩"）；WP34 已填正文，合成宇宙 ACME@2026-09-30 的 news/sentiment/macro 都是 available。改为断言真实状态（news/macro 下 technical、news 都被调用、照常 delivered——需给剧本补 news 回复），或改用 `news_uncovered` 的 0000.HK 请求保住"不可用不调用"的检查。 | 桩断言与真实阶段冲突：news 变 available 后剧本没有 news 回复，运行以 model_unavailable 停成 review。 | |
+| 2026-11-20 | 34 | `tests/test_scenarios.py` | `test_the_channel_scenarios_expect_what_blueprint_1813_states` 的 `assert len(by_name) == 21` 按版本 2.2 的场景数放宽（WP32 +5、WP33 +2、WP34 +4、WP35 +2；写 `>= 21` 或届时精确数）。 | 集成包各自只能建自己的场景文件，谁也不能改这个共享测试；不改则每加一个场景它都失败。 | |
+| 2026-11-20 | 33 | `insightcrew/flows/tools.py`、`tests/test_tools.py` | `indicator` 里收集进 `ToolBox.facts` 的从面向模型的四键结果 `result` 换成同一处已造好的完整事实：`facts.append(fact)`（`seen` 去重与顺序不变；工具返回给模型的四键 `{"id","value","unit","as_of"}` 是 19.11 原文，不动）。`tests/test_tools.py::test_facts_are_collected_in_call_order_without_duplicates` 的 `tools.facts == [first, second]` 相应改为比对 Fact 字段（id、value 仍逐一断言，另可加 label/source/bars_used；cases 不减不弱）。修好后摘掉 `tests/test_tools_flow.py` 里两个 `xfail(strict=True)` 标记（XPASS 报错即提醒）。 | `flows/graph.py` 的 join 把 `.facts` 原样写上黑板键 `tools/facts`，而 `flows/stages.py` 的 audit 用 `board.get("tools/facts", list[Fact])` 校验、再把池子交给 audit_numbers——四键 dict 缺 label/source/bars_used，任何一次成功的工具调用都会在审计处 ValidationError 崩掉整个运行。WP33 的 tools_clean 场景与"成功调用"两项测试因此暂记 xfail(strict)。 | |
+| 2026-11-20 | 32 | `tests/test_v22_switches.py` | `test_risk_rounds_on_runs_the_stub_and_changes_nothing`（注释自认"WP32 的桩不写键"）随 WP32 填正文而过时，改为断言真实行为：给剧本补 risk 三回复后 `delivered`、`risk/aggressive|conservative|neutral` 三键上板、调用序列在 trader 之后为 `risk.aggressive → risk.conservative → risk.neutral → trader → 评审`（写法可参照 `tests/test_stage_portfolio_risk.py::test_risk_shrinks_size_adopts_the_conservative_view`）；或不给回复、断言按规则停机（`review`、原因 `model_unavailable`）。 | 桩的三条断言（delivered、无 risk 键、调用序列不变）与真实阶段互斥：剧本没有 risk.* 回答时 Script 抛 ModelAPIError，正文按规则停机降级为 review。与 WP34 记的两条 v22_switches 桩断言同属一族，可一并更新。 | |
+| 2026-11-20 | 32 | `app/wiring.py` | `run_signature` 的 `portfolio_fingerprint(None)` 改为 `portfolio_fingerprint(deps.portfolio)`（该函数自己的注释就写着"WP31 接入后改为实际组合的指纹"；`open_run` 在写 run.started 之前已把 `deps.portfolio` 换成真组合，改动只需这一个词）。 | 现在不同组合、同请求同配置的两个运行签名相同：`resume` 可能拿别人的检查点在另一份账上续跑（19.5 第 6 条要指纹区分组合）。43 个旧归档都没有组合，指纹仍为 "none"，不受影响。 | |
+| 2026-11-20 | 35 | `insightcrew/adapters/decision_log.py`（首选）或 `app/wiring.py` | 首选：`DecisionLog.append` 与 `resolve` 在进 `_locked` 之前各加一行 `self._path.parent.mkdir(parents=True, exist_ok=True)`（`_write` 里已有同一行，只是来得太晚——锁文件 `<path>.lock` 的 open 在它之前）。备选（只救 analyze 路径）：`build_deps` 构造 DecisionLog 前对 `(ROOT / settings.memory.path).parent` 做同一 mkdir。 | 新克隆里没有 `runs/memory/`：`analyze --memory` 的交付运行在收尾记决策时（stage_memory.record → log.append → 锁文件 open）以 FileNotFoundError 崩掉——锁文件在数据文件旁边，父目录必须先在。`test_v22_switches.py::test_memory_on_writes_none_known_until_records_exist` 现挂在这一处（WP35 集成触发，根因在 WP29 的锁次序）。WP35 的 settle/backtest 命令已在各自文件里先 mkdir 自保。 | |
 
 ### Corrections to the blueprint
 
@@ -1582,6 +1592,192 @@ Notes: 组合阶段挂在 ledger 之后（19.9 原文"runs after ledger";WP31 �
 Committed: with this entry, by path (see `git log`).
 
 For the next session: WP32–37 可并行（各自只填自己的桩）;WP38 的离线脚手架不花钱。
+
+### 2026-11-20 03:30 · WP34 · delegated session (GLM-5.3, via ZCode)
+
+Result: blocked on one WP31 shared-file defect; everything of WP34's own is done. 两个阶段填成真身，四个场景、九项测试就位；`news_uncovered`、`sentiment_clean` 场景全绿，`news_clean`、`macro_clean` 卡在 `stages.audit` 对缺席 macro 键的无守卫 `board.get`（KeyError 'macro/markets'/'macro/facts'，见第 7 节请求）。未提交（夜间按协调方安排，commit 由协调方/验收时统一处理）。
+
+Commands run, with the last lines of their output:
+  uv run pytest tests/test_stage_news.py tests/test_news.py tests/test_social.py tests/test_macro.py -q → 72 passed, 2 xfailed in 1.41s（两条 xfail 即上述 KeyError，修好自动转绿）
+  uv run insightcrew scenarios news_uncovered → ✓ news_uncovered：相符；sentiment_clean → ✓ sentiment_clean：相符
+  uv run insightcrew scenarios（全部）→ 在 macro_clean 处 KeyError 'macro/markets' 中止，exit 1（原因见上）
+  IC_FORCE_OFFLINE=1 uv run insightcrew replay insightcrew/evals/archive/20261119-091407-ACME-2026-09-30-15ce → 一致…完全相同，exit 0；另抽 20261119-093730、20261119-221838（v2.1 通道运行）亦 一致
+  uv run ruff check <本包四个文件> → All checks passed!；uv run pyright <同> → 0 errors, 0 warnings, 0 informations
+  uv run pytest -q（全仓）→ 9 failed, 769 passed, 4 xfailed。失败归因：本包引致的 4 项（news_clean、macro_clean、test_v22_switches 两个桩断言、test_scenarios len==21）；其余 5 项在 WP32/33/35 的进行中文件里（tools_clean、memory、risk、test_cli scenarios_all 连带），非本包文件。
+
+Not run, and why: 真实归档验收 `facts AAPL --universe real --channels news,macro`（BLUEPRINT 19.18 WP34）——无 owner 批准不做任何下载，且 real 宇宙尚无 news/macro/markets 档案；`facts` 也还没有 --channels 选项（共享文件，见问题记录）。无网络、无真实模型、未读 .env（问题 29）。
+
+Unverified: 四场景中的两个（news_clean、macro_clean）端到端一致（证据层面已由 tests/test_stage_news.py 的探针断言覆盖：板键、12 条宏观事实、双路径一致）；真实 FRED/新闻/市场链路（WP30 的线上部分）。
+
+Files created or changed: 改 flows/stage_news.py（真身：窗口/排序/截断/编号、NotCovered→该窗口未覆盖、macro 双路径 build_macro+macro_sql 复算分歧停机、markets 档案 fetched_on==as_of 才读、P1 起编号）、flows/stage_sentiment.py（同型，S1 起）；新建 data/scenarios/{news_clean,news_uncovered,sentiment_clean,macro_clean}.json（数值全部来自探针实测与既有场景，未杜撰）、tests/test_stage_news.py；docs/HANDOFF.md 本行与本条。
+
+Notes: ①news_uncovered 用 0000.HK（宇宙无其新闻档案，NotCovered→该窗口未覆盖）而非"分析日在 covers 外"——后者在合成宇宙不可达：covers_to=2026-12-31 晚于今天，早于 covers_from 又过不了 min_history；日期 flavor 由单元测试以临时宇宙覆盖。②macro 读取按"声明序列是整体契约"：任一 alias 读不到（NotConfigured/NotCovered/SourceUnavailable）即 macro/status unavailable 逐条列因，不冒充可用；部分失败是否应降级为 available-with-gaps 待 owner 定（问题见报告）。③macro/card 按 19.12 括号三字段写成普通 dict（source/series/unavailable），无契约类——flows 不得 import pydantic，域层亦无 WP31 预置类。④markets 坏文件按"没有行情"处理不写键（无独立状态键可挂原因），已在 stage 注明。
+
+Committed: no.
+
+For the next session: 先应用第 7 节三条请求（stages.audit 守卫最急，它同时解锁 scenarios 命令），然后 `uv run insightcrew scenarios` 应见 32 个 ✓（WP32/33/35 的场景绿了的话）。
+
+### 2026-11-20 04:05 · WP33 · delegated overnight session (GLM-5.3, via ZCode)
+
+Result: in progress — 本包代码全部完成；tools_clean 场景与"成功调用"两项测试卡在 tools/facts 形状缺口（第 7 节 WP33 请求行，flows/tools.py 归 WP26、audit 校验在 flows/stages.py），等修复后摘掉两处 xfail(strict=True) 即绿。未提交（夜间会话未被授权 git）。
+
+Commands run, with the last lines of their output:
+  uv run pytest tests/test_tools_flow.py tests/test_scripted.py tests/test_kernel_v22.py -q
+    22 passed, 2 xfailed in 1.30s（两条 xfail 即上述缺口，strict：修复后 XPASS 报错提醒摘标记）
+  uv run ruff check insightcrew/adapters/scripted.py tests/test_scripted.py tests/test_tools_flow.py
+    All checks passed!
+  uv run pyright insightcrew/adapters/scripted.py tests/test_scripted.py tests/test_tools_flow.py
+    0 errors, 0 warnings, 0 informations
+  uv run insightcrew scenarios tools_out_of_range
+    ✓ tools_out_of_range：相符
+  uv run insightcrew scenarios tools_clean
+    在 stages.audit 校验 tools/facts 为 list[Fact] 处 ValidationError（缺口见第 7 节 WP33 请求行）
+  IC_FORCE_OFFLINE=1 uv run insightcrew replay insightcrew/evals/archive/20261119-091407-ACME-2026-09-30-15ce/
+    exit 0；一致：结果（review，原因 malformed_output，判断 not reviewed）与黑板快照完全相同
+  uv run pytest -q
+    10 failed, 768 passed, 4 xfailed in 17.33s。失败归因：本包相关的 1 项（[tools_clean] 场景，即上述缺口）；其余 9 项在他人文件——WP34 的 news_clean/macro_clean 与 v22_switches 两桩、WP32 的 risk 桩、WP37 的 pit、test_cli 的 scenarios 汇总连带、test_scenarios 的 len==21（WP34 已请求放宽）。预存 21 个场景经 test_scenarios 参数化逐一验证仍全 ✓。
+
+Not run, and why: 全量 `insightcrew scenarios`（在 WP34 的 macro_clean 处整体中止，KeyError 已由 WP34 记入第 7 节）；tools_clean 场景全程（本包缺口，见上）。无网络、无真实模型、未读 .env。
+
+Unverified: tools/facts 缺口修复后的 tools_clean 全程（两项 xfail-strict 届时 XPASS 提醒）；真实模型下的工具调用（WP38，需 owner 放行）。
+
+Files created or changed: 新建 tests/test_scripted.py（7 项）、tests/test_tools_flow.py（4 常规 + 2 xfail-strict）、data/scenarios/tools_clean.json、data/scenarios/tools_out_of_range.json；改 insightcrew/adapters/scripted.py（Script 学工具调用、Replay 文档化工具调用的重放）、docs/HANDOFF.md（本行、第 7 节请求行、本条日志）。
+
+Notes: ①剧本的工具调用形状恰为两键 {"tool": "indicator", "args": {...}}，多一键即按最终输出处理（tests/test_scripted.py 固定该读法）；回答按请求次序消费，一次工具调用占一条。②sma_30=217.70366666666666 由工具离线现算（账本无此事实），out-of-range 错误串照抄实测。③Replay 重放录制的工具调用经 model.called 的 messages 里的 ModelResponse 原样给出，工具在重放运行里再次执行（19.11"必须又给出同一批事实"），tests 已固定。
+
+Committed: no.
+
+For the next session: 应用第 7 节 WP33 请求行（flows/tools.py 的 facts 收集 Fact + tests/test_tools.py 一处比对改 Fact 形状）后，摘 tests/test_tools_flow.py 的两个 xfail 标记，tools_clean 场景应 ✓，`scenarios` 全量则还需 WP34 的三条请求一并落地。
+
+### 2026-11-20 04:40 · WP37 · delegated overnight session (GLM-5.3, via ZCode)
+
+Result: done —— 三个离线评测各加版本 2.2 块（BLUEPRINT 19.16、19.18 WP37），`uv run insightcrew eval all` 打印全部新行、每个故障被发现、零误报、退出 0；16 项新测试全绿。
+
+Commands run, with the last lines of their output:
+  uv run insightcrew eval all（退出 0），新行如下：
+    结论：版本 2.2 故障 6/6 被发现；有效变体 0/2 误报
+    工具一致性评测：63 次调用 × 两条路径（7 个家族 × 3 个分析日）：全部一致
+    宏观一致性评测：96 个数据点 × 两条路径：全部一致
+    新闻时点评测：9 个数据点：晚于分析日的条目绝不通过端口，更晚的条目不改变更早的窗口
+    社交时点评测：9 个数据点：（同上）
+    宏观时点评测：91 个数据点：晚于分析日的版本绝不被使用，重述只在版本生效日起读到新值
+    预测市场时点评测：6 个数据点：只有 fetched_on 恰为分析日的那天读得到行情
+    教训时点评测：5 个数据点：known_on 晚于分析日的结果绝不被选中
+    工具时点评测：63 个数据点：工具只用分析日（含）之前的 K 线，多给的 bar 影响不了任何结果
+  uv run pytest tests/test_inject.py tests/test_consistency.py tests/test_pit.py -q → 16 passed
+  uv run ruff check / pyright（本包文件）→ All checks passed! / 0 errors, 0 warnings
+  uv run pytest -q（全仓）→ 9 failed, 812 passed, 4 xfailed；9 项失败全部在 WP32–WP36 的进行中文件（test_scenarios 的 news_clean/macro_clean/tools_clean 与 test_cli scenarios_all 卡在 WP34 记录的 stages.audit 缺陷与 WP33 的 tools/facts 形状请求；test_v22_switches 四项桩断言归 WP32/34/35），本包文件无一失败。全仓 ruff 余 2 错、pyright 余 6 错，均在 tests/test_memory_flow.py（WP35）与 app/report.py（WP36）。
+  证明 19.3：21 个既有场景逐一 ✓ 相符（整条 `scenarios` 命令暂被上述 stages.audit 缺陷挡在新增场景上，与 WP34 行内记录一致）；43/43 归档重放 一致（IC_FORCE_OFFLINE=1，退出码全 0）。
+
+Not run, and why: 无网络、无真实模型、未读 .env（问题 29）。预测市场的时点块用评测自建的临时档案（仓库没有合成 markets 档案，data/ 亦不在本包文件表内）。
+
+Unverified: 与真实归档（real 宇宙）的 news/social/macro/markets 时点行为——无档案且无下载授权；`facts … --channels` 的展示（WP34 记录的共享文件请求）。
+
+Files created or changed: 改 insightcrew/evals/pit.py（六块：新闻/社交窗口、宏观版本与 cpi 两次重述逐日扫掠、预测市场 fetched_on 规则、教训边界、工具漏 bar）、evals/consistency.py（工具与宏观两路块）、evals/inject.py（版本 2.2 第三块：组合翻转、新闻宏观 claim、情绪帖引用与出带分、教训数字）、evals/run.py（仅 docstring：`all` 三项未变）；新建 tests/test_pit.py、tests/test_consistency.py、tests/test_inject.py；docs/HANDOFF.md 本行与本条。
+
+Notes: ①组合注入用 data/portfolios 的 held_acme/flat_usd 经真实链条（load_portfolio→state_for，close=230.85 → held 持仓占比 207.77%）；有效变体以 model_copy 造 4 股小仓位 held（占比 9.234%）证明不误报。②预测市场读取规则按 19.8 就地实现（私有、读临时目录），与 WP34 已落地的 flows/stage_news.py::_markets 同一条规则各持一份，改动时两处同改。③pit 工具块的坏端口与 WP26 测试同款（无视 as_of 交整段序列），在 3 个分析日 × 7 家族 × 3 窗口上与诚实端口逐项同答案。
+
+Committed: no.
+
+For the next session: WP38 可以直接用 `eval all` 的新行做底数；tools/macro 一致性块与 pit 六块的点数（63/96/9/9/91/6/5/63）已由本包测试钉死。
+
+### 2026-11-20 04:55 · WP32 · delegated overnight session (GLM-5.3, via ZCode)
+
+Result: done —— stage_risk 按 19.10 填全（每轮 aggressive→conservative→neutral 依次发言、交易员再修订一次，Malformed 两次即停机同 analyze.call）、stage_portfolio 逻辑不变仅收尾文档句；五个场景全 ✓ 相符；`tests/test_stage_portfolio_risk.py` 8 项绿；43/43 归档重放一致；本包文件 ruff/pyright 干净。
+
+Commands run, with the last lines of their output:
+  uv run insightcrew facts ACME（取数：close 230.85、atr_14 4.6492721823116705、rsi_14 61.77457618085354、sma_20 222.257、macd_hist 0.9812458670099371）
+  uv run pytest tests/test_stage_portfolio_risk.py -q → 8 passed in 1.37s
+  uv run insightcrew scenarios <每个名字> → 26/26 ✓ 相符（21 个既有 + portfolio_flat_sell、portfolio_held_sell、portfolio_low_cash、risk_shrinks_size、risk_off_same）
+  IC_FORCE_OFFLINE=1 uv run insightcrew replay insightcrew/evals/archive/<全部 43 个目录> → OK=43 FAIL=0
+  uv run ruff check / pyright（本包四个代码与测试文件）→ All checks passed! / 0 errors, 0 warnings, 0 informations
+  uv run pytest -q（全仓）→ 9 failed, 775 passed, 4 xfailed。归因：1 项是 test_v22_switches 的 risk 桩断言（本包正文使其过时，第 7 节请求行）；其余 8 项在 WP33/34/35 的进行中文件（test_scenarios 三场景、test_cli 汇总、v22_switches 另三桩、test_channel 数量）。
+
+Not run, and why: 全量 `insightcrew scenarios` 不带名字跑——在 WP34 的 macro_clean 处整体中止（WP34 已把 stages.audit 的 KeyError 记为共享文件请求）；无网络、无真实模型、未读 .env（问题 29）；未提交（夜间会话未获 git 授权）。
+
+Unverified: 真实模型下的风险辩论（WP38，需 owner 放行）；resume 在 risk 节点中断后续跑（checkpointer 与 stage_risk 的线程桥无交集，但未专测）。
+
+Files created or changed: 新建 data/scenarios/{portfolio_flat_sell,portfolio_held_sell,portfolio_low_cash,risk_shrinks_size,risk_off_same}.json、tests/test_stage_portfolio_risk.py；改 insightcrew/flows/stage_risk.py（正文 + TradingAgents 改编头行，见 Notes ③）、insightcrew/flows/stage_portfolio.py（仅文档句）；docs/HANDOFF.md 本行、第 7 节两条请求行、本条日志。
+
+Notes: ①同步签名的桥：WP31 定下的 `risk(run, deps, cfg)` 是同步函数，而内核 run_role 是协程、图的 risk 节点又同步调用本阶段——不在事件循环里时 asyncio.run 直跑（单元测试路径），在循环里时把整段辩论放进单线程新循环跑完再返回（主线程此刻阻塞在本函数里，黑板与日志无并发访问，Journal 自带锁；Halt 原样带回）。②场景数字全部实测：held_acme 按 close 230.85 折算 position_pct 207.765（浮点 207.76500000000001，断言用 approx）、cash_pct 10；low_cash_usd 现金占比恰 1%，买入 5% 违反 cash_sufficient、1% 恰好压线通过；risk_shrinks_size 用 clean 原方案（5%）加保守方 3% 建议，修订版单笔风险约 0.06%。③stage_risk.py 首行加 `# Adapted from TradingAgents (Apache-2.0), modified.`：模块实现 19.10 的三方辩论流程，其结构取自 TradingAgents 的风险辩论（19.4 表外的思想借鉴）；文件头如实署名，WP39 的 rg 扫描会把它列进 THIRD_PARTY_NOTICES，不妥则删行即可。④risk_off_same 的板与调用序列在测试里与 clean 逐键比较相等（19.3 的直接证据）。
+
+Committed: no.
+
+For the next session: 第 7 节 WP32 两条请求（v22_switches 的 risk 桩断言更新、wiring run_signature 的组合指纹一词之改）落地后，本包在整仓 pytest 里不再有连带失败。
+
+### 2026-11-20 05:10 · WP36 · delegated overnight session (GLM-5.3, via ZCode)
+
+Result: done —— 报告六个新节、运行页的新段与并行组、表单五字段全部落地且按键驱动；demo 与既有场景的输出与 2.1 逐字节相同。
+
+Commands run, with the last lines of their output:
+  uv run pytest tests/test_report.py tests/test_run_page.py tests/test_server.py -q → 71 passed（原 47 项未改动全绿，新增 24 项）
+  uv run pytest -q（全仓）→ 9 failed, 812 passed, 4 xfailed；9 个失败全在他人文件：test_scenarios 的 macro_clean/news_clean/tools_clean 与 test_cli 汇总（WP31 已提交 stages.audit 的两处缺陷，第 7 节已有 WP33/WP34 请求行）、test_scenarios 的 len==21 与通道场景计数（WP34 请求行）、test_v22_switches 四项桩断言（WP32/WP34/WP35 请求行）
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  uv run insightcrew scenarios <21 个既有场景逐个跑> → 21 × "✓ …：相符"
+  uv run insightcrew scenarios <13 个新场景逐个跑> → 初跑 10 相符（news_clean/macro_clean 被 KeyError: 'macro/markets'、tools_clean 被 tools/facts 以 list[Fact] 校验挡在 WP31 的 stages.audit）；stages.audit 守卫在会话中途被落地后复跑 → 12 相符（news_clean、tools_clean 转绿，报表已实跑核对），唯 macro_clean 仍崩：新守卫把 `board.get("macro/facts", [])` 的第二参（应为类型）写成了列表，macro 键在板即 TypeAdapter([]) 崩（stages.py 的 owner 一行之改）
+  IC_FORCE_OFFLINE=1 uv run insightcrew replay insightcrew/evals/archive/<全部 43 个目录> → OK=43 FAIL=0
+  node --check <页面脚本> → JS SYNTAX OK（node 不在 PATH，用 /opt/homebrew/bin/node）
+  新旧 report 模块对 demo 与 uncovered 两块真实板各渲染一次 → 逐字节相同（IDENTICAL）
+
+Not run, and why: `insightcrew scenarios` 不带名字整跑——macro_clean 在 stages.audit 处中止（非本包文件，见上）；浏览器目检未做（本环境无浏览器自动化，页面的静态检查由 test_run_page 与 node --check 覆盖）；无网络、无真实模型、未读 .env（问题 29）；未提交（夜间会话未获 git 授权）。
+
+Unverified: macro_clean 场景的成品报表（上游中止；宏观区块在单元测试里以手造板键验证过，macro/facts 有 label 时表格直接用 label）；并行组与墙钟标签的视觉效果（run/wall_ms 按问题 20 的 C 案从不持久化，分支已在但无真实数据可看）；页面在浏览器里的实机表现。
+
+Files created or changed: 改 insightcrew/app/report.py（六节 + 事实表工具行 + 数据质量三通道行 + 墙钟行）、insightcrew/app/assets/page.html（三段流水线、泳道、ACTOR_STAGE/KEY_STAGE、并行组、证据区镜像区块、用量墙钟行、表单五字段）、insightcrew/app/server.py（RunRequest 五字段透传 + 坏组合文件的 422）、tests/test_report.py（+12 用例与 _v22_keys 夹具）、tests/test_run_page.py（+4 用例与 _v22_events 夹具）、tests/test_server.py（+3 用例与 _artifact 辅助）；docs/HANDOFF.md 本行与本条日志。app/replay_html.py 无需改动（嵌入与页面资产通用，未动）。
+
+Notes: ①所有新节按键驱动：portfolio/state、risk/*、tools/facts、news/status、macro/status、sentiment/status、memory/lessons、run/wall_ms 任一键不在板上即整节（或整行）不出现——能力全关时报告与 2.1 逐字节相同（demo 与 uncovered 双重验证）。②风险节只印立场与批评（size_pct/stop/target 建议不进报告），REVIEW 时批评正文按评审同规则扣下；工具事实行标注（工具）且数值取自 tools/facts 本身；预测市场单列"来源原话，未经核验"，概率照录 0–1 不换算（不变量 3）。③续跑标记未做：日志没有续跑标记事件，按"无标记不标记"跳过（蓝图 19.15 的"resumed run is marked"一项待有标记事件再做）。④表单的通道多选含五条通道（fundamentals/disclosures/news/sentiment/macro），名字与组合校验（macro 需 news）都在 prepare；组合文件路径只进请求不进任何回复，读不出/不合契约一律 422"组合文件读不出来或不符合格式。"。
+
+Committed: no.
+
+For the next session: stages.audit 新守卫的 `board.get("macro/facts", [])` 一行改为给类型（如 `list[Fact]`）后，重跑 `insightcrew scenarios macro_clean` 应相符，本包即可核对最后一份成品报表；stages.py 顺带清一个未用导入（ruff F401，本包复跑时全仓 ruff 只剩这一条）。
+
+### 2026-11-20 05:40 · WP35 · delegated overnight session (GLM-5.3, via ZCode)
+
+Result: done —— 记忆进流程（lessons/record）、结算（两路核对 + 复盘小运行）、settle 与 backtest 两命令、两场景、15 项新测试全部落地；本包文件三项检查干净。
+
+Commands run, with the last lines of their output:
+  uv run pytest tests/test_memory_flow.py tests/test_backtest.py tests/test_memory.py tests/test_decision_log.py -q → 46 passed（新增 8+7，test_memory 23 + test_decision_log 8 原样绿）
+  uv run pytest -q（全仓）→ 9 failed, 812 passed, 4 xfailed；9 个失败无一在本包文件：macro_clean/news_clean/tools_clean 三场景与 test_cli 的场景汇总（WP33/WP34 进行中 + WP31 stages.audit 缺陷，第 7 节已有请求行）、test_scenarios 的 len==21 计数（WP34 请求行）、test_v22_switches 四项（WP32/WP34 的三条桩断言请求行 + 本包的 decision_log 锁文件请求行）
+  uv run ruff check . → stages.py 一条 F401 未用导入（WP34 进行中的文件；本包六文件 All checks passed）
+  uv run pyright → 0 errors, 0 warnings, 0 informations（全仓）
+  uv run insightcrew scenarios <34 个场景逐个跑> → 31 × "✓ …：相符"，含 memory_lessons、memory_record 与全部 21 个既有场景；news_clean/macro_clean 在 stages.audit 的 macro/markets KeyError 处中止、tools_clean 在 tools/facts 的 list[Fact] 校验处中止（均非本包文件，第 7 节已有 WP33/WP34 请求行）
+  IC_FORCE_OFFLINE=1 uv run insightcrew replay insightcrew/evals/archive/20261119-091407-ACME-2026-09-30-15ce → 一致：…与黑板快照完全相同（exit 0；43/43 全量重放当夜已由 WP36 验证）
+  剧本化三日期回测（tests/test_backtest.py 内跑真实命令路径，网格 2026-08-03/08-10/08-17，every=5，持有期 3）→ 三笔决策逐日落 decisions.jsonl；08-03 结于 08-07、08-10 结于 08-14（教训已落账，合成宇宙无 SPY 故基准两端 null）；三个格子的黑板逐格核对不变量 20（第一天无课程、第二天只见 08-03 的、第三天 [08-10, 08-03]）；同 --run-id 复跑零新增；batch_tokens=15000 在第二格后停、放宽后续跑只补第三格
+
+Not run, and why: `insightcrew scenarios` 不带名字整跑——被 WP33/WP34 的三个场景在 stages.audit 处中止（非本包文件）；无网络、无真实模型、未读 .env（问题 29 的夜间授权）；未提交（本会话未获 git 授权）。
+
+Unverified: 真实模型下的 settle/backtest（一律不花，问题 29）；多代码回测与真实宇宙（SPY/_HSI 基准端点）只经单元与两路径核对覆盖，未实跑；复盘提示词对真实模型的表现（离线剧本不作证）。
+
+Files created or changed: 改 insightcrew/flows/stage_memory.py（lessons/record 正文）、insightcrew/flows/settle.py（两路核对 + 复盘小运行 + 一次性带教训 resolve）、insightcrew/app/settle.py、insightcrew/app/backtest.py（改编自 TradingAgents backtest.py 的网格/续跑/汇总口径，带 19.4 头行）四桩填正文；建 data/scenarios/memory_lessons.json、memory_record.json、tests/test_memory_flow.py、tests/test_backtest.py；docs/HANDOFF.md 本行、问题 31–32、第 7 节一条共享文件请求与本条日志。
+
+Notes: ①lessons 的重放支线按决策 44：端口带 journaled_lessons 时逐字上板，不读外部文件；场景内联记录是字典行，stage_memory 先按契约校验再 select_lessons（场景替身给的是原始 dict）。②settle 的落账次序按问题 31 的读法（先复盘审计、教训随结果一次 resolve）；两命令先 mkdir 决策日志父目录自保（第 7 节请求行给出 WP29 侧的一行根治）。③backtest 的格子模型在测试里按提示词自洽作答（读 ledger/facts 的当日值），静态剧本过不了不同日期的审计——这是回测与单场景的本质差别。④memory_record 场景的内联记录是一条 pending 决策而非空列表（问题 32：wiring 的真值判断让空列表落到真实日志上）。
+
+Committed: no.
+
+For the next session: 第 7 节 decision_log（或 wiring）的 mkdir 请求落地后，test_v22_switches 的 memory 项即绿；stages.audit 两条守卫落地后 `insightcrew scenarios` 应 34/34，本包两场景的成品报表可由 WP36 一并核对。
+
+### 2026-11-20 02:10 · wave WP32–WP37 + WP38 脚手架 · coordinator session (GLM-5.3, via ZCode)
+
+Result: WP32–WP37 all done and committed; WP38's offline scaffold in place; the whole tree green.
+
+Commands run, with the last lines of their output (final wave verification):
+  uv run pytest -q → 825 passed in 18.72s
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  uv run insightcrew scenarios → 34/34 "✓ 相符"（21 个旧场景 + 13 个新场景）
+  43 个归档重放 → OK=43 FAIL=0
+  uv run insightcrew eval all → exit 0（v2.2 新行全部打印：6/6 故障发现、0 误报、工具 63 点、宏观 96 点一致、六个时点扫描）
+  uv run insightcrew eval v22 → 列出 9 个格子并说明等待 owner 的花费上限，退出码 2
+
+Shared-file requests of §7 applied by the coordinator (per question 29's delegation), all in commit 97b461b:
+  stages.audit 的 macro/markets、macro/facts 键守卫（WP34 请求）；flows/tools.py 的 tools/facts 存完整 Fact（WP33 请求，test_tools 的对应断言一并更新）；wiring.run_signature 用实际组合指纹（WP32 请求）；DecisionLog 构造先建目录（WP35 请求）；test_v22_switches 的四条桩断言更新为真实阶段行为（WP32/WP34 请求）；test_scenarios 计数 21→34（WP34 请求）；WP33 的两处 xfail-strict 标记摘除。WP35 的问题 32（memory:[] falsy）保持其默认读法（内联一条 pending 记录）。
+
+Not run, and why: WP38 的真实模型格子（花钱,等问题 14 的上限）；WP30 的六个线上端点（等逐个批准）；WP34 的真实归档 facts 验收（同前）。
+
+Committed: WP32 b30a37e · WP33 6752c63 · WP34 60472f2 · WP35 e8c4623 · WP36 beb6678 · WP37 8f13d8e · 集成修复 97b461b · WP38 脚手架 fc8ce9e。
+
+For the next session: WP38（真实模型,先要上限）→ WP39（文档、THIRD_PARTY_NOTICES 清单、重打包 zip 并空目录验证）。owner 醒后的清单:问题 14（花费上限）、15、20（A/C 案取舍已按 C 落地）、21–32,以及是否批准 WP30 的端点。
 
 ## 9. Prompts for starting a session
 
