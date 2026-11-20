@@ -1,15 +1,18 @@
-/* 55-launch.css —— 发起运行的表单、历史列表，以及流水线（运行状态区，WP50 接手）。 */
+/* 55-launch.css —— 发起表单、计划预览、历史，以及流水线/实时活动区（WP50 接手）。 */
 
-/* 流水线 */
+/* 流水线：每段 等待 / 进行中 / 完成 / 被打回↺n / 跳过 / 未完成 */
 #pipeline { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 .stage { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; font-size:12.5px;
          border:1px solid var(--line); background:var(--card); color:var(--muted); }
 .stage .kind { font-size:10px; padding:0 5px; border-radius:4px; border:1px solid currentColor; opacity:.75; }
+.stage .st { font-size:10.5px; opacity:.85; }
+.stage .redo { font-size:11px; font-weight:700; }
 .stage .ms { font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
 .stage.done { background:var(--good-bg); border-color:#bfe0cd; color:var(--good); }
 .stage.running { background:var(--accent-bg); border-color:var(--accent); color:var(--accent); font-weight:600; }
 .stage.revised { background:var(--warn-bg); border-color:#edd9ac; color:var(--warn); }
 .stage.halted { background:var(--bad-bg); border-color:#f4c7c1; color:var(--bad); font-weight:600; }
+.stage.skipped { background:var(--lane); border-style:dashed; color:var(--muted); }
 .arrow { color:var(--line); font-size:12px; }
 /* 并行分析师组：几位分析师同时跑，画成一个框里的并列泳道 */
 .parallel { display:flex; flex-direction:column; gap:4px; padding:6px 8px 6px; border:1px dashed var(--accent);
@@ -17,20 +20,69 @@
 .parallel .par-tag { position:absolute; top:-8px; left:10px; font-size:10px; padding:0 6px; border-radius:4px;
                      background:var(--accent-bg); color:var(--accent); border:1px solid #c9d3f7; }
 .parallel .stage { background:var(--card); }
+/* 正在工作的角色（计时器每秒走动）与总用时 */
+.working { display:flex; flex-wrap:wrap; gap:6px 14px; width:100%; padding:2px 2px 0; }
+.work-role { display:inline-flex; align-items:baseline; gap:6px; font-size:12px; color:var(--soft); }
+.work-role::before { content:"▸ "; color:var(--accent); }
+.work-role .ms { font-variant-numeric:tabular-nums; color:var(--accent); }
+.activity-meta { display:flex; flex-wrap:wrap; gap:6px 14px; width:100%; font-size:12px; color:var(--muted);
+                 padding:2px 2px 0; }
+.activity-meta .meta-bit:first-child { color:var(--soft); font-variant-numeric:tabular-nums; }
 
-/* 发起运行（实时模式） */
-#form { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+/* 页头的运行控制：取消 / 续跑 / 导出 */
+.runctl { display:flex; gap:6px; align-items:center; flex:none; }
+.runctl .ctl.warn { border-color:#f4c7c1; color:var(--bad); background:var(--card); }
+.runctl .ctl.warn:hover { background:var(--bad-bg); }
+.runctl-note { max-width:340px; font-size:11.5px; color:var(--muted); }
+
+/* 发起运行（实时模式）：折成一行、四组字段、计划预览在旁 */
+#launch summary { cursor:pointer; }
+#launch summary .fold-title { color:var(--soft); font-weight:600; font-size:14px; letter-spacing:.3px; }
+#launch summary .fold-title::after { content:"：填好后开始一次运行"; color:var(--muted); font-weight:400; font-size:12px; }
+#launch-fold[open] summary { margin-bottom:10px; }
+.launch-grid { display:grid; grid-template-columns:minmax(380px, 1fr) minmax(280px, 1fr); gap:0 22px; align-items:start; }
+.launch-grid:has(> #plan[hidden]) { grid-template-columns:1fr; }   /* 计划预览收起（服务端没有 /api/plan）时不留空列 */
+@media (max-width: 900px) { .launch-grid { grid-template-columns:1fr; } }
+#form { display:flex; flex-wrap:wrap; gap:14px 18px; align-content:flex-start; }
+.fgroup { border:1px solid var(--line); border-radius:9px; padding:10px 12px 12px; margin:0; min-width:220px;
+          flex:1 1 300px; display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
+.fgroup legend { font-size:12px; color:var(--muted); padding:0 6px; }
 #form label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+#form label .lab { color:var(--muted); }
 #form label.inline { flex-direction:row; align-items:center; gap:6px; padding-bottom:7px; color:var(--soft); }
 #form input, #form select { font:inherit; color:var(--ink); padding:6px 9px; border:1px solid var(--line);
                             border-radius:7px; background:var(--card); min-height:34px; }
 #form input:disabled, #form select:disabled { background:var(--lane); color:var(--muted); }
+#form input[type="checkbox"] { min-height:0; width:15px; height:15px; accent-color:var(--accent); }
 #f-scenario { min-width:230px; } #f-ticker { width:130px; } #f-rounds { width:70px; }
-#f-risk-rounds { width:70px; } #f-portfolio { width:230px; }
+#f-risk-rounds { width:70px; } #f-portfolio { min-width:200px; }
+.field-note { font-size:11px; color:var(--code); min-height:14px; }
+.field-error { font-size:11px; color:var(--bad); min-height:0; }
+/* 证据通道：五个复选框各占一行 */
+.chan { display:flex; flex-direction:column; gap:6px; flex:1 1 100%; }
+#form label.chan-line { flex-direction:row; align-items:baseline; gap:8px; font-size:12px; color:var(--muted); }
+.chan-line input { flex:none; }
+.chan-line b { color:var(--soft); font-weight:600; }
+.chan-line .muted { font-size:11.5px; }
+#f-channels[data-off="1"] .chan-line { opacity:.55; }
 .primary { padding:7px 20px; min-height:34px; border-radius:7px; border:1px solid var(--accent);
            background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
 .primary:hover { filter:brightness(1.08); }
+.primary:disabled { opacity:.45; cursor:not-allowed; }
 .linkish { border:0; background:none; padding:0; color:var(--accent); cursor:pointer; text-decoration:underline; }
 .error { margin:10px 0 0; font-size:12.5px; color:var(--bad); }
+.rowctl { display:inline-flex; gap:10px; }
 details { margin-top:12px; } summary { cursor:pointer; color:var(--soft); font-size:13px; }
 #history-body { max-height:340px; overflow:auto; }
+
+/* 计划预览（POST /api/plan；服务端没有这个接口时整个不出现） */
+.plan { border:1px dashed var(--line); border-radius:9px; padding:10px 14px; font-size:12.5px; }
+.plan h3 { margin:0 0 4px; }
+.plan-strip { display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin:8px 0; }
+.plan-line { color:var(--soft); margin:4px 0; font-variant-numeric:tabular-nums; }
+.plan-channels { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.plan-chan { font-size:11.5px; padding:2px 8px; border-radius:6px; border:1px solid var(--line); }
+.plan-chan.st-available { background:var(--good-bg); border-color:#bfe0cd; color:var(--good); }
+.plan-chan.st-unavailable { background:var(--bad-bg); border-color:#f4c7c1; color:var(--bad); }
+.plan-chan.st-off { background:var(--lane); color:var(--muted); }
+.plan-chan.st-empty { background:var(--warn-bg); border-color:#edd9ac; color:var(--warn); }
