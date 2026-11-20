@@ -29,9 +29,18 @@ async function getJSON(path, options) {
   return { status: response.status, data };
 }
 
+function streamNote(text) {
+  /* 事件流的连接状态：断开重连时说明（活区），连上即消 */
+  const note = $("stream-note");
+  if (!note) return;
+  note.hidden = !text;
+  note.textContent = text || "";
+}
+
 function resetRun(runId) {
   if (state.source) state.source.close();
   clearTimeout(state.timer);
+  streamNote("");
   Object.assign(state, { runId, events: [], shown: 0, ended: !runId, error: null, trace: [], bars: null, currency: "",
                          barsAsked: false, playing: false, source: null, selected: 0, cited: "", follow: true });
 }
@@ -48,6 +57,9 @@ function openRun(runId, watch) {
   state.playing = true;
   const source = new EventSource("/api/runs/" + encodeURIComponent(runId) + "/events");
   state.source = source;
+  source.addEventListener("open", () => {           // 重连成功（或首次连上）：连接状态的说明撤下
+    if (state.source === source) streamNote("");
+  });
   source.addEventListener("journal", (message) => {
     const event = JSON.parse(message.data);
     if (state.events.length && event.seq <= state.events[state.events.length - 1].seq) return;
@@ -58,6 +70,7 @@ function openRun(runId, watch) {
   });
   source.addEventListener("end", (message) => {     // 收尾消息之后必须关闭，否则浏览器会重连一个已结束的运行
     source.close();
+    streamNote("");
     state.ended = true;
     state.error = JSON.parse(message.data).error;
     if (state.playing && state.speed === "instant") { state.shown = state.events.length; state.playing = false; }
@@ -65,7 +78,13 @@ function openRun(runId, watch) {
     loadHistory();
   });
   source.onerror = () => {
-    if (source.readyState !== EventSource.CLOSED || state.ended) return;      // 其余情况浏览器会自己重连
+    if (state.ended) return;
+    if (source.readyState === EventSource.CONNECTING) {                       // 断了但浏览器在自动重连：说明，不算错误
+      streamNote("与本地服务的连接中断，正在自动重连……");
+      return;
+    }
+    if (source.readyState !== EventSource.CLOSED) return;
+    streamNote("");
     state.ended = true; state.playing = false;
     state.error = state.events.length ? "与本地服务的连接中断" : "没有这个运行";
     requestRender();
@@ -81,11 +100,17 @@ async function loadBars(runId) {
   requestRender();
 }
 
+let liveHooked = false;        // 监听只挂一次：meta 失败后的重试会再进 startLive
+
 async function startLive() {
   state.live = true;
   $("launch").hidden = false;
   const { status, data } = await getJSON("/api/meta");
-  if (status !== 200) { $("mode-note").textContent = "读不到本地服务的信息。"; return; }
+  if (status !== 200) {                            // 读不到服务的信息：给重试（质量清单「失败的请求有横幅与重试」）
+    fill($("mode-note"), "读不到本地服务的信息。",
+      el("button", { class: "linkish", type: "button", on: { click: retryMeta } }, "重试"));
+    return;
+  }
   state.meta = data;
   const scripted = data.mode !== "model";
   fill($("f-scenario"), el("option", { value: "" }, scripted ? "（不用场景）" : "（不用场景，调用真实模型）"),
@@ -98,12 +123,20 @@ async function startLive() {
     : "真实模型：quick = " + data.models.quick + "，deep = " + data.models.deep + "。每次运行都会调用模型并产生费用。";
   if (scripted && data.scenarios.some((s) => s.name === "demo")) $("f-scenario").value = "demo";
   applyScenario();
-  $("f-scenario").addEventListener("change", applyScenario);
-  $("form").addEventListener("submit", submitForm);
-  window.addEventListener("popstate", () => openRun(new URLSearchParams(window.location.search).get("run") || "", false));
+  if (!liveHooked) {
+    liveHooked = true;
+    $("f-scenario").addEventListener("change", applyScenario);
+    $("form").addEventListener("submit", submitForm);
+    window.addEventListener("popstate", () => openRun(new URLSearchParams(window.location.search).get("run") || "", false));
+  }
   loadHistory();
   const runId = new URLSearchParams(window.location.search).get("run") || "";
   if (runId) openRun(runId, false); else { $("history").open = true; requestRender(); }
+}
+
+function retryMeta() {                             // 清掉带重试键的说明再试一次；成功则照常走下去
+  $("mode-note").textContent = "";
+  startLive();
 }
 
 /* ---------- 入口：静态内嵌，或实时 ---------- */

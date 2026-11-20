@@ -161,16 +161,17 @@ function renderResult(model) {
     return;
   }
   const the = thesis || {}, prop = proposal || {};   // 交付：结论在上，证据与失效条件在下
-  const level = (label, value) => el("div", { class: "level" }, el("b", null, value), el("span", null, label));
+  const level = (label, value, cls) => el("div", { class: "level" + (cls ? " " + cls : "") }, el("b", null, value), el("span", null, label));
   const withCur = (label) => currency ? label + "（" + currency + "）" : label;
   const points = the.points || [], invalidation = the.invalidation || [];
+  const side = /buy|overweight/i.test(the.rating || "") ? " long" : /sell|underweight/i.test(the.rating || "") ? " short" : "";
   fill(box, el("h2", null, "结果"),
-    el("div", { class: "verdict" }, "评级 " + (the.rating || "—") + " · 操作 " + (prop.action || "—"),
+    el("div", { class: "verdict" + side }, "评级 " + (the.rating || "—") + " · 操作 " + (prop.action || "—"),
       currency ? el("small", null, currency) : null),
     el("div", { class: "levels" },
-      level(withCur("入场价"), num(prop.entry)),
-      level(withCur("止损价"), num(prop.stop)),
-      level(withCur("目标价"), num(prop.target)),
+      level(withCur("入场价"), num(prop.entry), "lv-entry"),
+      level(withCur("止损价"), num(prop.stop), "lv-stop"),
+      level(withCur("目标价"), num(prop.target), "lv-target"),
       level("仓位（占权益）", num(prop.size_pct) + "%"),
       level("持有（交易日）", prop.horizon_days === undefined || prop.horizon_days === null ? "—" : prop.horizon_days)),
     the.summary ? el("p", { class: "summary" }, the.summary) : null,
@@ -196,38 +197,40 @@ function renderChart(model) {
   }
   const board = model.board, outcome = board["run/outcome"];
   const proposal = outcome && outcome.status === "delivered" ? board["trader/proposal"] || {} : {};
-  const levels = [["入场", proposal.entry, "#18794e"], ["止损", proposal.stop, "#b42318"], ["目标", proposal.target, "#96600c"]]
+  const levels = [["入场", proposal.entry, "var(--info)"], ["止损", proposal.stop, "var(--bad)"], ["目标", proposal.target, "var(--good)"]]
     .filter(([, value]) => value !== null && value !== undefined);
   const closes = bars.map((bar) => bar.close);
   const low = Math.min(...closes), high = Math.max(...closes);
   const bottom = Math.min(low, ...levels.map(([, v]) => v)), top = Math.max(high, ...levels.map(([, v]) => v));
-  const W = 640, H = 250, L = 52, R = 78, T = 14, B = 26;                 // 以下只是把数值换成画布坐标
+  const W = 640, H = 250, L = 58, R = 108, T = 16, B = 30;                 // 以下只是把数值换成画布坐标
   const x = (i) => L + (W - L - R) * i / Math.max(1, closes.length - 1);
   const y = (v) => T + (H - T - B) * (top - v) / ((top - bottom) || 1);
   const chart = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "收盘价走势" });
   for (const value of [high, low]) {
-    chart.append(svg("line", { x1: L, x2: W - R, y1: y(value), y2: y(value), stroke: "#e2e7ee" }),
-      svg("text", { x: L - 6, y: y(value) + 4, "text-anchor": "end", "font-size": 11, fill: "#7a8496" }, num(value, 2)));
+    chart.append(svg("line", { x1: L, x2: W - R, y1: y(value), y2: y(value), class: "ch-grid" }),
+      svg("text", { x: L - 6, y: y(value) + 4, "text-anchor": "end", "font-size": 14, class: "ch-label" }, num(value, 2)));
   }
-  chart.append(svg("polyline", { fill: "none", stroke: "#3451d1", "stroke-width": 1.6, "stroke-linejoin": "round",
+  chart.append(svg("polygon", { class: "ch-area", points: x(0).toFixed(1) + "," + (H - B) + " "
+    + closes.map((c, i) => x(i).toFixed(1) + "," + y(c).toFixed(1)).join(" ") + " " + x(closes.length - 1).toFixed(1) + "," + (H - B) }));
+  chart.append(svg("polyline", { fill: "none", class: "ch-line", "stroke-width": 1.6, "stroke-linejoin": "round",
     points: closes.map((c, i) => x(i).toFixed(1) + "," + y(c).toFixed(1)).join(" ") }));
-  chart.append(svg("circle", { cx: x(closes.length - 1), cy: y(closes[closes.length - 1]), r: 3, fill: "#3451d1" }));
+  chart.append(svg("circle", { cx: x(closes.length - 1), cy: y(closes[closes.length - 1]), r: 3, class: "ch-dot" }));
   const scope = board["request/scope"] || {}, request = (model.started || {}).request || {};
   const asOf = scope.as_of || request.as_of || "";                        // 分析日：最后一段收盘所在的那条竖线
   if (asOf) {
     const lastX = x(closes.length - 1);
-    chart.append(svg("line", { x1: lastX, x2: lastX, y1: T, y2: H - B, stroke: "#7a8496",
+    chart.append(svg("line", { x1: lastX, x2: lastX, y1: T, y2: H - B, class: "ch-asof",
                               "stroke-dasharray": "2 4", opacity: "0.9" }),
-      svg("text", { x: lastX - 6, y: T + 10, "text-anchor": "end", "font-size": 11, fill: "#7a8496" }, "分析日 " + asOf));
+      svg("text", { x: lastX - 6, y: H - B - 6, "text-anchor": "end", "font-size": 14, class: "ch-label" }, "分析日 " + asOf));
   }
   const tags = levels.map(([label, value, color]) => ({ label, value, color, at: y(value) })).sort((a, b) => a.at - b.at);
   for (let i = 1; i < tags.length; i++) tags[i].at = Math.max(tags[i].at, tags[i - 1].at + 13);   // 价位挨得近时把标签错开
   for (const tag of tags) {
-    chart.append(svg("line", { x1: L, x2: W - R, y1: y(tag.value), y2: y(tag.value), stroke: tag.color, "stroke-dasharray": "5 4" }),
-      svg("text", { x: W - R + 6, y: tag.at + 4, "font-size": 11, fill: tag.color }, tag.label + " " + num(tag.value, 2)));
+    chart.append(svg("line", { x1: L, x2: W - R, y1: y(tag.value), y2: y(tag.value), style: "stroke:" + tag.color, "stroke-dasharray": "5 4" }),
+      svg("text", { x: W - R + 6, y: tag.at + 4, "font-size": 14, style: "fill:" + tag.color }, tag.label + " " + num(tag.value, 2)));
   }
-  chart.append(svg("text", { x: L, y: H - 8, "font-size": 11, fill: "#7a8496" }, bars[0].date),
-    svg("text", { x: W - R, y: H - 8, "text-anchor": "end", "font-size": 11, fill: "#7a8496" }, bars[bars.length - 1].date));
+  chart.append(svg("text", { x: L, y: H - 9, "font-size": 14, class: "ch-label" }, bars[0].date),
+    svg("text", { x: W - R, y: H - 9, "text-anchor": "end", "font-size": 14, class: "ch-label" }, bars[bars.length - 1].date));
   const currency = state.currency || (board["ledger/instrument"] || {}).currency || "";
   fill(box, el("h2", null, "收盘价（截至分析日，" + bars.length + " 根" + (currency ? "，" + currency : "") + "）"), chart,
     levels.length ? null : el("p", { class: "note" }, outcome && outcome.status !== "delivered"

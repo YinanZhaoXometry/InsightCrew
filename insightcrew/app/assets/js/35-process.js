@@ -220,7 +220,7 @@ function processCard(turn, body) {
   } else {
     kids.push(el("div", { class: "pbody" }, body));
   }
-  return el("details", { class: "pcard" + (turn.superseded ? " old" : ""),
+  return el("details", { class: "pcard" + (turn.superseded ? " old" : "") + " actor-" + turn.actor,
                          open: turn.superseded ? null : "" }, kids);
 }
 

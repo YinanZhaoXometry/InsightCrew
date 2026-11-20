@@ -17,6 +17,9 @@
 .pcard[open] > summary { border-bottom:1px solid var(--line); }
 .pcard.old > summary .who { text-decoration:line-through; color:var(--muted); }
 .pcard.old { border-style:dashed; }
+.pcard.actor-bull { border-top:2px solid var(--good); }
+.pcard.actor-bear { border-top:2px solid var(--bad); }
+.pcard.actor-bull .who { color:var(--good); } .pcard.actor-bear .who { color:var(--bad); }
 .phead { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; min-width:0; }
 .phead .who { font-size:13px; }
 .phead .step { color:var(--muted); font-size:11px; }
@@ -38,8 +41,8 @@
 /* 辩论与风险：一轮一框，多空两栏 / 风险三栏 */
 .de-round { position:relative; margin:10px 0 14px; padding:14px 10px 10px; border:1px solid var(--line);
             border-radius:var(--radius); background:var(--lane); }
-.round-tag { position:absolute; top:-9px; left:12px; font-size:10.5px; padding:0 8px; border-radius:4px;
-             background:var(--accent-bg); color:var(--accent); border:1px solid #c9d3f7; }
+.round-tag { position:absolute; top:-9px; left:12px; font-size:10.5px; padding:0 8px; border-radius:3px;
+             background:var(--card); color:var(--accent); border:1px solid var(--accent-line); }
 .de-two { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:10px; }
 .risk-three { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px; }
 @media (max-width:760px) { .de-two, .risk-three { grid-template-columns:1fr; } }
@@ -52,6 +55,6 @@
                                        font-weight:600; }
 .tscroll td .diff::after { content:" ▲"; font-size:10px; }
 .sentback { margin:8px 0 0; padding:8px 12px; border-left:3px solid var(--warn); background:var(--lane);
-            border-radius:0 8px 8px 0; }
+            border-radius:0 var(--radius-s) var(--radius-s) 0; }
 .sentback .note { margin:0 0 4px; }
 .quorum { font-weight:600; color:var(--soft); }

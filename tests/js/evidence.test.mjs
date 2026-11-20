@@ -1,5 +1,6 @@
-/* 证据页签（WP48，BLUEPRINT 20.10「Evidence」）的纯推导：统一事实表的行与搜索。
-   装载器仿 helpers.mjs，但把 40-evidence.js 一并载入——它加载时不碰 document/window。 */
+/* 证据页签（WP48，BLUEPRINT 20.10「Evidence」）的纯推导：统一事实表的行与搜索；
+   以及引用抽屉挂点（citePanelExtra，第 7 节共享文件请求由 WP51 落实）的直连。
+   装载器仿 helpers.mjs，把 40-evidence.js 一并载入——它加载时不碰 document/window（给挂点赋值不算）。 */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -9,12 +10,24 @@ import vm from "node:vm";
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../insightcrew/app/assets/js");
 
-function loadEvidence() {
+/* 假 DOM：只实现 el 用到的那几个方法（与 usage.test.mjs 同款的最小集） */
+class FakeNode {
+  constructor(tag) { this.tag = tag; this.children = []; this.attributes = {}; this.style = {};
+                    this.className = ""; this.listeners = {}; }
+  append(...kids) { this.children.push(...kids); }
+  replaceChildren(...kids) { this.children = [...kids]; }
+  setAttribute(key, value) { this.attributes[key] = String(value); }
+  addEventListener(name, fn) { (this.listeners[name] || (this.listeners[name] = [])).push(fn); }
+}
+const textOf = (node) => node.children.map((kid) => kid instanceof FakeNode ? textOf(kid) : String(kid)).join("");
+
+function loadEvidence(stateSnapshot) {
   const files = ["00-core.js", "05-labels.js", "10-model.js", "40-evidence.js"];
   const source = files.map((name) => readFileSync(path.join(SRC, name), "utf8")).join("\n");
-  const wrapper = `(function () {\n"use strict";\n${source}\n`
-    + "return { fold, evFactRows, evFactMatches, evActorName, evReadings, FACT_KIND_TEXT };\n})()";
-  return vm.runInNewContext(wrapper, {});
+  const state = JSON.stringify({ cited: "", ...(stateSnapshot || {}) });
+  const wrapper = `(function () {\n"use strict";\n${source}\nconst state = ${state};\n`
+    + "return { fold, evFactRows, evFactMatches, evActorName, evReadings, evCiteExtra, citePanelExtra, FACT_KIND_TEXT };\n})()";
+  return vm.runInNewContext(wrapper, { document: { createElement: (t) => new FakeNode(t) }, Node: FakeNode });
 }
 
 /** 手造一次带四类事实与多条分析的运行（形状与 journal.jsonl 一致） */
@@ -97,4 +110,19 @@ test("evActorName：泳道、组名与原文逐级回落，绝不空白", () => 
   assert.equal(evActorName("judge.evidence"), "证据评审");
   assert.equal(evActorName("evidence"), "证据");                       // 组名之外：LANES 兜住
   assert.equal(evActorName("someone-else"), "someone-else");           // 未知：回落原文
+});
+
+test("citePanelExtra：renderCite 的挂点在加载时接住——已知编号追加「在证据中查看」，未知引用不加", () => {
+  const known = loadEvidence({ cited: "sma_20" });
+  assert.equal(typeof known.citePanelExtra, "function");              // 40-evidence 加载时已把挂点设上
+  const model = richModel(known.fold);
+  const box = new FakeNode("aside");
+  known.citePanelExtra(model, box);
+  assert.equal(box.children.length, 1);                               // 只追加一个按钮容器
+  assert.ok(textOf(box).includes("在证据中查看"));
+
+  const unknown = loadEvidence({ cited: "nope" });
+  const box2 = new FakeNode("aside");
+  unknown.citePanelExtra(model, box2);
+  assert.equal(box2.children.length, 0);                              // 未知引用：挂点自己判空，什么都不加
 });

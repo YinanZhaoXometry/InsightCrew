@@ -2,10 +2,10 @@
    一张统一的事实表（带搜索框）：账本 / 基本面 / 工具 / 宏观，附种类徽章与引用它的角色；
    条目列表沿用原有标题，保留「来源原文，未经核验」「来源原话，未经核验」字样；
    每条通道一行状态、数据卡、组合状态、用到的课程。
-   引用徽章点开的抽屉由共享的 renderCite（60-events.js）绘制；这里给它补「在证据中查看」
-   ——共享文件本包不改（HANDOFF 5.6 规则 3，请求已写入第 7 节），故以观察器在每次重绘后追加。
-   本文件加载时不碰 document/window：纯推导（evReadings / evFactRows / evFactMatches /
-   evActorName）可被 Node 测试直接加载。 */
+   引用徽章点开的抽屉由共享的 renderCite（60-events.js）绘制；「在证据中查看」经 renderCite
+   末尾的挂点（citePanelExtra，00-core 声明）直连——第 7 节那行共享文件请求由 WP51 落实，
+   原先以观察器在重绘后追加按钮的绕法已删。本文件加载时不碰 document/window（给挂点赋值不算）：
+   纯推导（evReadings / evFactRows / evFactMatches / evActorName）可被 Node 测试直接加载。 */
 
 /* ---------- 纯推导（Node 测试直接调） ---------- */
 
@@ -63,8 +63,6 @@ function evFactMatches(row, query) {
 let evQuery = "";            // 搜索框里的字
 let evWanted = "";           // 「在证据中查看」点名的事实或条目编号
 let evScrolled = false;      // 落点只滚一次，之后的重绘保留高亮不再滚动
-let evModelRef = null;       // 最近一帧的模型：给抽屉的补充按钮判断编号是否已知（任意页签都要有）
-let evCiteHooked = false;    // 抽屉的观察器只挂一次
 let evBuilt = false;         // 骨架只建一次：搜索框是持久节点，重绘不换，输入焦点不丢
 let evInputEl = null, evCountEl = null;
 
@@ -78,30 +76,18 @@ function evRevealWanted(box) {
   if (!evScrolled) { node.scrollIntoView({ block: "center" }); evScrolled = true; }
 }
 
-/* ---------- 引用抽屉的补充：「在证据中查看」（20.10） ---------- */
+/* ---------- 引用抽屉的补充：「在证据中查看」（20.10；经 renderCite 末尾的挂点直连） ---------- */
 
-registerView({ id: "evidence-model", title: "", always: true, target: "view-evidence",
-               render: (model) => evKeepModel(model) });
-
-function evKeepModel(model) {
-  /* 每帧记下模型（只在可见页签渲染的视图拿不到别页签时的模型）；首次顺带挂上抽屉的观察器 */
-  evModelRef = model;
-  if (evCiteHooked) return;
-  evCiteHooked = true;
-  const box = $("detail");
-  if (box) new MutationObserver(() => evDecorateCite(box)).observe(box, { childList: true });
-}
-
-function evDecorateCite(box) {
-  /* renderCite 每次重绘抽屉都会换掉全部子节点：这里在其后追加跳转按钮（幂等） */
+function evCiteExtra(model, box) {
+  /* renderCite 画完引用面板后经 citePanelExtra 调用：已知编号追加跳转按钮；未知引用没有可去的行 */
   const id = state.cited;
-  if (!id || !evModelRef) return;
-  if (!(evModelRef.facts[id] || evModelRef.items[id])) return;   // 未知引用：没有可去的行
-  if (box.querySelector("#ev-cite-link")) return;
+  if (!id) return;
+  if (!(model.facts[id] || model.items[id])) return;
   box.append(el("div", { class: "cite-actions" },
     el("button", { class: "ctl", type: "button", id: "ev-cite-link",
                    on: { click: () => evViewInEvidence(id) } }, "在证据中查看")));
 }
+citePanelExtra = evCiteExtra;   // 挂点声明在 00-core（最先加载），此处加载时即可赋值
 
 function evViewInEvidence(id) {
   evWanted = id;
@@ -220,7 +206,6 @@ function evBuildSkeleton(box) {
 }
 
 function renderEvidence(model, box) {
-  evModelRef = model;
   if (!model.events.length) {
     evBuilt = false;                                     // 下次有运行时重建骨架
     fill(box, el("h2", null, "证据"),

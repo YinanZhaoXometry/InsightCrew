@@ -59,3 +59,8 @@ function cite(id) {
   return el("button", { class: "chip mono", type: "button", title: "引用：" + id,
                         on: { click: () => openCite(id) } }, id);
 }
+
+/* 引用面板的挂点（HANDOFF 第 7 节「Version 2.3: shared-file requests」WP48 那行，WP51 落实）：
+   renderCite（60-events.js）画完面板后调用它；40-evidence.js 在加载时把它设成「在证据中查看」的补充。
+   绑定声明在本文件（编号最小、最先加载），40-evidence 加载时赋值才不踩 60-events 的暂时性死区。 */
+let citePanelExtra = null;

@@ -133,3 +133,28 @@ test("activityRoles：轨迹里开着头没收尾的调用各一行，收了尾�
   assert.equal(roles[1].label, "新闻分析师");
   assert.equal(activityRoles(spans, null).length, 0);    // 没有可依据的「现在」就不画计时器
 });
+
+test("announceActivity：活动区是活区——段的状态与在飞角色变了才播报，计时数字不进摘要", () => {
+  function loadAnnouncer() {                    // 装载器同款，只是 sr-activity 给一个真实的记录节点
+    const files = ["00-core.js", "05-labels.js", "10-model.js", "25-activity.js"];
+    const source = files.map((name) => readFileSync(path.join(SRC, name), "utf8")).join("\n");
+    const node = { textContent: "" };
+    const wrapper = `(function () {\n"use strict";\n${source}\nreturn { pipeline, announceActivity };\n})()`;
+    const ctx = vm.runInNewContext(wrapper, {
+      document: { getElementById: (id) => (id === "sr-activity" ? node : undefined), querySelector: () => null },
+    });
+    return { ctx, node };
+  }
+  const { ctx, node } = loadAnnouncer();
+  const info = ctx.pipeline(baseRun());
+  ctx.announceActivity(info, []);
+  const first = node.textContent;
+  assert.ok(first.includes("进行中"));                       // 审计通过后评审在跑
+  assert.ok(first.includes("已完成"));                       // 已完成的段数也在摘要里
+  assert.ok(!first.includes("0:0"));                         // 计时数字不进摘要（每秒重画不重播）
+  ctx.announceActivity(info, [{ role: "technical", label: "技术分析师", step: "technical#1" }]);
+  assert.ok(node.textContent.includes("模型调用中：技术分析师"));   // 在飞角色变了：播报新摘要
+  const before = node.textContent;
+  ctx.announceActivity(info, [{ role: "technical", label: "技术分析师", step: "technical#1" }]);
+  assert.equal(node.textContent, before);                   // 内容没变：不再播报
+});

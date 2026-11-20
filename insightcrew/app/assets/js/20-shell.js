@@ -42,6 +42,7 @@ function selectTab(id) {
     const on = button.dataset.view === id;
     button.classList.toggle("on", on);
     button.setAttribute("aria-selected", on ? "true" : "false");
+    button.tabIndex = on ? 0 : -1;               // 页签组只占一个 Tab 停靠点，组内用方向键移动
   }
   for (const section of document.querySelectorAll(".view")) section.hidden = section.id !== "view-" + id;
   requestRender();
@@ -64,8 +65,16 @@ function render() {
   $("run").hidden = !(state.events.length || state.runId);
   const banner = $("banner");
   banner.hidden = !state.error;
-  banner.textContent = state.error ? "这次运行没有正常结束：" + state.error + "。这是程序的问题，不是分析结论。" : "";
-  renderHeader(model); renderRunState(model); renderPipeline(model);
+  const bannerKey = state.error ? state.error + "|" + state.runId : "";
+  if (banner.dataset.key !== bannerKey) {        // 只在内容变了才重画：role=alert 每次重画都会再播报一遍
+    banner.dataset.key = bannerKey;
+    fill(banner, state.error ? [
+      "这次运行没有正常结束：" + state.error + "。这是程序的问题，不是分析结论。",
+      state.live && state.runId
+        ? el("button", { class: "ctl banner-retry", type: "button", on: { click: () => openRun(state.runId, false) } }, "重试")
+        : null] : []);
+  }
+  renderHeader(model); renderRunState(model); renderPipeline(model); announceStatus();
   for (const v of VIEWS)
     if (v.always || v.id === state.tab) v.render(model, $(v.target || "view-" + v.id));
   renderDetail(model);
@@ -76,6 +85,25 @@ function render() {
   $("slider").value = String(state.shown);
   $("progress").textContent = state.shown + " / " + state.events.length + (state.ended ? "" : " …");
 }
+
+/* 读屏：运行状态变化时播报一次（胶囊文字），不随每帧重画而重复 */
+let announced = "";
+function announceStatus() {
+  const pill = $("run-state"), text = pill.hidden ? "" : pill.textContent;
+  if (text === announced) return;
+  announced = text;
+  $("sr-status").textContent = text ? "运行状态：" + text : "";
+}
+
+$("tabs").addEventListener("keydown", (ev) => {
+  const tabs = [...$("tabs").querySelectorAll("button")], at = tabs.indexOf(document.activeElement);
+  if (at < 0) return;
+  const to = { ArrowRight: (at + 1) % tabs.length, ArrowLeft: (at + tabs.length - 1) % tabs.length, Home: 0, End: tabs.length - 1 }[ev.key];
+  if (to === undefined) return;
+  ev.preventDefault();
+  selectTab(tabs[to].dataset.view);
+  tabs[to].focus();
+});
 
 $("tabs").addEventListener("click", (ev) => {
   const button = ev.target.closest("button");

@@ -131,6 +131,9 @@ function renderPipeline(model) {
   const events = model.events;
   const watching = state.live && !state.ended;                  /* 正在看现场（流还开着） */
   const info = pipeline(events, !watching && !model.finished);  /* 回放/已中断：停下的段画「未完成」 */
+  const frozen = watching ? Date.now() : frozenNow(model);      /* 现场用当前时刻，回放/中断停在最后已知时刻 */
+  const working = activityRoles(model.spans, frozen);           /* 在飞的调用：读屏播报与计时行同一份 */
+  announceActivity(info, working);
   const board = model.board;
   const started = model.started;
   const parallel = started && started.flow && started.flow.parallel !== false;
@@ -167,8 +170,6 @@ function renderPipeline(model) {
   });
 
   /* 正在工作的角色（轨迹给的在飞跨度）＋总用时＋「模型调用中」提示 */
-  const frozen = watching ? Date.now() : frozenNow(model);      /* 现场用当前时刻，回放/中断停在最后已知时刻 */
-  const working = activityRoles(model.spans, frozen);
   if (working.length) {
     chips.push(el("div", { class: "working", title: "轨迹里开着头没收尾的调用：这些角色此刻在等模型返回" },
       working.map((w) => el("span", { class: "work-role" },
@@ -181,6 +182,31 @@ function renderPipeline(model) {
   if (meta.length) chips.push(el("div", { class: "activity-meta" },
     meta.map((text) => el("span", { class: "meta-bit" }, text))));
   fill($("pipeline"), chips);
+}
+
+/* 读屏：活动区的变化（进行到哪一段、谁在飞）变化时播报一次（20.10 质量清单「活动区是活区」）。
+   计时器每秒走的数字不进摘要，免得读屏每秒念一遍；只有段的状态集合与在飞角色集合变了才说。 */
+let announcedActivity = "";
+function stageTitleOf(key) {
+  const entry = STAGES.find(([k]) => k === key);
+  return entry ? entry[1] : key;
+}
+function announceActivity(info, working) {
+  const box = $("sr-activity");
+  if (!box) return;
+  const running = Object.keys(info.status).filter((key) => info.status[key] === "running");
+  const halted = Object.keys(info.status).filter((key) => info.status[key] === "halted");
+  const done = Object.keys(info.status)
+    .filter((key) => info.status[key] === "done" || info.status[key] === "sentback").length;
+  const parts = [];
+  if (running.length) parts.push("进行中：" + running.map(stageTitleOf).join("、"));
+  if (halted.length) parts.push("未完成：" + halted.map(stageTitleOf).join("、"));
+  if (working.length) parts.push("模型调用中：" + working.map((w) => w.label).join("、"));
+  if (done) parts.push("已完成 " + done + " 段");
+  const text = parts.join("；");
+  if (text === announcedActivity) return;
+  announcedActivity = text;
+  box.textContent = text;
 }
 
 function frozenNow(model) {

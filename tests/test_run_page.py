@@ -280,3 +280,24 @@ def test_the_assembler_refuses_a_script_that_closes_the_tag(tmp_path: Path,
     monkeypatch.setattr(replay_html, "_ASSETS", assets)
     with pytest.raises(RuntimeError):
         live_page()
+
+
+def test_the_page_declares_the_quality_layer_of_wp51() -> None:
+    """20.10 质量清单落在页面上的静态部分：活区、页签键盘操作、抽屉对话框、断流说明。"""
+    page = ASSET
+    assert 'id="banner" role="alert"' in page                      # 失败横幅是警报活区
+    assert 'id="sr-status" role="status" aria-live="polite"' in page   # 运行状态的播报活区
+    assert 'id="sr-activity" role="status" aria-live="polite"' in page  # 活动区的播报活区
+    assert 'id="stream-note" role="status" hidden' in page         # 断流重连的说明（活区）
+    assert 'role="tablist"' in page and 'role="tab"' in page       # 页签组与页签（方向键移动在 20-shell.js）
+    assert 'role="tabpanel"' in page and "aria-labelledby" in page
+    assert 'id="detail" hidden role="dialog"' in page              # 抽屉是对话框：焦点进出在 60-events.js
+    assert ".sr-only" in page and ":focus-visible" in page         # 读屏专用文字与键盘焦点可见
+
+
+def test_the_cite_panel_hook_is_declared_and_taken() -> None:
+    """第 7 节 WP48 的共享文件请求：renderCite 末尾有可替换挂点，40-evidence 加载时接住它。"""
+    assert "let citePanelExtra = null;" in ASSET                   # 挂点声明在 00-core（最先加载）
+    assert "if (citePanelExtra) citePanelExtra(model, box);" in ASSET  # renderCite 两个出口都调用
+    assert "citePanelExtra = evCiteExtra;" in ASSET                # 40-evidence 直连（观察器绕法已删）
+    assert "MutationObserver" not in ASSET                         # 绕法不再出现

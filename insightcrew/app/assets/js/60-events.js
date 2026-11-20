@@ -59,7 +59,7 @@ function renderTimeline(model) {
     for (const e of turn.events) {
       const [title, sub, kind] = describe(e);
       const old = e.type === "artifact.written" && newest[e.data.key] !== e.data.version;
-      cell.append(el("button", { type: "button", title: title + (sub ? " · " + sub : ""),
+      cell.append(el("button", { type: "button", "data-seq": e.seq, title: title + (sub ? " · " + sub : ""),
         class: "ev " + kind + (old ? " old" : "") + (e.seq === state.selected ? " selected" : "")
           + (e.seq === latest ? " latest" : ""),
         on: { click: () => openDetail(e.seq) } }, el("b", null, title), el("span", null, sub)));
@@ -84,9 +84,29 @@ function renderTimeline(model) {
 
 /* ---------- 事件详情 ---------- */
 
-function openDetail(seq) { state.selected = seq; state.cited = ""; state.follow = false; requestRender(); }
-function openCite(id) { state.selected = 0; state.cited = id; state.follow = false; requestRender(); }
-function closeDetail() { state.selected = 0; state.cited = ""; requestRender(); }
+/* 抽屉的焦点：打开时记下触发它的控件并把焦点移进抽屉，关闭时还回去（控件每次渲染都会重建，所以靠 data-seq 找回时间线上的卡片） */
+let drawerOpener = null, drawerWantsFocus = false;
+function rememberOpener() {
+  const active = document.activeElement;
+  if (active && active !== document.body && !$("detail").contains(active)) drawerOpener = active;
+  drawerWantsFocus = true;
+}
+function openDetail(seq) { rememberOpener(); state.selected = seq; state.cited = ""; state.follow = false; requestRender(); }
+function openCite(id) { rememberOpener(); state.selected = 0; state.cited = id; state.follow = false; requestRender(); }
+function closeDetail() {
+  const seq = state.selected, id = state.cited;
+  state.selected = 0; state.cited = "";
+  const back = drawerOpener; drawerOpener = null; drawerWantsFocus = false;
+  requestRender();
+  setTimeout(() => {        // 等这一轮渲染落定后再还焦点
+    let target = back && back.isConnected ? back : null;
+    if (!target && seq) target = document.querySelector('.ev[data-seq="' + seq + '"]');
+    if (!target && id) {    // 引用徽章每帧重建，记下的那个必已失效：找回同编号的一个徽章
+      target = [...document.querySelectorAll(".chip")].find((chip) => chip.textContent === id) || null;
+    }
+    if (target) target.focus();
+  }, 200);
+}
 
 function citedByText(entries) {                     // 谁引用了它：角色（中文名）· 黑板键 · 事件号
   return entries.map((entry) => {
@@ -112,7 +132,9 @@ function renderCite(model, box) {                   // 引用徽章点开的面�
   } else {
     kids.push(el("dl", { class: "kv" }, [el("dt", null, "编号"), el("dd", null, id)]),
               el("p", { class: "note" }, "未知引用：这次运行里没有这个编号对应的事实或条目。"));
-    fill(box, kids); box.hidden = false; return;
+    fill(box, kids); box.hidden = false;
+    if (citePanelExtra) citePanelExtra(model, box);   // 挂点（00-core 声明）：未知引用要不要补，由挂点自己判断
+    return;
   }
   const by = model.cited_by[id];
   kids.push(el("dl", { class: "kv" }, rows.map(([k, v]) => [el("dt", null, k), el("dd", null, v)])));
@@ -120,10 +142,18 @@ function renderCite(model, box) {                   // 引用徽章点开的面�
     by && by.length ? citedByText(by) : "没有角色在产物里引用过它。"));
   fill(box, kids);
   box.hidden = false;
+  if (citePanelExtra) citePanelExtra(model, box);     // 挂点（00-core 声明，§7 共享文件请求）：40-evidence 接「在证据中查看」
 }
 
 function renderDetail(model) {
   const box = $("detail");
+  const hadFocus = box.contains(document.activeElement);   // 抽屉每次渲染都重建：焦点在里面时，重建后放回关闭键
+  renderDetailBody(model, box);
+  const close = box.hidden ? null : box.querySelector(".close");
+  if (close && (drawerWantsFocus || hadFocus)) { close.focus(); drawerWantsFocus = false; }
+}
+
+function renderDetailBody(model, box) {
   if (state.cited) { renderCite(model, box); return; }
   const e = state.events.find((event) => event.seq === state.selected);
   box.hidden = !e;

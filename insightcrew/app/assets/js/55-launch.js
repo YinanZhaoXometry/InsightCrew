@@ -364,7 +364,11 @@ function updateLaunchState() {
 async function loadHistory() {
   const { status, data } = await getJSON("/api/runs");
   const body = $("history-body");
-  if (status !== 200) { body.textContent = "读不到运行列表。"; return; }
+  if (status !== 200) {                            // 读不到列表：就地给重试（质量清单「失败的请求有重试」）
+    fill(body, el("span", { class: "muted" }, "读不到运行列表。"),
+      el("button", { class: "linkish", type: "button", on: { click: loadHistory } }, "重试"));
+    return;
+  }
   if (!data.runs.length) { body.textContent = "还没有运行。"; return; }
   const when = (id) => id.slice(0, 4) + "-" + id.slice(4, 6) + "-" + id.slice(6, 8) + " "
     + id.slice(9, 11) + ":" + id.slice(11, 13) + ":" + id.slice(13, 15);
