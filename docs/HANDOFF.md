@@ -2501,6 +2501,8 @@ Not run, and why: 真实模型 `analyze` 未跑（花费须先问；owner 未选
 
 补记（01:25，owner 批准第 3 条，确认与并行的 serve 会话不互斥后执行）：`.venv/bin/insightcrew analyze ACME --date 2026-09-30 --no-open` 真模型跑通端到端（key 读取、网络、deepseek-flash 与 deepseek-v4-pro 双档、审计、报告），但交付为 `REVIEW（malformed_output）`：trader#1 单次调用输出恰好 8000（上限打满，AGENTS 已记载的 reasoning 耗尽输出预算截断，非代码缺陷）。用量 14,573 入 + 15,390 出（trader 占 4,476+8,000），约 0.012 USD。`replay` 一致、`verify` 通过；run 目录 `runs/20261121-011110-ACME-2026-09-30-4b02`，未归档。新用户首跑遇 REVIEW 而非 delivered 属当日模型方差（11-20 的 eval v22 九格 8 交付）；是否调大 trader 的输出上限或加一次重试，是 owner 的决定（涉 prompt/上限须真模型验证）。与 serve 会话无冲突：不同 run 目录，决策日志有锁，未动其进程与文件。
 
+再补记（01:20 复跑，owner 批准"再跑一次；若复现则立项"）：同一命令第二次 `runs/20261121-011523-ACME-2026-09-30-63d9` → `delivered（ok）；accepted 2/3；verified`，3:33 全流程（含审计与评审），trader 输出 2,689（远低于 8,000），`replay` 一致、`verify` 通过。截断为偶发、不复现 → 不立项、不加第 7 节问题；AGENTS 的已知机制记载足够。用量 50,613 入 + 32,983 出（约 0.03 USD，与 README/EVALUATION 记录一致）；两次合计约 0.04 USD。README 的带 key 路径就此实证完毕：指引可用，REVIEW 与 delivered 都是系统按设计的正常交付。
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.
