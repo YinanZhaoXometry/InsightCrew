@@ -2499,6 +2499,8 @@ Commands run, with the last lines of their output:
 
 Not run, and why: 真实模型 `analyze` 未跑（花费须先问；owner 未选可选项 3）。网络仅 127.0.0.1 本地 serve；未读未打印 `.env`。
 
+补记（01:25，owner 批准第 3 条，确认与并行的 serve 会话不互斥后执行）：`.venv/bin/insightcrew analyze ACME --date 2026-09-30 --no-open` 真模型跑通端到端（key 读取、网络、deepseek-flash 与 deepseek-v4-pro 双档、审计、报告），但交付为 `REVIEW（malformed_output）`：trader#1 单次调用输出恰好 8000（上限打满，AGENTS 已记载的 reasoning 耗尽输出预算截断，非代码缺陷）。用量 14,573 入 + 15,390 出（trader 占 4,476+8,000），约 0.012 USD。`replay` 一致、`verify` 通过；run 目录 `runs/20261121-011110-ACME-2026-09-30-4b02`，未归档。新用户首跑遇 REVIEW 而非 delivered 属当日模型方差（11-20 的 eval v22 九格 8 交付）；是否调大 trader 的输出上限或加一次重试，是 owner 的决定（涉 prompt/上限须真模型验证）。与 serve 会话无冲突：不同 run 目录，决策日志有锁，未动其进程与文件。
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.
