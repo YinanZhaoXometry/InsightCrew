@@ -2453,7 +2453,9 @@ Result: done — 问题 38 按读法 A 修复（owner 授权："好的"，回应
 
 做了什么：`insightcrew/app/resume.py::_models` 在 `settings.force_offline` 时直接返回 `Script({})`，与 `wiring._tiers` 同一判断；离线续跑从此不会构造真实档位、不会花钱。新测试 `tests/test_cli.py::test_resume_models_respect_force_offline`（能构造真实模型的设置 + force_offline，断言得到 Script）先红（返回了 `Tiers`）后绿。`tests/test_cli.py`、`tests/test_server.py` 三处注释原称 "_models 不看 force_offline"，改为现状（打补丁只为给续跑剧本回复）。文档：AGENTS.md、ARCHITECTURE.md、ROADMAP.md 的已知缺口由三条减为两条（43、44），测试数 906→907（无 Node 904→905）随 README/AGENTS/EVALUATION/ROADMAP 更新；本文件顶部过时的"Nothing of it is built"横幅改为已建成。
 
-Commands run, with the last lines of their output: 见下一提交前的检查（pytest、ruff、pyright、`scripts/check.sh`、zip 重建与空目录验证），结果记在本条目末尾。
+Commands run, with the last lines of their output:
+  uv run pytest tests/test_cli.py::test_resume_models_respect_force_offline -q → 修前 1 failed（`isinstance(<Tiers>, Script)` 为假）；修后通过
+  ./scripts/check.sh（不设 IC_FORCE_OFFLINE；设了会让 test_wiring 的两项"有模型"测试失败，那是环境不是代码）→ 907 passed；ruff/pyright 0；36 场景 ✓；53/53 重放一致；eval all 6/6；「check.sh：全部阶段通过。」退出 0
 
 Not run, and why: 无网络请求、无真实模型、未读未打印 `.env`。问题 43、44、45 未动（等 owner）。
 
