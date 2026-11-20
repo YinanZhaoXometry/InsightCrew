@@ -7,6 +7,7 @@ Status: **plan, not yet built.** Written 2026-11-19, and revised the same day wh
 - [TRANSFORMATION.md](TRANSFORMATION.md) is the earlier proposal. It remains the record of what was learned from the two reference systems and of the fit with the course requirements. Where the two documents differ, this one wins. [Section 17](#17-relation-to-transformationmd) lists the differences.
 - Sections 0 to 17 describe version 2.0, which is built: work packages 0 to 12 are done. [Section 18](#18-version-21-evidence-channels) is the plan for version 2.1, which adds two evidence channels (fundamentals and disclosures). It was proposed on 2026-11-19 and nothing in it is built.
 - [Section 19](#19-version-22-langgraph-orchestration-and-five-capabilities) is the plan for version 2.2 (proposed 2026-11-19 late evening, version 2.1 by then built): LangGraph orchestration with parallel analysts and resume, a portfolio, a three-way risk debate, analyst tools, news with macro data and social sentiment, and memory with settlement and backtest. Nothing in it is built. Where it amends an earlier section, section 19 says so.
+- [Section 20](#20-version-23-hardening-run-control-and-the-workbench-page) is the plan for version 2.3 (proposed 2026-11-20, version 2.2 by then built except its real-model runs): fixes for the defects a review found, a timing trace beside the journal, cancel and resume from the page, and the run page rebuilt around the user's questions. Nothing in it is built. Where it amends an earlier section, section 20 says so.
 
 ## 0. Reading guide
 
@@ -2839,4 +2840,416 @@ In addition to 12.4 and 18.17:
 | TradingAgents runs analysts in parallel as subgraphs with private message histories, keys checkpoints by a run signature, and gives every conditional edge a path map | Read in `../TradingAgents-main/tradingagents/graph/setup.py`, `trading_graph.py`, `checkpointer.py` on 2026-11-19 |
 | That `langgraph` and `langgraph-checkpoint-sqlite` resolve under `exclude-newer = 2026-11-15` | **Not tried.** WP22's first step. |
 | Any live endpoint of 19.12 | **Not tried** for this version, except the RSS feeds in 18.18. |
+| Effort estimates | The author's. Not measured. |
+
+## 20. Version 2.3: hardening, run control and the workbench page
+
+Status: **plan, not built.** Written 2026-11-20 morning, after version 2.2 was built except its real-model runs (branch `v2.2`, head `549c40f`: 825 tests, 34 scenarios, 43 archived journals, the three checks clean). It comes from a review the owner asked for: the code as built, the two reference systems, and the run page used in a browser. The owner chose the scope, authorised one kernel change, accepted the recommended readings of the open questions and gave WP38 its spending cap the same morning; [HANDOFF.md](HANDOFF.md) section 4 records it. Sections 0 to 19 still describe what is built. This section amends them where it says so, and only there.
+
+Readers: an implementer reads 20.1 to 20.6, then the subsections its work package names in 20.14. [HANDOFF.md](HANDOFF.md) section 5.6 says which packages may run at the same time and which files each owns. File and line references are to the head `549c40f`.
+
+### 20.1 What the review found
+
+**What is sound and stays.** The layering and its architecture test; the two computation paths per fact; the audit as a pure function; the journal as the only truth with replay; deferred commit, which makes a parallel journal equal a serial one; point-in-time reading; explicit absence (`unavailable` is never an empty list); the server's boundary checks. None of it is redesigned.
+
+**Defects.** "Read" means found by reading the code and not yet reproduced by a test; the package that fixes one writes the failing test first.
+
+| # | Defect | Where | Consequence | Status |
+|---|---|---|---|---|
+| D1 | The risk debate is a synchronous function that runs the asynchronous kernel in a second thread with its own event loop | `flows/stage_risk.py` `risk()`; called at `flows/graph.py:333` | The server's event loop is blocked for the whole debate (the event stream freezes, a run cannot be cancelled), and the model's HTTP client is used from two event loops. No real-model run has included the risk debate, so the second point is untested. WP38's risk cells would be the first to meet it | Read |
+| D2 | `resume` loses parallel analysts | `flows/graph.py` `_deferred_analyst` keeps results only in the in-memory `holder`; `join` commits what it finds there | A run interrupted during the analyst fan-out resumes with nothing to commit; the audit later fails on a missing board key. `tests/test_graph.py` tests resume only after `manager` | Read |
+| D3 | `resume` of a run with tools fails | `run.tools` is built only in the `intake` node (`flows/graph.py:117`), which a resumed graph does not rerun; `kernel/runtime.py:241` then raises `KeyError`. `app/resume.py` restores `_steps` but not `_requests` | A tools run cannot be resumed; a resumed run may exceed `max_requests` | Read |
+| D4 | `[flow] channels` in `insightcrew.toml` never applies | `app/wiring.py:249` always passes a tuple, because `_channel_names(None)` returns `()` (line 269), so the override replaces the settings value every time | WP38's last step, "decide which capabilities the settings switch on", would have no effect for channels | Read |
+| D5 | Runs started from the page have no checkpoint | `app/server.py:36` imports `flows.analyze.analyze`, not `wiring.run_flow` | A run started in the browser cannot be resumed | Read |
+| D6 | An interrupted run is a dead end on every surface | The command line and the page report the failure; neither mentions `resume`; the page has no way to resume or to stop a run | Money already spent is lost to the user | Seen in the browser (no control exists) |
+| D7 | Nothing says what is happening during a model call | The journal gains `model.called` only when a call returns; per-analyst wall time lives only in memory (question 20, option C); a resumed run is not marked | The page stands still for the length of each call; the parallel-against-serial comparison of WP38 has nowhere to be recorded | Seen in the browser |
+| D8 | A torn last line makes a journal unreadable | `Journal.load` validates every line | A process killed during an append leaves a run that `resume` refuses | Read |
+
+Smaller points, fixed only where 20.7 lists them: `_call` is defined in three flow modules and `_one_line` in two app modules; `app/cli.py:339` and `:356` handle a `NotImplementedError` no stub raises any more; the labels tables `_GATES` and `_STAGES` in `app/cli.py` lack the version 2.2 roles; when one parallel branch halts, the calls its siblings completed are never journaled, so their spend is not in `run/usage`.
+
+**The page, as a user meets it.** Checked on the `demo` scenario and by reading `app/assets/page.html` (1179 lines, one script).
+
+| # | Pain point |
+|---|---|
+| P1 | During a model call nothing moves, and nothing says who is working or for how long. Parallel analysts cannot be seen to be parallel. Live events are revealed one every 0.7 s even when they have all arrived |
+| P2 | A run cannot be stopped or resumed. The start button is never disabled |
+| P3 | The answer is buried: the result card has the rating and levels but not the thesis, the reasons or the invalidation conditions. The page is one long column (about 3200 px for `demo`). Cards are titled with board keys (`judges/on_thesis`) and enum values in English |
+| P4 | Fact and item IDs that roles cite (`sma_20`, `N1`, `S3`) are plain text. The project's claim is that every number can be traced; the page offers no way to trace one |
+| P5 | The audit sending a proposal back, which is the system's distinguishing behaviour, shows only as struck-through cards: no before and after, no limit against actual |
+| P6 | Bull and bear arguments, the risk views' details and the judges' citations are not on the page; they are only in `report.md` |
+| P7 | Usage is grouped by role family, with no duration and no comparison with the limits; nothing estimates a run before it starts |
+| P8 | The form asks for a server file path for the portfolio, uses a multi-select list box for channels, remembers nothing, and gives no hint of what data covers the chosen date |
+| P9 | No link to the report or the static replay |
+| P10 | Fetch failures are silent; no live region, no focus management, no dark mode; tables overflow on a narrow screen; every view folds the whole journal again on every event; no test runs the script |
+
+### 20.2 What is learned from the two references
+
+Ideas only. No file of either reference is opened for copying by any package of this version; nothing is added to `THIRD_PARTY_NOTICES.md`.
+
+| Idea | Seen in | Verdict |
+|---|---|---|
+| Spans with start, end and duration per agent call; a waterfall view | open-multi-agent (trace events, run viewer); LangGraph Studio and similar tools | **Built**: the trace (20.6) and the timing tab (20.10) |
+| Cancel a run with the abort reaching the model call | open-multi-agent | **Built** (20.8), by cancelling the task; the run stays resumable |
+| Human approval before a result is delivered | open-multi-agent (approval gate); LangGraph interrupts | **Stretch** (20.11), off by default |
+| Plan preview before spending | open-multi-agent (dry run) | **Built** as `POST /api/plan` (20.8) |
+| Offline verification of a recorded run's structure | open-multi-agent (`verifyRun`) | **Built** as the `verify` command (20.7) |
+| Retry with backoff on transient model errors | open-multi-agent, TradingAgents | **Verify, do not build.** The review saw `DEFAULT_MAX_RETRIES = 2` in the installed OpenAI SDK and no override in Pydantic AI's provider, so the client probably retries already. WP38 confirms it by reading the installed source and records what it finds; a retry in the kernel would be a kernel change |
+| Tests that a prompt and the role that loads it agree | TradingAgents | **Built** (20.12) |
+| A test harness that also blocks `connect_ex` and clears API-key variables | TradingAgents | **Built** (20.12) |
+| One command for every check; a CI workflow file | TradingAgents | **Built** (20.12). The workflow is a file only: nothing is pushed, so it is never run |
+| A live terminal status view | TradingAgents (Rich) | **Small form only**: the command line prints a line when a role starts and ends. `rich` is not a declared dependency and is not imported |
+| Token streaming; live tool-call notices; insider transactions; `Retry-After` in data adapters; lenient numeric coercion; a manager prompt that guards against speaking-order bias; follow-up questions on a finished run; fork a run from a stage; comparing two runs; redacting a journal for sharing | both | **ROADMAP** (20.16) |
+| A free-form coordinator that plans its own tasks; scheduling strategies; shared memory with expiry; context compaction; MCP and sandboxes; OpenTelemetry export; run leases | open-multi-agent | **Rejected.** The fixed flow is what makes the audit and replay possible; the rest solves problems this system does not have |
+
+### 20.3 Decisions
+
+Numbered after section 19's last decision.
+
+| # | Decision | Why |
+|---|---|---|
+| 51 | Defects D1 to D5 are fixed before WP38 spends money. WP38 runs on `v2.3`. | D1 and D4 would spoil WP38's own cells and its last step |
+| 52 | Timing and liveness go into a sidecar file, `<run dir>/trace.jsonl`, never into the journal. The journal keeps its eight event types and `model.called` its fields. This answers question 20. | Durations differ on every run; in the journal they would break invariant 19, replay's whole-board comparison and two reference tests (the reason option A of question 20 was reverted) |
+| 53 | The kernel gains one observer hook, called at the start and at the end of a model call (20.5). | Only the kernel knows when a call starts. The owner authorised exactly this on 2026-11-20 |
+| 54 | No token streaming in this version. | It changes the request path for real models and has no meaning for the scripted and replay models; with three days left it is not worth the risk to WP38 |
+| 55 | Cancel stops the run and leaves it unfinished and resumable. It writes nothing to the journal; the trace records it. Ctrl-C on the command line behaves the same way, as it does today. | One meaning for "interrupted" on every surface, no new outcome reason, no special case in replay. Question 35 lets the owner choose otherwise |
+| 56 | The page stays one self-contained file at run time, with no build step and no package. Its source is split into modules that `app/replay_html.py` assembles. | `replay.html` must open from a file with no network; no package may be added; several agents can then work on the page at once |
+| 57 | The page is organised by the user's questions, in this order: what is the answer, why, can it be trusted, what did it cost. The raw event timeline stays, as the last tab. | P3, P5, P6 |
+| 58 | Every ID a role cites is a link to the evidence it names, and every piece of evidence lists who cited it. | P4; it is the claim of the project made usable |
+| 59 | The approval gate is a stretch package, off by default, and a human may only accept or reject: no edit. | An edited level would bypass the audit |
+| 60 | Nothing in this version changes a prompt, a rule, a limit or a contract of versions 2.0 to 2.2, except what 20.7 and 20.11 name. | The 43 archives and the scenarios must keep their meaning |
+
+### 20.4 The compatibility rule
+
+A version 2.3 run with `approve = False` (the default, and the only value unless WP52 is built) appends, for the same inputs and model replies, the journal that version 2.2 appends. `trace.jsonl` is a separate file. The fixes of 20.7 change behaviour only where version 2.2 failed.
+
+The proof, run at the end of every version 2.3 package, is that of 19.3. WP43 puts it in one script:
+
+```bash
+scripts/check.sh          # the three checks, every scenario ✓ 相符, every archive replays 一致, eval all exits 0
+```
+
+Until WP43 is done, run the commands of 19.3 by hand.
+
+### 20.5 Kernel change: the observer hook
+
+The owner authorised exactly this change to `insightcrew/kernel/runtime.py`. Only WP40 makes it. `tests/test_kernel.py` and `tests/test_kernel_v22.py` are not edited; new tests go in `tests/test_kernel_v23.py`.
+
+1. `Run` gains one field after `clock`: `observe: Callable[[str, Mapping[str, Any]], None] | None = None`.
+2. A module-level helper `_notify(run, kind, **data)` calls `run.observe(kind, data)` inside `contextlib.suppress(Exception)`: an observer that raises changes nothing.
+3. `run_role_deferred` calls it in three places, each guarded by `if run.observe is not None:` so that **with no observer the function makes no extra call to `run.clock`** (`tests/test_kernel.py:142` injects a clock that counts its calls):
+   - after `model = run.models.for_role(role)`: record `began = run.clock()` and notify `role.started` with `step`, `role` (the role's name), `tier`, `model` (`model.model_name`);
+   - in the `except (ModelAPIError, UserError)` branch, before `raise`: notify `role.failed` with `step`, `role`, `ms`;
+   - before `return Deferred(...)`: notify `role.finished` with `step`, `role`, `ms`, `ok` (`output is not None`), `requests`, `input_tokens`, `output_tokens`, `tool_calls` (`ledger.calls`, or 0).
+   `ms` is `int((run.clock() - began) * 1000)`.
+4. Nothing else. The kernel writes no file, imports nothing new except `contextlib`, and knows nothing about the trace. `commit` is unchanged, so a deferred call is "finished" when it was computed, which is what a duration should mean.
+
+Accept (part of WP40): `tests/test_kernel.py` and `tests/test_kernel_v22.py` untouched and green; new tests: with no observer the events are identical to before; with a recording observer the three kinds arrive in order with the fields above; with an observer that raises, the journal equals that of a run with no observer; a failed model call notifies `role.failed`.
+
+### 20.6 The trace
+
+`<run dir>/trace.jsonl`: one JSON object per line, appended by `app/trace.py` (new, standard library only). It is measurement. No role reads it, no number in `report.md` comes from it, replay never reads it, and deleting it changes no outcome (invariant 22).
+
+| `kind` | Written by | Fields besides `ts` and `kind` |
+|---|---|---|
+| `role.started` | the kernel hook | `step`, `role`, `tier`, `model` |
+| `role.finished` | the kernel hook | `step`, `role`, `ms`, `ok`, `requests`, `input_tokens`, `output_tokens`, `tool_calls` |
+| `role.failed` | the kernel hook | `step`, `role`, `ms` |
+| `run.resumed` | `app/resume.py` | `after_seq` (the journal's last sequence number at resume) |
+| `run.cancelled` | `app/server.py` | — |
+
+`ts` is UTC ISO time with milliseconds. `app/trace.py` holds: `Tracer(path, now)`, a callable taking `(kind, data)` that appends one line under a lock; `mark(path, kind, **data)` for the two lines the app writes itself; `load(path) -> list[dict]`, which skips a line that does not parse and returns `[]` for a missing file.
+
+Where it is attached: in `wiring.run_flow` and in the resume path, as `run.observe`, that is, for real command-line and web runs. Scenarios, tests and `replay` call `flows.analyze.analyze` directly and write no trace. A span with a start and no end is a call that was interrupted.
+
+The static page embeds the trace beside the events (20.9), so a `replay.html` shows durations with no server.
+
+### 20.7 Hardening
+
+Each fix names its owner package and the test that proves it. A test is written first and seen to fail.
+
+**Flows (WP41).**
+
+1. **D1.** `stage_risk.risk` becomes `async def risk(run, deps, cfg) -> None` and awaits the debate directly; the thread bridge, `asyncio.run` and `ThreadPoolExecutor` go. The graph's `risk_node` awaits it. Section 19 called the synchronous signature final; this amends it. Tests that call `risk` change only how they call it. New test: while the debate runs under a slow scripted model, another coroutine on the same loop keeps advancing.
+2. **D2.** `join` iterates the analysts of this round, `analysts_group[_rerun_start(state["route"]):]`, in order. For each, it takes the deferred result from `holder`; if there is none and the analyst is due (`technical`, or `stages.channel_ready`), it computes it there with `run_role_deferred` and commits it. In an uninterrupted run every due analyst has a result, so nothing changes. New test in `tests/test_graph.py`: a parallel run with two analysts is interrupted when the second analyst's model raises an unexpected error on its first attempt, then resumed with an empty `holder`; the final board equals that of an uninterrupted run.
+3. **D3, the flow's half.** `drive(..., resume=True)` with `cfg.tools` rebuilds `run.tools` when the board holds `request/scope`, and seeds the tool box with the board's `tools/facts` if present (a small method on the tool box in `flows/tools.py`). New test: a tools run interrupted after `manager` resumes and delivers.
+4. **Siblings' spend.** In `drive`, the `Halt` handler first commits any deferred results still in `holder`, in the fixed order, ignoring `Malformed`, and only then degrades. Reproduce first: a parallel run whose second analyst's model is unavailable shows the first analyst's `model.called` in the journal and its tokens in `run/usage`.
+5. **Wall time.** `drive`'s `wall_on_board` parameter, `_record_wall` and the write of `run/wall_ms` are removed; the trace replaces them. No test of the flow read them at `549c40f`; if one does by then, leave them and say so. The report's and the page's readers of that key have tests (`tests/test_report.py`, `tests/test_run_page.py`) and are not touched: they simply never find the key.
+6. `_call` defined once and imported by the other two flow modules, if it can be done without an import cycle; otherwise leave it and say so.
+
+**App (WP42).**
+
+7. **D4.** In `prepare`, `names` is `None` when a scenario is chosen **or** `channels` is `None`; otherwise the validated tuple. `_channel_names` is no longer called with `None`. New tests: settings with `[flow] channels = ["fundamentals"]` and no `--channels` give a job with that channel; `--channels` overrides it; a scenario ignores both.
+8. **D3, the app's half.** `app/resume.py` restores `_requests` as the sum of `usage.requests` over the journal's `model.called` events. Its body becomes `async def resume_run(settings, path) -> Outcome`, raising `BadRequest` with the Chinese message for each refusal; the synchronous `run(settings, run_dir)` wraps it and keeps its exit codes. The server calls `resume_run` (WP45).
+9. **D8.** Before loading a journal to resume it, if the file's last line does not end with a newline and does not parse, `resume` truncates the file to its last complete line and says so in one printed line. A bad line anywhere else is still an error.
+10. **The trace** (20.6): create `app/trace.py`; attach in `run_flow` and in `resume_run`; `resume_run` writes `run.resumed`. `tests/test_cli.py`'s expected set of files in a run directory gains `trace.jsonl` (question 33, the precedent of question 28).
+11. **D6, the command line's half.** `analyze` catches an unexpected exception from the run, writes the page for what exists, prints one line with the exception's class and `可用 insightcrew resume <运行目录> 续跑`, and exits 1. With `show`, it prints a line when a role starts and one with the duration when it ends, from the observer. `_GATES` and `_STAGES` gain the version 2.2 stages and roles; the two dead `NotImplementedError` handlers go.
+12. **`verify` command.** `app/verify.py` and `insightcrew verify RUN_DIR`: an offline structural check of a journal that runs no model and no flow. It checks: sequence numbers run from 1 with no gap; the first event is `run.started`; at most one `run.finished`, and it is last; every `caused_by` names an earlier event; each key's artifact versions increase by one; every `model.called` whose `output` is not null is followed by an `artifact.written` caused by it; `run/usage`, when present, equals the sums over `model.called`; `run/outcome` is present exactly when `run.finished` is. It prints `通过` or the problems, and exits 0 or 1. An unfinished journal passes with the note `未结束`.
+13. `replay` on a journal with no `run.finished` says the run did not finish and cannot be compared, and exits 1, instead of printing a list of differences.
+14. `_one_line` defined once.
+
+**Not fixed here**, recorded for ROADMAP (20.16): the prediction-markets reader in `flows/stage_news.py` reads files from a flow stage and treats an unreadable file as no markets; `audit/channels` is written only when the fundamentals or disclosures channel is present; the news analyst is skipped when the news window is empty even if macro facts are available. Each needs a decision about behaviour, not only a repair.
+
+### 20.8 Run control and the server API
+
+WP45. The boundary rules of 10.6 stand: replies carry no key, endpoint or file path; one run at a time.
+
+1. **Checkpointed runs (D5).** `_execute` calls `wiring.run_flow`.
+2. **Cancel.** `POST /api/runs/{run_id}/cancel`: 202 with `{"run_id"}` when that run is active, 409 otherwise. The server cancels the run's task, waits for it, appends `run.cancelled` to the trace and clears the active run. `_execute` treats `asyncio.CancelledError` as an interruption, not an error. The journal gets no event; the run is unfinished and resumable. The usage of the call that was in flight is in no file; the page says so when it asks for confirmation.
+3. **Resume.** `POST /api/runs/{run_id}/resume`: 202 when the run is unfinished, has a checkpoint and a signature, and no run is active; 409 with the Chinese reason otherwise (active run, already finished, signature differs, a run from before version 2.2). It runs `resume_run` as the active task.
+4. **The event stream** `GET /api/runs/{run_id}/events` also sends each trace line as `event: trace` (no `id`; all trace lines are sent again on every connection, and the page resets its copy when it connects), and a comment line `: keep-alive` every 15 s. The closing `end` event's data gains `status`: `finished` or `interrupted`.
+5. **Exports.** `GET /api/runs/{run_id}/report` returns `report.md` as `text/markdown; charset=utf-8`, and `GET /api/runs/{run_id}/replay` returns `replay.html`, both with `Content-Disposition: attachment`; 404 when the file does not exist.
+6. **`GET /api/meta`** gains: `defaults` with every `FlowConfig` field the form shows (`judges`, `debate_rounds`, `risk_rounds`, `tools`, `memory`, `channels`); `channels`, the five names in order; `portfolios`, the file stems in `data/portfolios/`; `limits` (`max_requests`, `max_seconds`); the role ceilings beside the run ceilings.
+7. **`RunRequest`.** `portfolio` must be empty or one of `meta.portfolios`; anything else is 422. The page can no longer name an arbitrary server path. `channels` becomes `tuple[str, ...] | None`: `None` means "use the settings", an empty tuple means "none".
+8. **Plan preview.** `POST /api/plan` takes a `RunRequest` and returns, with no model call and no run directory: the resolved `ticker` and `as_of`; `mode`; `stages`, each with its key and its roles, the analysts marked parallel or not; `calls` with `typical` (the calls of a run with no rework: one per due analyst, two per debate round, the manager, the trader, four per risk round, and the judges as `2–3`) and `ceiling` (`max_requests`); the token and cost ceilings; per channel `off`, `available` or `unavailable` with the reason; the portfolio's state. Channel coverage is computed by the functions the `facts` command already uses, not by a second copy of the window rules. 422 for a request `prepare` refuses.
+9. **`GET /api/runs`** rows gain `resumable`.
+10. `wiring.write_page` passes the run's trace to `replay_html.write` when the file exists. The `trace` parameter itself is WP44's (20.9); if WP44 is not done when WP45 reaches this item, WP45 leaves it and records it for WP51.
+
+Tests (`tests/test_server.py`, cases added): each new route's success and refusals; a cancelled scripted run (a scripted model that waits on an event) leaves a journal with no `run.finished`, a trace ending in `run.cancelled`, and no active run; that run then resumes to `delivered`; the stream carries `trace` events; no reply contains a path.
+
+### 20.9 The page: architecture
+
+WP44 builds this; WP46 to WP50 fill it.
+
+**Source layout**, under `insightcrew/app/assets/`:
+
+| File | Holds | Owner |
+|---|---|---|
+| `page.html` | The shell: head, CSP, the static markup, one `<style>` holding the line `/*@@css*/`, the embedded-data element, one `<script>` whose function body holds the line `/*@@js*/` | WP44 |
+| `css/00-tokens.css`, `css/10-base.css` | Design tokens as CSS variables (colour, space, type, radius; a dark set under `prefers-color-scheme: dark`); base components (card, table, chip, pill, tabs, drawer) | WP44 |
+| `js/00-core.js` | DOM helpers (`el`, `svg`), formatting, the citation chip `cite(id)`, the view registry | WP44 |
+| `js/05-labels.js` | Every Chinese label: stages, roles, board keys, rules, audit checks, outcome reasons, channel states. The existing tables keep their names (`STAGES`, `LANES`, `ACTOR_STAGE`, `KEY_STAGE`, `CHANNEL_STAGES`, `ANALYST_KEYS`, `GROUP_NAME`) | WP44 |
+| `js/10-model.js` | `fold(events, trace, live)`: the one pure function from which every view draws | WP44 |
+| `js/20-shell.js` | Header, tabs, drawer, the render loop | WP44 |
+| `js/25-activity.js` | Run status, the pipeline with live roles, cancel, resume, export | WP44 creates it with the existing pipeline code; WP50 owns it afterwards |
+| `js/30-verdict.js`, `css/30-verdict.css` | Verdict card and price chart | WP44 moves the existing code; WP46 owns |
+| `js/35-process.js`, `css/35-process.css` | The process tab | WP44 creates an empty view; WP47 owns |
+| `js/40-evidence.js`, `js/45-audit.js`, `css/40-evidence.css` | The evidence tab; the rules and audit tab | WP44 moves the existing evidence code; WP48 owns |
+| `js/50-usage.js`, `css/50-usage.css` | The usage and timing tab | WP44 moves the existing usage code; WP49 owns |
+| `js/55-launch.js`, `css/55-launch.css` | The form, the plan preview, the run history | WP44 moves the existing code; WP50 owns |
+| `js/60-events.js` | The raw events tab: the swim lanes, the playback bar and the event detail, as they are today | WP44 |
+| `js/90-boot.js` | State, the event stream, start-up | WP44 |
+
+**Assembly.** `app/replay_html.py` replaces the two marker lines with the files of `css/` and `js/`, each in file-name order. It raises if a marker is missing or if a script file contains `</script`. `live_page()` returns the assembled text; `render` and `write` use it, and both gain a keyword parameter `trace: list[dict] | None = None`, embedded beside `events` and `bars` under the key `trace`. The output is deterministic. All script files share one function scope, as the single script does today, so the split is a matter of cutting along function boundaries; files numbered below 20 touch no `document` or `window` when they load, so that they can be tested without a browser.
+
+**The model.** `fold(events, trace, live)` returns one object, computed once per render and passed to every view:
+
+| Field | Meaning |
+|---|---|
+| `started`, `finished` | The data of `run.started` and `run.finished`, or `null` |
+| `status` | `running` (live and unfinished), `delivered`, `review`, or `interrupted` (unfinished and not live) |
+| `board` | Key to latest value |
+| `versions` | Key to the list of `{seq, version, value, by, step, superseded}` |
+| `calls` | One per `model.called`: `seq`, `step`, `actor`, `model`, `usage`, `cost`, `output`, `tool_calls`, `retried` (`usage.requests > 1`), `ms` (from the trace, or `null`) |
+| `gates`, `routes` | The `gate.checked` and `route` events |
+| `rounds` | The audit's history: for each version of `trader/proposal`, the gate that checked it, its findings, and where the flow was routed |
+| `facts` | Fact ID to the fact, with `kind`: `ledger`, `fundamentals`, `tool` or `macro` |
+| `items` | Item ID to the item, with `kind`: `disclosure`, `news`, `market`, `post` or `lesson` |
+| `cited_by` | ID to the list of `{actor, key, seq}`: built by walking every artifact a role wrote and collecting the strings under the keys `fact`, `item`, `post` and in the arrays under `cites` |
+| `spans` | From the trace: `{step, role, model, start, end, ms, ok}`; `end` is `null` for a call in flight or interrupted |
+| `usage` | Per role and in total: calls, requests, tokens, cost, duration |
+
+A view that needs something else derives it privately from `board`, `versions` or `events`. A change to the model, the labels, the core or the shell after WP44 is a shared-file request ([HANDOFF.md](HANDOFF.md) 5.6).
+
+**Views.** A view registers `{id, title, render(model, element)}`. The shell calls `render` at most once per animation frame, and only for the visible tab and the always-visible parts.
+
+**Layout.**
+
+```
+header      title · mode badge · run status · [取消] [续跑] [导出]
+activity    the pipeline; under the running stage, each working role with a timer
+verdict     the answer, and the price chart beside it
+tabs        过程 · 证据 · 规则与审计 · 用量与耗时 · 原始事件
+drawer      detail of whatever was clicked
+launch      the form; folds to one line while a run is shown
+```
+
+**Rules that do not change.** No `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval` or `new Function`, in code or in a comment. No external resource. The CSP line as it is. Text from a model is set as text. `tests/test_run_page.py` passes unchanged; cases are added. Three traps in that file: the assembled page must contain `</script>` exactly twice; no `href="..."` or `src="..."` may appear in the source, so a link's address is set with `setAttribute`; the string `http://` may not appear.
+
+### 20.10 The page: views
+
+Each view handles four states: no run, running (partial data), finished, interrupted. A value that is absent is shown as absent with its reason, never as zero or an empty table. A label missing from `05-labels.js` falls back to the raw key, never to blank.
+
+**Verdict (WP46).** The first thing on the page once a run is loaded.
+
+- Delivered: rating and action; entry, stop, target and size with the currency; the thesis `summary`; its `points`, each with citation chips; the `invalidation` conditions; `horizon_days`; and two trust lines, "事实与规则" (`facts_and_rules`) and "模型评审" (`judgment`), each a link to its tab.
+- Review: no rating word and no level, as the report already does. The reason in Chinese from the labels, and one line on what to do about it (for `budget_exhausted`, raise the ceiling; for `contested`, read the dissents; for `model_unavailable`, resume).
+- Interrupted: how far the run got, and the resume button.
+- Running: what is known so far, and "结论形成中".
+- The chart keeps today's closes and levels, and marks the analysis date.
+
+**Process (WP47).** The run told in order, one section per stage that ran, each role as a card with its label, model, duration and tokens, and its output rendered from its contract, not as JSON.
+
+- Analysts: narrative, then claims or signals with citation chips; the confidence where the contract has one. Parallel analysts are laid side by side.
+- Debate: bull and bear in two columns per round; each point with its chips; the rebuttal under it.
+- Manager: the thesis. Trader: the proposal.
+- **Revisions.** When `trader/proposal` has more than one version: a table with one column per version and one row per field (`action`, `entry`, `stop`, `target`, `size_pct`), changed cells marked; under each rejected version, the findings that sent it back (the check's label, the subject, the message) and the role the flow was routed to. The same for `manager/thesis` when the judges sent it back.
+- Risk debate: three columns (stance, critique, the suggested size, stop and target, chips), then the trader's revision. The heading keeps the words "未经审计的意见".
+- Judges: per round, one card per judge with its lens, accept or reject, target, critique and chips; then the quorum line.
+- Superseded versions are folded by default. Every card has "查看提示词与原始回复", which opens the drawer with the event detail that exists today.
+
+**Evidence, and rules and audit (WP48).**
+
+- Citation chips become links: a click opens a small panel with the fact (value, unit, date, source) or the item (title or text, date, source), and "在证据中查看". An ID that names nothing is drawn as an unknown citation.
+- Evidence tab: one fact table with a search box (ID, label, value, unit, date, a kind badge 账本 / 基本面 / 工具 / 宏观, and the roles that cite it); the item lists under their existing headings, which keep the words "来源原文，未经核验" and "来源原话，未经核验"; a line per channel with its state and, when unavailable, the reason; the data card; the portfolio state; the lessons used.
+- Rules and audit tab: the rule results as a table (the rule's Chinese label, its formula on delivered runs only as the report does, the limit, the actual value, pass or fail); then the audit's rounds in order: the findings of each round, where the flow went, and which version fixed them. Layers L1 and L2 are named.
+
+**Usage and timing (WP49).**
+
+- A table per role, not per family: calls, requests, input and output tokens, cost (or 未定价), duration. Totals against the limits as bars: tokens against the run ceiling, requests against `max_requests`, seconds against `max_seconds`.
+- A waterfall from the trace: one bar per call on a time axis, so parallel analysts are seen to overlap; marks for `run.resumed` and `run.cancelled`.
+- With no trace (a run from before version 2.3, or a scenario): the duration column and the waterfall are replaced by one line saying so.
+- The notes that exist today stay; one is added: the usage of an interrupted call is not recorded.
+
+**Launch, history and live activity (WP50).**
+
+- The form in groups: 标的与日期 (a scenario, or a ticker and a date; choosing a ticker shows its last bar and limits the date); 流程 (judges, debate rounds, risk rounds, tools, memory); 证据通道 (five check boxes with a line each; `macro` is disabled unless `news` is ticked, as the server requires); 组合 (a select of `meta.portfolios` and 无). The element IDs `f-scenario`, `f-ticker`, `f-date`, `f-judges`, `f-rounds`, `f-risk-rounds`, `f-tools`, `f-memory`, `f-portfolio`, `f-channels` stay.
+- The plan preview beside the form, refreshed after a change: typical and ceiling calls, the ceilings, each channel's coverage for that date with the reason. Hidden if `POST /api/plan` answers 404.
+- The start button is disabled while a request is pending or a run is active. Errors appear beside the field they concern. The last values are remembered in `localStorage`.
+- History: a table with status, ticker, date, mode and time; a resumable run has its resume button.
+- Activity: each pipeline stage is waiting, running, done, sent back (with the count) or skipped (channel unavailable). Under a running stage, each role with a `role.started` and no end shows a timer that ticks every second; the total elapsed time; the line "模型调用中：结果返回后一次显示". Live events are drawn as they arrive: the 0.7 s reveal applies only to playback in the raw events tab.
+- Cancel asks for confirmation and says the call in flight is not recorded. After an interruption the resume button appears. Export links appear when the server offers them; a static `replay.html` shows no control that needs a server.
+
+**Quality pass (WP51).** The status and activity regions are live regions; tabs are operable from the keyboard; focus moves into the drawer and back; no state is told by colour alone; text contrast meets WCAG AA in both colour schemes; at 480 px wide nothing overflows the page (a wide table scrolls inside its own box); a failed fetch shows a banner with a retry; a dropped stream says so and reconnects. Then the browser check of 20.14.
+
+### 20.11 The approval gate (stretch)
+
+WP52, built only if 20.15 allows. Off by default; with it off nothing in this subsection exists at run time.
+
+- `FlowConfig` gains `approve: bool = False`; `analyze` gains `--approve`. With it on, after the judges accept (or after the audit passes when judges are off) and before `outcome`, the graph pauses for a human.
+- The decision is a contract, `Approval(decision: Literal["approved", "rejected"], note: str)`, written to the board key `approval/decision` by the actor `user`. Approved: the run continues to `outcome`. Rejected: the run ends `review` with the reason `rejected_by_user`. A human cannot edit the proposal (decision 59).
+- The page shows the verdict as "待你确认" with both buttons; the server gains `POST /api/runs/{run_id}/approval`. On the command line `--approve` asks in the terminal.
+- Replay supplies the decision from the journal, as decision 44 does for other outside inputs. A run waiting for a decision that is never given is simply interrupted and resumable; no model call follows the pause, so no limit is spent while waiting.
+- The mechanism is LangGraph's interrupt. Read the installed source first (`.venv/lib/python3.12/site-packages/langgraph/`). If it does not fit this graph within an hour of reading, stop and record why; the package then moves to ROADMAP.
+
+### 20.12 Tests
+
+- **Harness (WP43).** `tests/conftest.py`: the network fixture also blocks `socket.socket.connect_ex`; a second autouse fixture removes every environment variable whose name ends in `_API_KEY` for the length of a test. If an existing test fails under either, stop and record it: the test was relying on the machine.
+- **Prompt integrity (WP43),** `tests/test_prompts.py`: every file in `roles/prompts/` is loaded by at least one role; no role's instructions contain `<!--` or the attribution line; every board key a prompt names in backticks is one the role reads or writes; a role that reads a `*/status` key has a prompt that says what `unavailable` means. Only checks that pass on today's prompts are committed; one that would fail is a finding for WP38, recorded in HANDOFF section 7, because only WP38 changes a prompt.
+- **One command (WP43).** `scripts/check.sh` (20.4) and `.github/workflows/ci.yml`, which installs uv and runs the three checks. The workflow has never run; say so wherever it is mentioned.
+- **The page (WP44).** `tests/js/*.test.mjs`, run by Node's built-in test runner, load the files numbered below 20 and test `fold` on small hand-built journals: versions and `superseded`, `rounds`, `cited_by`, `status`, spans from a trace. `tests/test_page_js.py` runs them and `node --check` on the assembled script, and skips with a clear reason when `node` is not on the machine. `tests/test_page_labels.py` asserts that every rule ID in `data/rules.toml`, every audit check name in `insightcrew/domain/` and every `Halt` reason in `insightcrew/flows/` has a label in the assembled page. Node is a convenience of the development machine, not a dependency: the test count in the documents is the count with it present.
+- **Flows, app, server:** as 20.7 and 20.8 list.
+
+### 20.13 Invariants
+
+| # | Change |
+|---|---|
+| 15 | Extended: the page shows only what is in the journal, the trace and the bars. It formats values and adds up usage and durations; it computes no fact. |
+| 19 | Reworded: parallel and serial runs append the same journal, except `ts`. Timing lives in the trace. |
+| 22, new | The trace is measurement. No role reads it; no number in a report comes from it; replay and `resume` do not read its contents; deleting it changes no outcome. Enforced by `tests/test_trace.py` (the journal of a run with a tracer equals that of a run without). |
+| 23, new | An observer cannot affect a run: with an observer that raises, the journal equals that of a run with none. Enforced by `tests/test_kernel_v23.py`. |
+| 24, new | An interrupted run is resumable from any point: after `resume`, a run interrupted between nodes ends with the board of an uninterrupted run. Enforced by `tests/test_graph.py`. An interruption inside a node that makes several calls (debate, risk, judges) repeats that node's calls; the result is a valid run, not an identical journal. |
+
+### 20.14 Work packages
+
+Hours are the author's estimates, not measured. Every package ends with the three checks and the proof of 20.4. Labels continue from 39; WP38 and WP39 keep theirs and are amended below.
+
+| WP | Result | Est. | Needs |
+|---|---|---|---|
+| 40 | Tag `v2.2`, branch `v2.3`, the plan committed, the kernel hook | 1.5 h | The owner's go-ahead |
+| 41 | Flow hardening | 3 h | WP40 |
+| 42 | App hardening, the trace, `verify` | 4 h | WP40 |
+| 43 | Test harness, prompt integrity, `scripts/check.sh`, the CI file | 2 h | WP40 |
+| 44 | Page foundation: the split, the assembler, the model, the labels, the shell | 4 h | WP40 |
+| 45 | Server API and run control | 4 h | WP41, WP42 |
+| 46 | Page: verdict and chart | 2.5 h | WP44 |
+| 47 | Page: process | 3.5 h | WP44 |
+| 48 | Page: evidence, citations, rules and audit | 3.5 h | WP44 |
+| 49 | Page: usage and timing | 2.5 h | WP44 |
+| 50 | Page: launch, history, live activity, run controls | 4 h | WP44; the API of 20.8 (final check after WP45) |
+| 51 | Page quality pass and the browser check | 3 h | WP45 to WP50, or what 20.15 leaves of them |
+| 52 | Approval gate (stretch) | 4 h | WP41, WP45, WP51 |
+| 38 | Real-model runs, as amended | 4 h | WP41, WP42 |
+| 39 | Documents and packaging, as amended | 3 h | Everything else done or cut |
+
+About 45 hours without WP52. The chain that cannot be made parallel is WP40, WP44, one page view, WP51, WP39: about 15 hours.
+
+**WP40: Open version 2.3.** Read 20.1 to 20.6. Runs alone.
+
+1. `git tag v2.2` on the head of `v2.2`, then `git switch -c v2.3`. Commit `docs/BLUEPRINT.md`, `docs/HANDOFF.md` and `AGENTS.md` alone as `Plan: version 2.3`.
+2. The kernel change of 20.5, exactly, and `tests/test_kernel_v23.py`.
+
+Accept: 20.5's list; the three checks; the proof of 19.3; `git tag -l` lists `v2.2`; `git diff v2.2 -- insightcrew/kernel/` shows only the hook.
+
+**WP41: Flow hardening.** Read 20.7 items 1 to 6, 19.5, 19.6. Edit `flows/stage_risk.py`, `flows/graph.py`, `flows/analyze.py`, `flows/tools.py`, `tests/test_graph.py`, `tests/test_stage_portfolio_risk.py`, and other tests only where they call `risk`; create `tests/test_flow_hardening.py`. `tests/test_flow.py` is a reference test and is not edited.
+
+Accept: each of items 1 to 4 has a test that failed before the fix and passes after; the three checks; the proof.
+
+**WP42: App hardening.** Read 20.6, 20.7 items 7 to 14. Edit `app/wiring.py`, `app/resume.py`, `app/cli.py`, `app/replay.py`, `app/check.py` (only for `_one_line`), `tests/test_cli.py` and the tests of those files; create `app/trace.py`, `app/verify.py`, `tests/test_trace.py`, `tests/test_verify.py`.
+
+Accept: a test per item; `uv run insightcrew analyze --no-open` leaves a `trace.jsonl` whose `role.started` and `role.finished` lines pair up; `uv run insightcrew verify` passes on that run and on every directory of `insightcrew/evals/archive/`; a journal with a deleted middle line fails it; the three checks; the proof.
+
+**WP43: Test harness.** Read 20.12. Edit `tests/conftest.py`; create `tests/test_prompts.py`, `scripts/check.sh`, `.github/workflows/ci.yml`.
+
+Accept: the three checks; `scripts/check.sh` exits 0 and prints each stage's result; the findings about prompts, if any, are in HANDOFF section 7.
+
+**WP44: Page foundation.** Read 20.9, 20.10 (to know what the views will need), 10.5, and the whole of `app/assets/page.html`. Create the layout of 20.9; edit `app/replay_html.py`, `tests/test_run_page.py` (cases added); create `tests/js/`, `tests/test_page_js.py`, `tests/test_page_labels.py`.
+
+Order: first split the page with no change in behaviour and see `tests/test_run_page.py` pass unchanged; then the model, replacing each view's private folding; then the shell with its tabs, the existing views placed in them (verdict and chart on top; evidence, usage and raw events as tabs; process and rules as empty tabs that say which package fills them); then the tokens and base styles.
+
+Accept: the three checks; the proof; `tests/test_run_page.py` unchanged cases all green; the Node tests green; the label test green; in a browser, `demo` and one channel scenario show everything the version 2.2 page showed, live and as `replay.html` (see HANDOFF section 7 for the port the in-app browser allows).
+
+**WP45: Server API and run control.** Read 20.8, 10.6. Edit `app/server.py`, `app/wiring.py` (`write_page` only), `tests/test_server.py`. It does not edit `app/replay_html.py`, which is WP44's.
+
+Accept: 20.8's tests; the three checks; the proof.
+
+**WP46 to WP50: Page views.** Each reads 20.9 and its part of 20.10, and edits only its own files (20.9's table). Each view works on a live run, a finished run, an interrupted run and a `replay.html`.
+
+Accept, each: the three checks; the Node tests; `tests/test_run_page.py` green; a screenshot of its view for `demo`, for a scenario where the audit sends a proposal back, and for a run with every capability on; nothing the version 2.2 page showed in that area is lost.
+
+**WP51: Quality pass.** Read 20.10's last paragraph. Runs alone on the page files. Apply the shared-file requests of HANDOFF section 7; then the list of 20.10; then the browser check, with a screenshot of each: `demo` delivered; a run sent back by the audit; a `review` run; a channel run with an unavailable channel; a run with every capability on; a live run cancelled and resumed; 480 px wide; the dark scheme; a `replay.html` opened from a file.
+
+Accept: the three checks; the proof; the screenshots listed in the session log.
+
+**WP52: Approval gate.** Read 20.11, 19.5. Edit `domain/types.py` (`Approval`), `flows/analyze.py`, `flows/graph.py`, `app/cli.py`, `app/server.py`, `app/wiring.py` (the replay port), `js/30-verdict.js`, their tests; one scenario for each decision.
+
+Accept: with `approve` off, the proof; both scenarios match; a run approved in the browser delivers, one rejected ends `review` with `rejected_by_user`; both replay `一致`.
+
+**WP38, as amended.** As 19.18, on `v2.3` once WP41 and WP42 are done, with these additions. The cap is 2 USD: it is the owner's yes for these runs, no further asking below it; at 1.60 USD spent, stop and ask. Before the pilot, read the installed source to confirm whether the model client retries transient errors (20.2) and record it. Archive each cell's `trace.jsonl` beside its journal; the parallel-against-serial comparison comes from the traces. Run `insightcrew verify` on every archive as well as `replay`. The real-bar cells have no news, sentiment or macro archive, because no live source has been fetched: those channels will be `unavailable` there, and the results table says so.
+
+**WP39, as amended.** As 19.18, and: describe version 2.3 as built; move 20.16's list into `docs/ROADMAP.md`; `docs/ARCHITECTURE.md` gains the trace and run control; the test count is taken with Node present and the documents say what skips without it.
+
+### 20.15 Schedule and the stop rule
+
+| Date | Work | True by the end of the day |
+|---|---|---|
+| 11-20 | WP40; WP41 to WP44 in parallel; WP45 and WP38 started | The fixes green; the page split green |
+| 11-21 | WP45; WP46 to WP50 in parallel; WP38 | The API green; most views done; real-model runs archived |
+| 11-22 | Views finished by 12:00; WP51 by 20:00; WP52 only if WP51 started before 12:00 | The page checked in a browser |
+| 11-23 | WP39 from 10:00; nothing else after 14:00 | A fresh unzip installs and runs |
+
+1. Every package leaves the system shippable: the three checks and the proof pass at its end.
+2. The tag `v2.2` is a complete system at every moment and can be packaged by WP39's procedure.
+3. **WP38 does not wait for the page.** It starts when WP41 and WP42 are done and the join check is clean.
+4. **If WP44 is not green by the end of 11-20**, the page redesign is cut: WP46 to WP51 are not started, WP45 still ships, and one small package the owner assigns adds only the cancel and resume buttons to the unsplit page.
+5. **At 12:00 on 11-22**, a view package that is not done stops. Its tab keeps what WP44 left there, the gap is recorded in HANDOFF section 7, and WP39 moves it to ROADMAP. WP52, if not started, is not started.
+6. **At 10:00 on 11-23**, WP39 starts whatever the state.
+
+### 20.16 What goes to ROADMAP, and what must not be claimed
+
+Not built in this version; WP39 lists them in `docs/ROADMAP.md`: token streaming; live notices of tool calls (a further call of the kernel hook, which needs the owner's word); the three behaviour questions at the end of 20.7; a manager prompt that guards against speaking-order bias, if a WP38 journal shows the bias; insider transactions as a channel; `Retry-After` handling in the data adapters; lenient numeric coercion of model output; follow-up questions on a finished run; forking a run from a stage; comparing two runs side by side; redacting a journal for sharing; flushing the journal to disk on every append.
+
+In addition to 12.4, 18.17 and 19.20, do not claim:
+
+- **That the page streams the model's output.** It shows that a role is working and for how long; the output appears when the call returns.
+- **That resume loses nothing.** The usage of the interrupted call is in no file, and an interruption inside a node with several calls repeats them.
+- **That durations in the trace are a benchmark.** They are wall time on one machine and one network.
+- **That the approval gate is a control of any regulatory kind.** It is a pause for a yes or a no.
+- **That the CI workflow passes.** It has never run.
+- **That the page matches any named product.** Say what it does.
+
+### 20.17 What has been verified
+
+| Item | Status |
+|---|---|
+| The design in this section | **Not built, not tested.** Gaps are likely; an implementer who finds one stops and records it (HANDOFF section 7). |
+| Version 2.2 at `549c40f`: 825 tests, `ruff`, `pyright` | Run on 2026-11-20; all clean |
+| Defects D1 to D5 and D8 | Read in the code at the lines 20.1 gives; **none reproduced by a test** |
+| D6, D7 and pain points P1 to P10 | The `demo` scenario started from the page in a browser with `IC_FORCE_OFFLINE=1`, and the page source read. A real-model run was not made |
+| `tests/test_kernel.py:142` injects a clock that counts calls | Read; it is why the hook must not call the clock when no observer is set |
+| `tests/test_cli.py` asserts the exact set of files in a run directory | Read; question 33 |
+| The OpenAI SDK's default of two retries, with no override in Pydantic AI's provider | Seen in the installed source during the review; **not confirmed against a failing call** |
+| That cancelling the task leaves a checkpoint LangGraph can resume from | **Not tried.** WP45's first test |
+| That LangGraph's interrupt fits this graph | **Not tried.** WP52's first step |
+| Node's test runner on this machine | `node` is present; the runner was **not tried** |
+| What the two references do | Read by review agents on 2026-11-20; their reports were not all checked line by line |
 | Effort estimates | The author's. Not measured. |

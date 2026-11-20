@@ -10,7 +10,8 @@ InsightCrew version 2.2: a multi-agent trading assistant with an independent aud
 - Run every command from this directory, through `uv run`.
 - Code comments, docstrings, console output, prompts and reports are in Chinese. Enum values, keys and identifiers are in English. Documentation is in English.
 - With no key in `.env`, every run without `--scenario` falls back to scripted replies, and the command says so. With a key, a run without a scenario calls the real model and costs money. Ask the owner before every real-model spend and every network request.
-- [docs/BLUEPRINT.md](docs/BLUEPRINT.md) is the specification (section 19 is version 2.2) and [docs/HANDOFF.md](docs/HANDOFF.md) the status board. Read both before a change that touches a name, a rule, a limit or an invariant. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists the files adapted from TradingAgents; each carries its header line.
+- **Version 2.3 is being built from 2026-11-20** ([docs/BLUEPRINT.md section 20](docs/BLUEPRINT.md#20-version-23-hardening-run-control-and-the-workbench-page)): fixes for defects a review found, a timing trace beside the journal, cancel and resume from the page, and the run page split into modules and rebuilt. Until WP39 rewrites this file, the rest of it describes version 2.2. Start at [docs/HANDOFF.md](docs/HANDOFF.md): it says which work package is next, which files each one owns, and what is authorised. Version 2.3 adds no package, and nothing in it is copied from the two reference codebases.
+- [docs/BLUEPRINT.md](docs/BLUEPRINT.md) is the specification (section 19 is version 2.2, section 20 is version 2.3) and [docs/HANDOFF.md](docs/HANDOFF.md) the status board. Read both before a change that touches a name, a rule, a limit or an invariant. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists the files adapted from TradingAgents; each carries its header line.
 
 ## Commands
 

@@ -4,9 +4,11 @@ The status board for the rewrite described in [BLUEPRINT.md](BLUEPRINT.md). The 
 
 **Every session reads this file first, and before it ends updates [section 2](#2-status) and appends to [section 8](#8-session-log).**
 
-Last updated: 2026-11-20 01:00, by the overnight session (owner delegated: proceed through the packages without asking; recommendations apply). Submission is 2026-11-23 23:59.
+Last updated: 2026-11-20 morning, by the review and planning session that wrote version 2.3. Submission is 2026-11-23 23:59.
 
-> **Version 2.2 is planned and authorised: work packages 21 to 39, in [BLUEPRINT.md section 19](BLUEPRINT.md#19-version-22-langgraph-orchestration-and-five-capabilities). Nothing of it is built.** LangGraph orchestration with parallel analysts and resume, a portfolio, a three-way risk debate, analyst tools, news with macro data and social sentiment, memory with settlement and backtest. Start with WP21 (alone). [Section 5.5](#55-version-22-work-packages-21-to-39) says which packages run at the same time and which files each owns; [section 4](#4-what-the-owner-has-authorised) the version 2.2 authorisations, including **ask the owner before every network request and every real-model spend**. Version 2.1 stays the submission until 2.2 is packaged; WP21 tags it `v2.1`.
+> **Version 2.3 is planned and authorised: work packages 40 to 52, in [BLUEPRINT.md section 20](BLUEPRINT.md#20-version-23-hardening-run-control-and-the-workbench-page). Nothing of it is built.** It fixes the defects a review of version 2.2 found (five of them before WP38 spends money), adds a timing trace beside the journal, cancel and resume from the page, and rebuilds the run page around the user's questions. Start with WP40 (alone). [Section 5.6](#56-version-23-work-packages-40-to-52) says which packages run at the same time and which files each owns; [section 4](#4-what-the-owner-has-authorised) the version 2.3 authorisations. **WP38 now runs on `v2.3`, after WP41 and WP42, with a cap of 2 USD. WP39 comes last.** Version 2.2 as built stays at the tag `v2.2`, which WP40 creates.
+
+> **Version 2.2 is built except its real-model runs (WP38) and its packaging (WP39): work packages 21 to 37 are done.** The paragraph that follows was written before the build and is kept as history. Version 2.2 was planned and authorised as work packages 21 to 39, in [BLUEPRINT.md section 19](BLUEPRINT.md#19-version-22-langgraph-orchestration-and-five-capabilities). LangGraph orchestration with parallel analysts and resume, a portfolio, a three-way risk debate, analyst tools, news with macro data and social sentiment, memory with settlement and backtest. Start with WP21 (alone). [Section 5.5](#55-version-22-work-packages-21-to-39) says which packages run at the same time and which files each owns; [section 4](#4-what-the-owner-has-authorised) the version 2.2 authorisations, including **ask the owner before every network request and every real-model spend**. Version 2.1 stays the submission until 2.2 is packaged; WP21 tags it `v2.1`.
 
 > **Version 2.1 is built: work packages 13 to 20 are done except WP17B's live acceptance, which is blocked on the network (see its row below and question 11).** The two evidence channels work end to end against a real model; the default behaviour with no channel open is byte-for-byte that of version 2.0, and every archived journal still replays. `../InsightCrew.zip` is the 2.1 package; version 2.0 remains at the tag `v2.0`.
 
@@ -18,8 +20,8 @@ Read in this order:
 
 1. This file.
 2. [BLUEPRINT.md](BLUEPRINT.md) sections 0.2, 2 and 3.
-3. The work package you were given, and the sections it names. WP0 to WP12 are in BLUEPRINT.md section 13. WP13 to WP20 are in section 18.14; for those, read 18.1 to 18.3 as well. WP21 to WP39 are in section 19.18; for those, read 19.1 to 19.4 and [section 5.5](#55-version-22-work-packages-21-to-39) of this file as well.
-4. The files it names in [BLUEPRINT-REFERENCE.md](BLUEPRINT-REFERENCE.md). WP13 to WP39 name none: read the code as built.
+3. The work package you were given, and the sections it names. WP0 to WP12 are in BLUEPRINT.md section 13. WP13 to WP20 are in section 18.14; for those, read 18.1 to 18.3 as well. WP21 to WP39 are in section 19.18; for those, read 19.1 to 19.4 and [section 5.5](#55-version-22-work-packages-21-to-39) of this file as well. WP40 to WP52, and WP38 and WP39 as amended, are in section 20.14; for those, read 20.1 to 20.6 and [section 5.6](#56-version-23-work-packages-40-to-52) of this file as well.
+4. The files it names in [BLUEPRINT-REFERENCE.md](BLUEPRINT-REFERENCE.md). WP13 to WP52 name none: read the code as built.
 
 Which document to believe:
 
@@ -71,21 +73,43 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 28 | Version 2.2: macro core | done | Contracts of 19.7 verbatim + `build_macro`; two independent paths agree on all 4 synthetic series at every month-end 2025-01…2026-12 × 3 analysis dates × 3 transforms (864 comparisons); a vintage after the analysis date is never used; cpi 的 2026-01 重述在 2026-03-12 前读旧值 329.4、之后读 329.5。20 tests; `tests/test_market.py` 不受 macro/ 子目录影响。四个解释记为问题 16 到 19。 |
 | 29 | Version 2.2: memory core | done | 31 测（test_memory 23 + test_decision_log 8）：settle 在窗口走完前 None、两路逐项一致、hit 四情形（同根同日按 stop）、select_lessons 不见 as_of 之后的结果（不变量 20）、两进程 spawn 并发追加一条不丢、重复 decision 忽略、pending 永不淘汰。结算与缺基准的读法四条待主人：问题 21–24。 |
 | 30 | Version 2.2: source chain, live adapters, `fetch` | done | `first_ok`+`scrub`（`adapters/vendors.py`，改编自 router/errors/net，带头行）、五个线上适配器（news_rss、stocktwits、reddit、fred、polymarket，除 news_rss 外均带 19.4 头行），各自把夹具解析成 19.8 的归档形状；46 个测试全部离线（夹具全部手工构造，各夹具目录注明，未发任何真实请求）。`fetch` 增 news/social/macro/markets 关键字参数（默认关）与 `SourceOrder` 链参数（缺省 19.12 全链；bars 缺省顺序与 2.1 相同）；归档合并（url 去重、covers_from 留在首写日、macro 按 (date, realtime_start) 并集、markets 按天一份）用 MockTransport 临时脚本离线验证。线上验收等 owner 批准端点与 `IC_FRED_API_KEY`；问题 25–26。 |
-| 31 | Version 2.2: integration points (every shared file) | in progress | Alone. Needs WP22 to WP29. Overnight session; question 20 applied per its option A.
+| 31 | Version 2.2: integration points (every shared file) | done | Committed as `fb09d2b` and logged at "2026-11-20 01:30 · WP31"; the row had been left at `in progress` and was corrected by the review session on 2026-11-20. Question 20's option A was tried and reverted to C (see that question). |
 | 32 | Version 2.2: portfolio and risk in the flow | done | Overnight session. stage_risk 正文（每轮 aggressive→conservative→neutral→trader，同步签名经线程桥跑异步内核）、stage_portfolio 仅文档句更新；五场景全 ✓ 相符（预存 21 个逐一验证亦 ✓）；test_stage_portfolio_risk.py 8 项绿；43/43 归档重放一致；本包文件 ruff/pyright 干净。两条第 7 节请求（v22_switches 的 risk 桩断言、wiring 的组合指纹）；全量 `scenarios` 仍被 WP34 的 macro_clean 挡住（WP34 的请求行）。 | |
 | 33 | Version 2.2: tools in the flow | done | Overnight session. Script 学会恰两键 {"tool","args"} 的回答（内核包装真执行、结果送回）、Replay 原样重放录制的工具调用；两场景 tools_clean、tools_out_of_range 均 ✓ 相符（tools/facts 形状缺口由协调者按 §7 请求修复：板键存完整 Fact、模型仍收四键；xfail 标记已摘）。 |
 | 34 | Version 2.2: news, macro, sentiment in the flow | done | Overnight session. stage_news/stage_sentiment 正文：窗口、上限、显式缺席、宏观双路径复算、markets 的 fetched_on 规则；四场景 news_clean、news_uncovered、sentiment_clean、macro_clean 均 ✓ 相符（stages.audit 的宏观键守卫由协调者按 §7 请求补上）。真实归档的 facts 验收仍等 WP30 端点批准。 |
 | 35 | Version 2.2: memory, `settle`, `backtest` | done | Overnight session. stage_memory 正文（lessons：重放替身的 journaled_lessons 原样奉还（决策 44）、场景内联字典行先校验再 select_lessons、空时写 none_known；record：交付运行按黑板组 DecisionRecord，替身写入为空操作）；flows/settle：待决逐条两路核对六个计算字段，一致才落账（分歧保持待决并汇报），基准经同一行情端口读（宇宙没有 SPY/_HSI 时两端无价、结果照算——问题 22 的读法），每个新结果在 runs/memory/settle/<id>/ 开小运行跑 reflector、lesson_findings 审计通过才把教训随结果一次 resolve 落账（问题 31 的读法），复盘不可用或审计不过则结果照落、教训留空；settle/backtest 命令落地（真实模型没有 --yes 拒绝、退出码 2；进度 progress.json 原子写、同 --run-id 续跑跳过已完成格子、批次预算超限即停、收尾把 to 结一遍、按评级汇总笔数/已结算/平均收益/平均超额/先触止损/目标）。两场景 ✓（memory_lessons 只见分析日前的教训、memory_record 空起点照常交付）；tests/test_memory_flow.py 8 项 + tests/test_backtest.py 7 项绿（三日期网格 08-03/08-10/08-17、先结算后分析、不变量 20 逐格核对、同 --run-id 复跑不做新事、batch_tokens=15000 停后加预算续跑补第三格）；test_memory/test_decision_log 原样绿；本包文件 ruff/pyright 干净；21 个既有场景逐一 ✓、归档重放抽 1 个一致（43/43 由 WP36 当夜全量验证）。遗留：test_v22_switches 的 memory 项因 WP29 决策日志锁文件先于 _write 建目录而挂（第 7 节 WP35 请求行）；问题 31（resolve 与教训的次序）、32（场景空 memory 的 falsy 缝）。 |
 | 36 | Version 2.2: report, page, `serve` | done | Overnight session. 六个新节全部按键驱动（组合状态/风险三方意见（只立场与批评）/工具事实进事实表并标注/新闻与宏观（预测市场单列"来源原话，未经核验"）/社交情感/用到的课程；run/wall_ms 在板上才画墙钟——问题 20 的 C 案下从不出现，分支已备）；页面：news/sentiment/risk 流水线段与泳道、ACTOR_STAGE/KEY_STAGE 映射、并行分析师组（≥2 位时并列成框、无箭头）、墙钟标签、镜像报告的证据区块、表单五字段（组合文件/风险轮数/工具/记忆/通道多选）经 prepare/open_run 透传，坏组合文件 422 且回复不带路径；replay_html.py 无需改动。本包文件 pytest 71 项绿、ruff/pyright 干净、页面 JS 过 node --check；demo 与 uncovered 的报告新旧模块逐字节相同；21 个既有场景逐一 ✓ 相符；43/43 归档重放一致；新增 13 场景中 12 个的报表已实跑核对（portfolio×3、risk×2、sentiment_clean、news_uncovered、memory×2、tools_out_of_range、news_clean、tools_clean——守卫修复落地后最后两个转绿）；仅 macro_clean 仍被挡：刚刚落地的 stages.audit 守卫把 `board.get("macro/facts", [])` 的第二参（应为类型）写成了列表，macro 键在板即 `TypeAdapter([])` 崩（该行的修正属 stages.py 的 owner）；宏观区块的报表在单元测试里以手造板键验证。续跑标记未做：日志没有续跑标记事件（按指示跳过）。全仓 pytest 的失败全在他人文件（见日志）。 |
 | 37 | Version 2.2: evaluations | done | Overnight session (问题 29 授权)。`eval all` 打印全部新行并退出 0：inject 加版本 2.2 块（组合状态翻转 ×2、新闻 claim 引未知宏观事实、情绪信号引未知帖、情绪分出带、教训带数字——6/6 发现、0/2 误报）；consistency 加工具块（7 家族 × 3 分析日 × 3 窗口 = 63 次调用，flows/tools 内部两路 + evals 独立复算 recompute 比对）与宏观块（4 序列 × 3 变换 × 8 分析日 = 96 点，macro vs macro_sql）；pit 加六块（新闻 9、社交 9、宏观 91 含 cpi 两次重述逐日 329.4→329.5/337.0→337.2、预测市场 6（fetched_on==as_of，评测自建临时档案、就地实现 19.8 规则，与 WP34 的 stage_news._markets 同一条规则各持一份）、教训 5（含边界日成员断言）、工具 63（漏 bar 检查，诚实端口 vs 无视 as_of 的坏端口同答案））。新测试 16 项（tests/test_inject.py、test_consistency.py、test_pit.py，各含伪造分歧/泄漏的检出用例）。run.py 仅 docstring（`all` 三项未变，新行随各评测打印）。 |
-| 38 | Version 2.2: real-model runs and ablation | not started | Spending only after the owner's yes and cap. |
-| 39 | Version 2.2: documents, notices, packaging | in progress | Documents + notices part done (02:05 session): README, AGENTS, ARCHITECTURE, EVALUATION, ROADMAP rewritten to version 2.2 as built; THIRD_PARTY_NOTICES lists the 20 adapted files; start scripts checked and unchanged; link check bad 0; three checks green. The zip rebuild and final packaging wait for WP38 (owner's cap). |
+| 38 | Real-model runs and ablation, as amended by BLUEPRINT 20.14 | not started | **Runs on `v2.3`, after WP41 and WP42 and a clean join check.** Cap 2 USD (owner, 2026-11-20): no further asking below it; at 1.60 USD spent, stop and ask. The offline scaffold (`evals/v22.py`, nine cells) is in place. |
+| 39 | Documents, notices, packaging, as amended by BLUEPRINT 20.14 | in progress | The version 2.2 documents and the notices list are done (02:05 session). **Runs last, after version 2.3 is done or cut:** describe 2.3 as built, move BLUEPRINT 20.16's list to ROADMAP, rebuild and verify the zip. |
 
-**Work packages 0 to 12 are done: that is version 2.0, and it is a complete submission.** [ROADMAP.md](ROADMAP.md) lists its known issues and next steps. Work packages 13 to 20 are version 2.1, in [BLUEPRINT.md section 18](BLUEPRINT.md#18-version-21-evidence-channels). Work packages 21 to 39 are version 2.2, in [BLUEPRINT.md section 19](BLUEPRINT.md#19-version-22-langgraph-orchestration-and-five-capabilities).
+| 40 | Version 2.3: tag `v2.2`, branch `v2.3`, the plan committed, the kernel observer hook | in progress | Alone. The only package that edits `insightcrew/kernel/`. |
+| 41 | Version 2.3: flow hardening (risk debate awaited, resume across the analyst fan-out and with tools, siblings' spend) | not started | Needs WP40. On WP38's path. |
+| 42 | Version 2.3: app hardening (`[flow] channels`, resume, torn journal line), the trace, the `verify` command | not started | Needs WP40. On WP38's path. |
+| 43 | Version 2.3: test harness, prompt-integrity tests, `scripts/check.sh`, the CI file | not started | Needs WP40. |
+| 44 | Version 2.3: page foundation (the split into modules, the assembler, the model, the labels, the shell) | not started | Needs WP40. Critical path of the page; give it the strongest agent. |
+| 45 | Version 2.3: server API and run control (checkpointed web runs, cancel, resume, trace in the stream, exports, plan preview) | not started | Needs WP41 and WP42. |
+| 46 | Version 2.3: page, verdict and chart | not started | Needs WP44. |
+| 47 | Version 2.3: page, process (debate, revisions with the audit's findings, risk, judges) | not started | Needs WP44. |
+| 48 | Version 2.3: page, evidence with clickable citations, rules and audit | not started | Needs WP44. |
+| 49 | Version 2.3: page, usage and timing with the trace waterfall | not started | Needs WP44. |
+| 50 | Version 2.3: page, launch form with plan preview, history, live activity, cancel and resume | not started | Needs WP44; final check after WP45. |
+| 51 | Version 2.3: page quality pass and the browser check | not started | Alone on the page files. Needs WP45 to WP50, or what the stop rule leaves of them. |
+| 52 | Version 2.3: approval gate (stretch) | not started | Only if BLUEPRINT 20.15 allows. Off by default. |
+
+**Work packages 0 to 12 are done: that is version 2.0, and it is a complete submission.** [ROADMAP.md](ROADMAP.md) lists its known issues and next steps. Work packages 13 to 20 are version 2.1, in [BLUEPRINT.md section 18](BLUEPRINT.md#18-version-21-evidence-channels). Work packages 21 to 39 are version 2.2, in [BLUEPRINT.md section 19](BLUEPRINT.md#19-version-22-langgraph-orchestration-and-five-capabilities). Work packages 40 to 52 are version 2.3, in [BLUEPRINT.md section 20](BLUEPRINT.md#20-version-23-hardening-run-control-and-the-workbench-page).
 
 ## 3. The repository at handoff
 
-**As it stands on 2026-11-19 late evening**, before any work on version 2.2:
+**As it stands on 2026-11-20 morning**, before any work on version 2.3:
+
+- Branch `v2.2`, head `549c40f`. The working tree is clean except the version 2.3 plan: `docs/BLUEPRINT.md` (section 20 and one introduction bullet), this file, and `AGENTS.md`. The workspace's own `../AGENTS.md` (outside the repository) was changed in the same session. Tags `v1-data-analyst`, `v2.0`, `v2.1`; `v2.2` is not yet tagged (WP40 does it). Nothing has been pushed.
+- 825 tests, 34 scenarios, 43 archived real-model journals; `ruff` and `pyright` clean (run by the review session). `../InsightCrew.zip` is still version 2.1.
+- No real-model run and no live request has been made for version 2.2. `.env` holds the DeepSeek key and `IC_SEC_CONTACT`; whether `IC_FRED_API_KEY` is there was not checked (question 13).
+- `data/market/real/` exists on this machine and is ignored by git; WP38's real-bar cells need it.
+- The review session started `serve` twice with `IC_FORCE_OFFLINE=1` to look at the page and stopped it; that left one scripted run under `runs/`, which git ignores.
+
+**As it stood on 2026-11-19 late evening**, before any work on version 2.2:
 
 - Branch `v2.1`, head `082a0a3`, working tree clean except the version 2.2 plan: `docs/BLUEPRINT.md` (section 19 and one introduction bullet), this file, and `AGENTS.md`. The workspace's own `../AGENTS.md` (outside the repository) was changed in the same session. Tags `v1-data-analyst` and `v2.0`; `v2.1` is not yet tagged (WP21 does it). Nothing has been pushed.
 - 486 tests, 21 scenarios, 43 archived real-model journals. `../InsightCrew.zip` is version 2.1.
@@ -150,6 +174,15 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | Version 2.2: adapting TradingAgents | **Yes, only the files in BLUEPRINT 19.4**, each with its header line. No LangChain import. Nothing from `open-multi-agent-main/`. README and the other documents do not discuss it beyond `THIRD_PARTY_NOTICES.md`. |
 | Version 2.2: the version number | Stays 2.0.0, as question 7 settled, unless the owner says otherwise. `uv add` in WP22 changes `uv.lock`; that is authorised. |
 | WP19's uncommitted files | Moot: WP19 and WP20 were committed before this plan was written. |
+| Version 2.3: building (WP40 to WP52) | **Yes (2026-11-20).** The owner chose: fix the defects, add the trace, rebuild the page; the approval gate (WP52) is a stretch package, built only if the stop rule of BLUEPRINT 20.15 allows. |
+| Version 2.3: the kernel | **Yes, limited to the observer hook of BLUEPRINT 20.5** (the field `Run.observe` and its three guarded calls in `run_role_deferred`). Only WP40 edits `insightcrew/kernel/`. `tests/test_kernel.py` and `tests/test_kernel_v22.py` are not edited. A further call of the hook (for tool calls, say) is not authorised. |
+| Version 2.3: names, rules, limits, invariants | **Yes, to exactly what BLUEPRINT section 20 lists:** `stage_risk.risk` becomes asynchronous; the routes and fields of 20.8; `trace.jsonl` and its line shapes; the `verify` command; the invariant changes of 20.13; and, only if WP52 is built, `FlowConfig.approve`, the `Approval` contract and the reason `rejected_by_user`. No prompt, rule or limit changes. Anything else: stop and ask. |
+| Version 2.3: packages | **None.** No `uv add`, no upgrade, no change to `exclude-newer`. The page gets no build step and no JavaScript package. Node, where present, only runs tests. |
+| Version 2.3: tag, branch, commits | **Yes.** WP40 tags `v2.2` on the head of `v2.2`, creates `v2.3`, and commits the plan (this file, `docs/BLUEPRINT.md`, `AGENTS.md`) as `Plan: version 2.3`. Each package then commits its own files by path on `v2.3` after its acceptance passes, message `WP<n>: <result>`. Never push; never commit on `v2.2` again. |
+| Version 2.3: network | **Ask the owner before every network request**, as for version 2.2. No package of version 2.3 needs one. The CI workflow is a file; it is not pushed and not run. |
+| Version 2.3: real-model spending | **WP38 only, cap 2 USD (owner, 2026-11-20).** The cap is the owner's yes for WP38's runs: no further asking below it; at 1.60 USD spent, stop and ask. Every other package runs scripted; when starting `serve` to look at the page, set `IC_FORCE_OFFLINE=1`. |
+| Version 2.3: the reference codebases | **Ideas only, from both.** No file of `TradingAgents-main/` or `open-multi-agent-main/` is copied or adapted by any package of version 2.3, and `THIRD_PARTY_NOTICES.md` gains nothing. |
+| The open questions of version 2.2 | **Settled (owner, 2026-11-20):** 14 is 2 USD; 15 to 19, 21 to 28 and 30 to 32 stand as each row's recommended reading; 20 is answered by the trace (BLUEPRINT decision 52). Questions 11 and 13 remain open. |
 
 ## 5. What may run at the same time
 
@@ -359,6 +392,83 @@ Rules, in addition to 5.3 (read `v2.2` for `v2` there):
 8. **The joins.** Before WP31 starts, before WP38 starts and before WP39 starts, the three checks and the proof of BLUEPRINT 19.3 are run while no other agent is working (WP30 may still be running before WP31; it must then be paused for the check). They must be clean; a failure goes back to the package that owns the file.
 9. **Network and money.** Every live request and every real-model spend is asked for first (section 4). A package that cannot get an answer builds from fixtures and says so; it is not blocked.
 
+### 5.6 Version 2.3: work packages 40 to 52
+
+The design is in [BLUEPRINT.md section 20](BLUEPRINT.md#20-version-23-hardening-run-control-and-the-workbench-page); each package's steps and acceptance are in 20.14. Two ideas make the waves possible. The fixes are split by layer, so the flow package and the app package share no file. The page is first split into one file per view by WP44, so the five view packages share no file either.
+
+| Step | Starts when | May run at the same time | Agents at once |
+|---|---|---|---|
+| 1 | The owner's go-ahead | **WP40**. Alone: it tags, branches, commits the plan and makes the kernel change. | 1 |
+| 2 | WP40 is done | **WP41** · **WP42** · **WP43** · **WP44** | 4 |
+| 3a | WP41 and WP42 are done, and the join check is clean | **WP45** · **WP38**. WP38 spends within its cap. Neither waits for the page. | 2 |
+| 3b | WP44 is done | **WP46** · **WP47** · **WP48** · **WP49** · **WP50**. They may run beside WP45 and WP38. | up to 5 |
+| 4 | WP45 to WP50 are done, or stopped by the rule of BLUEPRINT 20.15 | **WP51**. Alone on the page files. | 1 |
+| 5 | WP51 is done, and BLUEPRINT 20.15 allows | **WP52** (stretch). | 1 |
+| 6 | Everything else is done or cut, or 10:00 on 11-23 has come | **WP39**. Alone. | 1 |
+
+```mermaid
+flowchart LR
+    WP40 --> WP41
+    WP40 --> WP42
+    WP40 --> WP43
+    WP40 --> WP44
+    WP41 --> WP45
+    WP42 --> WP45
+    WP41 --> WP38
+    WP42 --> WP38
+    WP44 --> WP46
+    WP44 --> WP47
+    WP44 --> WP48
+    WP44 --> WP49
+    WP44 --> WP50
+    WP45 -->|"final check"| WP50
+    WP45 --> WP51
+    WP46 --> WP51
+    WP47 --> WP51
+    WP48 --> WP51
+    WP49 --> WP51
+    WP50 --> WP51
+    WP51 -->|"stretch"| WP52
+    WP38 --> WP39
+    WP43 --> WP39
+    WP51 --> WP39
+```
+
+**Where the time goes.** Two chains run side by side. The money chain is WP40 (1.5 h), WP41 or WP42 (4 h), WP38 (4 h): real-model runs can be archived about ten hours after the start. The page chain is WP40, WP44 (4 h), the longest view (4 h), WP51 (3 h). WP39 (3 h) closes both. WP44 is the package to give the strongest agent: if it slips, the page slips, and BLUEPRINT 20.15 item 4 says what is then cut.
+
+**Suggested staffing**, if fewer agents are available than the table allows: in step 2, WP44 and WP42 first, then WP41, then WP43. In step 3, WP38 as soon as it may start, then WP45, WP50, WP47, WP48, WP46, WP49.
+
+The files each package owns. Paths under `insightcrew/` are written without that prefix; `assets/` means `insightcrew/app/assets/`. A file not in a package's row is not that package's to edit.
+
+| Package | Creates | Edits, in files it did not create |
+|---|---|---|
+| WP40 | `tests/test_kernel_v23.py` | `kernel/runtime.py` (BLUEPRINT 20.5 only) |
+| WP41 | `tests/test_flow_hardening.py` | `flows/stage_risk.py`, `flows/graph.py`, `flows/analyze.py`, `flows/tools.py`, `tests/test_graph.py`, `tests/test_stage_portfolio_risk.py`, and any other test only in the lines that call `stage_risk.risk` |
+| WP42 | `app/trace.py`, `app/verify.py`, `tests/test_trace.py`, `tests/test_verify.py` | `app/wiring.py`, `app/resume.py`, `app/cli.py`, `app/replay.py`, `app/check.py` (`_one_line` only), `tests/test_cli.py`, and the existing tests of those files (cases added; the one line of question 33) |
+| WP43 | `tests/test_prompts.py`, `scripts/check.sh`, `.github/workflows/ci.yml` | `tests/conftest.py` |
+| WP44 | Everything under `assets/css/` and `assets/js/` (BLUEPRINT 20.9's table), `tests/js/`, `tests/test_page_js.py`, `tests/test_page_labels.py` | `assets/page.html`, `app/replay_html.py`, `tests/test_run_page.py` (cases added) |
+| WP45 | | `app/server.py`, `app/wiring.py` (`write_page` only, after WP42 is done), `tests/test_server.py` |
+| WP46 | | `assets/js/30-verdict.js`, `assets/css/30-verdict.css` |
+| WP47 | | `assets/js/35-process.js`, `assets/css/35-process.css` |
+| WP48 | | `assets/js/40-evidence.js`, `assets/js/45-audit.js`, `assets/css/40-evidence.css` |
+| WP49 | | `assets/js/50-usage.js`, `assets/css/50-usage.css` |
+| WP50 | | `assets/js/55-launch.js`, `assets/js/25-activity.js`, `assets/css/55-launch.css` |
+| WP51 | | Every file under `assets/`, `tests/js/`, `tests/test_run_page.py` |
+| WP52 | Two files in `data/scenarios/`, `tests/test_approval.py` | `domain/types.py` (`Approval`), `flows/analyze.py`, `flows/graph.py`, `app/cli.py`, `app/server.py`, `app/wiring.py`, `assets/js/30-verdict.js`, `tests/test_architecture.py` only if a role-read rule needs the new key |
+| WP38 | New directories under `evals/archive/` | As section 5.5's row |
+| WP39 | | As section 5.5's row, and `docs/ROADMAP.md`, `docs/ARCHITECTURE.md` for version 2.3 |
+
+Rules, in addition to 5.3 (read `v2.3` for `v2` there) and to rule 5 of 5.5 (how to edit this file), which stands:
+
+1. **Git.** WP40 is the one package that tags and switches: `git tag v2.2` on the head of `v2.2`, `git switch -c v2.3`, then commits `docs/BLUEPRINT.md`, this file and `AGENTS.md` alone as `Plan: version 2.3`. After that everyone stays on `v2.3`. Commit by path only, after your acceptance passes. Never `git add -A` / `.` / `commit -a`, never `switch`, `checkout`, `stash`, `restore`, `reset`, `clean`, `rebase`, never push, never delete `index.lock`.
+2. **The kernel** is edited by WP40 and by no one else. A package that seems to need a kernel change stops and asks.
+3. **Shared page files.** After WP44, `assets/page.html`, `assets/js/00-core.js`, `05-labels.js`, `10-model.js`, `20-shell.js`, `60-events.js`, `90-boot.js`, `assets/css/00-tokens.css` and `10-base.css` are edited by no view package. A view that needs a change in one writes it in section 7 under "Version 2.3: shared-file requests" and works around it meanwhile: a private helper or a private label inside its own file is always allowed. WP51 applies the requests.
+4. **Page tests.** `tests/test_run_page.py` is WP44's, then WP51's. A view package adds its tests under `tests/js/` in a file of its own, named after its view.
+5. **`app/wiring.py`** is edited by WP42, then by WP45, then by WP52, never at the same time.
+6. **The joins.** Before WP38 starts, before WP51 starts and before WP39 starts, `scripts/check.sh` (or the commands of BLUEPRINT 19.3, if WP43 is not done) is run while no other agent is working. It must be clean; a failure goes back to the package that owns the file.
+7. **Looking at the page.** Start the server with `IC_FORCE_OFFLINE=1 uv run insightcrew serve --no-open --port 9999` and open `http://localhost:9999/` (section 7 says why that port). Stop the server when done. Runs it leaves under `runs/` are ignored by git; leave them.
+8. **No real model and no network** in any package but WP38.
+
 ## 6. Environment
 
 | Fact | Value |
@@ -485,9 +595,11 @@ Questions for the owner, and gaps found while building:
 | 31 | 2026-11-20 | 35 | **settle 的落账与教训写回次序。** 任务书的字面次序是"先 log.resolve(路径 1 的记录)，复盘通过后把教训写回该记录"；但 DecisionLog.resolve 对同一 (as_of, ticker) 是一次性的（第二条 outcome 被忽略），日志也没有更新接口，"先落账再写回"在该冻结 API 下不可能。WP35 的读法：先复盘、lesson_findings 审计，通过则把 lesson 放进路径 1 的 OutcomeRecord 后**一次性** resolve（教训随结果同条落账）；复盘不可用或审计不过则 resolve 一条 lesson=null 的结果（结果不丢，下次结算不会重来）。确认这个次序。附带一读：flows.settle.settle 与 app 两命令在桩签名之后只加了带默认值的关键字参数（holding_days、models、runs_root、limits、output_mode、note / runs_root、settle_root），cli 的调用形状不变——测试与续跑需要这些注入点。 | — |
 | 32 | 2026-11-20 | 35 | **场景 `memory: []` 的 falsy 缝。** wiring.open_run 以 `scenario.config.memory` 为真值决定换不换 _ScenarioLog：空列表为假，于是"记忆开、内联记录从空开始"的场景会落到**真实**决策日志上（读取它、交付后还写入它），场景命令每次都会污染 runs/memory/decisions.jsonl。WP35 的 memory_record 因此放了一条**只有 pending 决策**的内联记录（无结果即无教训，语义等于空起点，_ScenarioLog 生效、写入为空操作）。若 owner 更想要字面的空列表，需把 wiring 的条件改成 `is not None`（一行，WP31 的文件，随本条定夺一并改）。 | — |
 
+**Owner, 2026-11-20 morning, on the table above:** question 14 is 2 USD (stop and ask at 1.60 USD); questions 15 to 19, 21 to 28 and 30 to 32 stand as each row's recommended reading, which is what the code already does; question 20 is answered by the trace file of BLUEPRINT 20.6, so wall time is persisted beside the journal and neither reference test is amended. Questions 11 and 13 remain open. The "Answer" cells above were left as they were; this paragraph is the answer.
+
 ### Version 2.2: shared-file requests
 
-A core or integration package that needs a change in a shared file writes it here instead of making it (section 5.5 rule 3).
+A core or integration package that needs a change in a shared file writes it here instead of making it (section 5.5 rule 3). The coordinator's log entry "2026-11-20 02:10 · wave WP32–WP37" says all seven rows below were applied in commit `97b461b`; the "Applied by" column was never filled in.
 
 | Date | From WP | File | Change | Why | Applied by |
 |---|---|---|---|---|---|
@@ -498,6 +610,38 @@ A core or integration package that needs a change in a shared file writes it her
 | 2026-11-20 | 32 | `tests/test_v22_switches.py` | `test_risk_rounds_on_runs_the_stub_and_changes_nothing`（注释自认"WP32 的桩不写键"）随 WP32 填正文而过时，改为断言真实行为：给剧本补 risk 三回复后 `delivered`、`risk/aggressive|conservative|neutral` 三键上板、调用序列在 trader 之后为 `risk.aggressive → risk.conservative → risk.neutral → trader → 评审`（写法可参照 `tests/test_stage_portfolio_risk.py::test_risk_shrinks_size_adopts_the_conservative_view`）；或不给回复、断言按规则停机（`review`、原因 `model_unavailable`）。 | 桩的三条断言（delivered、无 risk 键、调用序列不变）与真实阶段互斥：剧本没有 risk.* 回答时 Script 抛 ModelAPIError，正文按规则停机降级为 review。与 WP34 记的两条 v22_switches 桩断言同属一族，可一并更新。 | |
 | 2026-11-20 | 32 | `app/wiring.py` | `run_signature` 的 `portfolio_fingerprint(None)` 改为 `portfolio_fingerprint(deps.portfolio)`（该函数自己的注释就写着"WP31 接入后改为实际组合的指纹"；`open_run` 在写 run.started 之前已把 `deps.portfolio` 换成真组合，改动只需这一个词）。 | 现在不同组合、同请求同配置的两个运行签名相同：`resume` 可能拿别人的检查点在另一份账上续跑（19.5 第 6 条要指纹区分组合）。43 个旧归档都没有组合，指纹仍为 "none"，不受影响。 | |
 | 2026-11-20 | 35 | `insightcrew/adapters/decision_log.py`（首选）或 `app/wiring.py` | 首选：`DecisionLog.append` 与 `resolve` 在进 `_locked` 之前各加一行 `self._path.parent.mkdir(parents=True, exist_ok=True)`（`_write` 里已有同一行，只是来得太晚——锁文件 `<path>.lock` 的 open 在它之前）。备选（只救 analyze 路径）：`build_deps` 构造 DecisionLog 前对 `(ROOT / settings.memory.path).parent` 做同一 mkdir。 | 新克隆里没有 `runs/memory/`：`analyze --memory` 的交付运行在收尾记决策时（stage_memory.record → log.append → 锁文件 open）以 FileNotFoundError 崩掉——锁文件在数据文件旁边，父目录必须先在。`test_v22_switches.py::test_memory_on_writes_none_known_until_records_exist` 现挂在这一处（WP35 集成触发，根因在 WP29 的锁次序）。WP35 的 settle/backtest 命令已在各自文件里先 mkdir 自保。 | |
+
+### Version 2.3: traps and open questions
+
+Traps, for whoever builds WP40 to WP52:
+
+- **Section 20 is a design and nothing in it has been run.** The defects it lists were found by reading the code; none has been reproduced. Write the failing test first. If the test does not fail, the defect is not what section 20 says: stop and record what you found.
+- **The compatibility rule (BLUEPRINT 20.4) is the one thing that must not break.** The 43 archived journals must keep replaying `一致` and the 34 scenarios must keep matching. Run the proof at the end of every package.
+- **The kernel hook must not touch the clock when no observer is set.** `tests/test_kernel.py:142` injects a clock that counts its calls. Guard every call with `if run.observe is not None`.
+- **Timing never goes into the journal.** Not as a field of `model.called`, not as a board key. `tests/test_kernel_v22.py` compares whole journals, replay compares whole boards, and option A of question 20 was reverted for exactly this. The trace file is where it goes.
+- **The page's tests read the assembled page as text.** `tests/test_run_page.py` must pass unchanged. It forbids the words `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval(` and `new Function` anywhere, comments included; it forbids `href="…"` and `src="…"` in the source, so set a link's address with `setAttribute`; it forbids the string `http://`; and it counts `</script>` to be exactly two. It also looks for the table names `CHANNEL_STAGES`, `KEY_STAGE`, `ANALYST_KEYS`, for entries such as `"risk.aggressive": "risk"` and `news: "news/status"`, for the form's element IDs, and for the section headings with "未经核验": keep them all.
+- **The static page must work from a file.** `replay.html` is opened with no server. Every control that needs the server is hidden there, and nothing is fetched.
+- **The in-app browser on this machine opens only a few local addresses.** `127.0.0.1` and arbitrary `localhost` ports are refused by an administrator's allow-list; `http://localhost:9999` is allowed. Start the server with `--port 9999` and `IC_FORCE_OFFLINE=1`. The form is empty for a moment until `/api/meta` answers; take the screenshot after that.
+- **`IC_FORCE_OFFLINE=1` whenever a server is started to look at the page.** `.env` holds a real key; without the variable, a run started from the form with a ticker and no scenario spends money.
+- **Cancelling must be tried, not assumed.** Whether a cancelled task leaves a checkpoint LangGraph resumes from has not been tried; it is WP45's first test. If it does not, stop and record what happens.
+- **What you remember of LangGraph's interrupt is probably out of date** (WP52). Read the installed source first.
+- **Node runs tests only.** No `package.json`, no `npm install`, no bundler. A test that needs Node skips with a reason when Node is absent.
+- **A resumed run may repeat calls.** An interruption inside the debate, risk or judges node reruns that node from its start. Tests of resume inside a node assert a valid delivered run, not a journal equal to an uninterrupted one.
+
+Questions for the owner, and gaps found while building. Questions 33 to 35 were decided by the planning session as consequences of what the owner chose on 2026-11-20; each can be overruled, and the row says what then changes.
+
+| # | Date | WP | Question or gap | Answer |
+|---|---|---|---|---|
+| 33 | 2026-11-20 | 42 | **`tests/test_cli.py` asserts the exact set of files in a run directory.** The trace adds `trace.jsonl`, so the expected set in `test_analyze_with_nothing_runs_the_demo_and_writes_four_files` gains that one name (cases are neither removed nor weakened), as question 28 did for `checkpoints.sqlite`. | Applied as the consequence of the owner's choice of the trace (2026-11-20). If overruled: the trace is written only for runs started from the page. |
+| 34 | 2026-11-20 | 41 | **`stage_risk.risk` becomes `async`.** BLUEPRINT 19 called its synchronous signature final (WP31). The fix for defect D1 changes it; tests that call it change only how they call it. | Applied as part of the hardening the owner chose. If overruled: D1 stays, and the risk cells of WP38 are run from the command line only. |
+| 35 | 2026-11-20 | 45 | **What cancel means.** The plan: a cancelled run is unfinished and resumable; nothing is written to the journal; the trace records `run.cancelled` (BLUEPRINT decision 55). The alternative: cancel finishes the run as `review` with a new reason `cancelled`, writes the report, and the run cannot be resumed; that needs a special case in `replay`. | The plan's reading, recommended. The owner may choose the alternative before WP45 starts. |
+
+### Version 2.3: shared-file requests
+
+A package that needs a change in a file it does not own writes it here instead of making it (section 5.6 rule 3). WP51 applies the page requests; the owner decides who applies any other.
+
+| Date | From WP | File | Change | Why | Applied by |
+|---|---|---|---|---|---|
 
 ### Corrections to the blueprint
 
@@ -524,6 +668,7 @@ When the owner settles a question, the fix goes into BLUEPRINT.md and is listed 
 | 2026-11-19 11:10 | 18 (new), and one bullet in the introduction | **Section 18 added: the plan for version 2.1, evidence channels.** It is a proposal, not a correction: sections 0 to 17 are unchanged and still describe version 2.0 as built. Section 18 carries its own decisions (29 to 38), work packages (13 to 20), and the changes it asks for to invariants 3, 4, 6 and new invariants 17 and 18. None of it is in force until the owner agrees (the questions above). |
 | 2026-11-19 evening | 18.6, 18.7 (by way of questions 8 and 9) | **Two gaps settled by the owner.** (8) Evidence stays at `data/market/<universe>/{statements,disclosures}/`; WP2's `test_generator_writes_the_same_bytes_twice` had its `_snapshot()` helper amended (with authorisation) to list files only, so the generator's output set is still asserted exactly. (9) Under a currency mismatch, `evidence` (WP16) passes `recompute_fundamentals` the specs without price-dependent declarations; the blueprint's signatures and `disagreements` stand. |
 | 2026-11-19 late evening | 19 (new), and one bullet in the introduction | **Section 19 added: the plan for version 2.2.** Sections 0 to 18 are unchanged and still describe what is built. Section 19 carries decisions 39 to 50, work packages 21 to 39, and the invariant changes of 19.17 (3, 4, 6, 12, 17, 18 amended; 19, 20, 21 new). The owner authorised building it the same evening (section 4). `AGENTS.md` and the workspace's `../AGENTS.md` now allow adapting the TradingAgents files of 19.4 with attribution. |
+| 2026-11-20 morning | 20 (new), and one bullet in the introduction | **Section 20 added: the plan for version 2.3.** Sections 0 to 19 are unchanged and still describe what is built. Section 20 carries decisions 51 to 60, work packages 40 to 52, the amendments to WP38 and WP39, and the invariant changes of 20.13 (15 extended, 19 reworded; 22, 23, 24 new). It amends section 19 in three places: `stage_risk.risk` becomes asynchronous (19 called the synchronous signature final); 19.5 item 5's `run/usage.wall_ms` is replaced by the trace file (20.6); WP38 runs on `v2.3` after WP41 and WP42. The owner authorised building it the same morning (section 4). |
 
 ## 8. Session log
 
@@ -1803,6 +1948,33 @@ Committed: no（协调方提交）。
 
 For the next session: WP38（先向 owner 要问题 14 的上限,试点后逐格跑,归档全部重放）;之后 WP39 收尾——重打包 ../InsightCrew.zip 并空目录验证（uv sync、825 测试、无密钥 analyze）。
 
+### 2026-11-20 morning · review of version 2.2 and planning of version 2.3 · planning session (Cursor)
+
+Result: the owner asked for a review of the architecture and quality of version 2.2 as built, for what else can be learned from the two reference systems, for an investigation of the run page against current multi-agent tools and real pain points, and for a plan another agent can build from. The plan is BLUEPRINT section 20 (version 2.3, work packages 40 to 52, with WP38 and WP39 amended). No code was changed.
+
+What was done:
+  Read this file, ROADMAP.md, and the code of `flows/graph.py`, `flows/analyze.py`, `flows/stage_risk.py`, `flows/stages.py` (audit), `flows/stage_news.py`, `kernel/runtime.py`, `kernel/events.py`, `app/wiring.py`, `app/resume.py`, `app/server.py`, `app/replay.py`, `app/replay_html.py`, `evals/v22.py`, `tests/test_run_page.py`, `tests/conftest.py`.
+  Four read-only review agents reported on code quality, on TradingAgents, on open-multi-agent and on the page. Their high-severity findings were checked against the code before being written into 20.1; the rest are marked as theirs in 20.17.
+  The page was used in the in-app browser on the `demo` scenario, with `IC_FORCE_OFFLINE=1`.
+
+Commands run, with the last lines of their output:
+  uv run pytest -q → 825 passed
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  git status --short → clean before the plan was written; head 549c40f on v2.2
+
+Not run, and why: `insightcrew scenarios`, the replay of the 43 archives and `eval all` were not rerun by this session (the coordinator's 02:10 entry reports them clean on the same head). No real model, no network request, no web search. None of defects D1 to D5 or D8 was reproduced by a test: they were read.
+
+Decisions the owner gave this morning: the scope (fixes, trace, page; approval gate as a stretch); the kernel observer hook, limited to BLUEPRINT 20.5; the recommended readings of questions 15 to 32, with 20 answered by the trace; WP38's cap of 2 USD.
+
+Decisions this session made on the owner's behalf, each open to being overruled: questions 33 (one line of `tests/test_cli.py`), 34 (`stage_risk.risk` becomes asynchronous) and 35 (cancel leaves a run resumable) in section 7.
+
+Files created or changed: `docs/BLUEPRINT.md` (section 20, one introduction bullet), this file (the notice at the top, sections 1, 2, 3, 4, the new 5.6, section 7, the corrections table, this entry, section 9), `AGENTS.md`, and the workspace's `../AGENTS.md`. The stale status row of WP31 was corrected to `done`.
+
+Committed: no. WP40 commits the plan as `Plan: version 2.3` after it creates the branch.
+
+For the next session: WP40, alone, with the prompt in section 9. Then WP41 to WP44 at the same time.
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.
@@ -1822,6 +1994,20 @@ The owner pastes one of these. Replace `<label>` with the package's label in the
 > Work in `InsightCrew/`. Read `docs/HANDOFF.md` first and follow its section 1. You are doing WP`<n>` from `docs/BLUEPRINT.md` section 19.18: read 19.1 to 19.4 and the subsections WP`<n>` names, then implement it exactly as written; do not start any other work package. First check in `docs/HANDOFF.md` section 5.5 that everything it needs is done, and set its row in section 2 to `in progress`. Other agents are working in the same directory on branch `v2.2` at the same time: touch only the files section 5.5 lists for your package and follow its rules; a change you need in a shared file goes into section 7 "Version 2.2: shared-file requests", not into the file. Do not add or upgrade any package (WP22: only `uv add langgraph langgraph-checkpoint-sqlite`, after asking me). Ask me before every network request and every real-model spend, naming what and why; never read or print `.env`. Run your acceptance commands, the three checks (`uv run pytest -q`, `uv run ruff check .`, `uv run pyright`) and the proof in BLUEPRINT 19.3, and show me the output. Then set your row and append a session log entry. If the blueprint is ambiguous, silent, or contradicts a test, stop, record the question in section 7, and ask me. You may commit your own files by path on `v2.2` once acceptance passes; never push. Reply to me in Chinese.
 
 **WP31 and WP39 (version 2.2).** Use the prompt above, and add: "You run alone: before starting, check that no other package's row is `in progress` (WP30 may be, before WP31; ask me to pause it for the join check). Apply every request in section 7 'Version 2.2: shared-file requests' made before you started, and mark each applied."
+
+**WP40 (version 2.3).** It runs alone; start nothing else until it is done:
+
+> Work in `InsightCrew/`. Read `docs/HANDOFF.md` first and follow its section 1. Implement WP40 from `docs/BLUEPRINT.md` section 20.14 exactly as written, after reading 20.1 to 20.6; do not start any other work package. Set its row in `docs/HANDOFF.md` section 2 to `in progress` first. The kernel change is exactly BLUEPRINT 20.5 and nothing more; do not edit `tests/test_kernel.py` or `tests/test_kernel_v22.py`. Do not add or upgrade any package, do not touch the network, do not read `.env`. Run the three checks (`uv run pytest -q`, `uv run ruff check .`, `uv run pyright`) and the proof in BLUEPRINT 19.3, and show me the output. Then set your row and append a session log entry. If the blueprint is ambiguous, silent, or contradicts a test, stop, record the question in `docs/HANDOFF.md` section 7, and ask me. You may create the tag `v2.2` on the head of `v2.2` and the branch `v2.3`, commit the plan as `Plan: version 2.3`, and commit your own files by path on `v2.3` once acceptance passes; never push. Reply to me in Chinese.
+
+**Any package of version 2.3, WP41 to WP50.** The same prompt serves whether the agent works alone or beside others:
+
+> Work in `InsightCrew/`. Read `docs/HANDOFF.md` first and follow its section 1. You are doing WP`<n>` from `docs/BLUEPRINT.md` section 20.14: read 20.1 to 20.6 and the subsections WP`<n>` names, then implement it exactly as written; do not start any other work package. First check in `docs/HANDOFF.md` section 5.6 that everything it needs is done, and set its row in section 2 to `in progress`. Other agents are working in the same directory on branch `v2.3` at the same time: touch only the files section 5.6 lists for your package and follow its rules; a change you need in a file you do not own goes into section 7 "Version 2.3: shared-file requests", not into the file. For a defect of BLUEPRINT 20.1, write the failing test first and show me it failing. Do not edit `insightcrew/kernel/`. Do not add or upgrade any package, and add no JavaScript package or build step. No network request and no real-model call: when you start the server to look at the page, use `IC_FORCE_OFFLINE=1 uv run insightcrew serve --no-open --port 9999`, open `http://localhost:9999/`, and stop it afterwards. Never read or print `.env`. Run your acceptance commands, the three checks (`uv run pytest -q`, `uv run ruff check .`, `uv run pyright`) and the proof in BLUEPRINT 20.4, and show me the output; a page package also shows me its screenshots. Then set your row and append a session log entry. If the blueprint is ambiguous, silent, or contradicts a test, stop, record the question in section 7, and ask me. You may commit your own files by path on `v2.3` once acceptance passes; never push. Reply to me in Chinese.
+
+**WP51, WP52 and WP39 (version 2.3).** Use the prompt above, and add: "You run alone: before starting, check that no other package's row is `in progress`, and run the join check of section 5.6 rule 6. Apply every request in section 7 'Version 2.3: shared-file requests' that concerns your files, and mark each applied." For WP52 add: "This is a stretch package: first check BLUEPRINT 20.15 allows it today, and stop after an hour if LangGraph's interrupt does not fit, as 20.11 says."
+
+**WP38 (real-model runs, on version 2.3).**
+
+> Work in `InsightCrew/`. Read `docs/HANDOFF.md` first and follow its section 1. You are doing WP38 from `docs/BLUEPRINT.md` section 19.18 as amended by 20.14: read 19.16, 19.20, 20.2 and 20.6 first; do not start any other work package. First check in `docs/HANDOFF.md` section 5.6 that WP41 and WP42 are done and that the join check is clean, and set your row to `in progress`. I allow real-model spending for this package up to 2 USD in total: tell me your estimate before the pilot, keep a running total, and stop and ask me at 1.60 USD. No other network request: the real-bar cells use the bars already in `data/market/real/`, and no news, social or macro source is fetched. Never read or print `.env`. Run one pilot and read its journal before the cells; change a prompt only for a fault a journal shows, one at a time, and say which journal. Archive every journal with its `trace.jsonl`; every archive must pass `uv run insightcrew replay` and `uv run insightcrew verify`. Show me the results table, the parallel-against-serial timing from the traces, and the total spent. Do not switch any capability on in `insightcrew.toml` without asking me. Then run the three checks, set your row and append a session log entry. You may commit your own files by path on `v2.3`; never push. Reply to me in Chinese.
 
 **WP13.** It runs alone, and only after the owner has answered questions 1 to 4 under "Version 2.1" in section 7:
 
