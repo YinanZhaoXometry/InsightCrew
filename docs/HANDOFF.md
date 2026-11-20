@@ -89,11 +89,11 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 43 | Version 2.3: test harness, prompt-integrity tests, `scripts/check.sh`, the CI file | done | `tests/conftest.py` 网络夹具加拦 `connect_ex`，新增 autouse 夹具移除所有 `*_API_KEY` 环境变量；830 项既有测试无一因此失败。`tests/test_prompts.py` 四项检查今天全过（发现见问题 36）。`scripts/check.sh` 六阶段（三项检查、34 场景、43 重放、eval all）全过退出 0。`.github/workflows/ci.yml` 仅是文件：从未推送、从未运行。 |
 | 44 | Version 2.3: page foundation (the split into modules, the assembler, the model, the labels, the shell) | done | 按任务书次序四步走：先无行为变化的拆分（`tests/test_run_page.py` 原有 16 项不变全绿）→ `fold(events, trace, live)` 模型（视图私有折叠全部换掉）→ 页签外壳（过程/证据/规则与审计/用量与耗时/原始事件；过程与规则为空页签，写明 WP47/WP48 填充；结论与图置顶；`run/wall_ms` 的读取保留）→ 令牌与基础样式（含暗色一套）。`replay_html.py` 拼装 `/*@@css*/`、`/*@@js*/` 两标记行（缺失或源文件含 `</script` 即报错；输出确定），`render`/`write` 增 `trace` 参数。新增 `tests/js/`（Node 内建 runner，7 项：版本与 superseded、rounds、cited_by、status、跨度配对/失败/无轨迹）、`tests/test_page_js.py`（无 node 时跳过并说明）、`tests/test_page_labels.py`（rules.toml 14 规则、domain 17 检查名、flows 12 停机原因全部有标签）、`tests/test_run_page.py` 加 8 项。浏览器核对（端口 9999，IC_FORCE_OFFLINE=1）：demo 从表单起跑直播、channels_clean 看 ?run=、两者的 `replay.html` 静态打开，均显示 2.2 页面原有内容；发现并修复渲染循环在 rAF 冻结（隐藏页签/内嵌浏览器）下整页不画的问题（150ms 定时器兜底）。全仓剩余失败均在 WP42 进行中的文件。 |
 | 45 | Version 2.3: server API and run control (checkpointed web runs, cancel, resume, trace in the stream, exports, plan preview) | not started | Needs WP41 and WP42. |
-| 46 | Version 2.3: page, verdict and chart | not started | Needs WP44. |
-| 47 | Version 2.3: page, process (debate, revisions with the audit's findings, risk, judges) | not started | Needs WP44. |
-| 48 | Version 2.3: page, evidence with clickable citations, rules and audit | not started | Needs WP44. |
-| 49 | Version 2.3: page, usage and timing with the trace waterfall | not started | Needs WP44. |
-| 50 | Version 2.3: page, launch form with plan preview, history, live activity, cancel and resume | not started | Needs WP44; final check after WP45. |
+| 46 | Version 2.3: page, verdict and chart | done | 20.10 结论四态齐：交付（评级/操作/带货币价位/摘要/论点带引用徽章/失效条件/持有期/两条信任行链去页签）、REVIEW（无评级无价位＋原因＋下一步建议行＋脚本化提示）、中断（进度行＋续跑按钮，静态页说明不能续跑）、运行中（进度行＋结论形成中）；价格图保留 2.2 全部元素并加"分析日"竖线标记。新增 `tests/js/verdict.test.mjs` 5 项（12/12 绿）。共享页文件零改动。问题 39、40 记录在案。浏览器五查（demo、审计打回、全能力、中断、静态 replay.html）均过。 |
+| 47 | Version 2.3: page, process (debate, revisions with the audit's findings, risk, judges) | done | 20.10「Process」全条落地：分析师（并列，卡上标签/模型/耗时/token，产物按契约渲染：叙事→论断或信号带引用徽章→基调/情绪带与把握）、多空辩论（一轮一框、多空两列、回应在点下）、主管与交易员、修订对照（一版一列一字段一行、改动格加 ▲；被打回的版本列出检查项标签/主语/消息与流向——审计的按路由点名键主人归属，评审反对票与随上游重做也分得清；论点被评审否决时同样有对照）、风险三方意见（三列＋交易员修订摘要，标题保留"未经审计的意见"）、评审（一轮一卡＋汇总行）。被取代的旧版默认折叠；每卡「查看提示词与原始回复」开原有事件抽屉；四态（无运行/进行中/交付/中断/REVIEW 各有一句交代）。Node 测试 `tests/js/process.test.mjs` 5 项（含跨 realm JSON 比对）。截图 4 张（demo、misquote、全能力上下两幅）。 |
+| 48 | Version 2.3: page, evidence with clickable citations, rules and audit | in progress | Needs WP44 (done). Owns `assets/js/40-evidence.js`, `assets/js/45-audit.js`, `assets/css/40-evidence.css`, `tests/js/evidence.test.mjs`, `tests/js/audit.test.mjs`. |
+| 49 | Version 2.3: page, usage and timing with the trace waterfall | in progress | Needs WP44 (done). |
+| 50 | Version 2.3: page, launch form with plan preview, history, live activity, cancel and resume | in progress | Needs WP44 (done); final check after WP45. |
 | 51 | Version 2.3: page quality pass and the browser check | not started | Alone on the page files. Needs WP45 to WP50, or what the stop rule leaves of them. |
 | 52 | Version 2.3: approval gate (stretch) | not started | Only if BLUEPRINT 20.15 allows. Off by default. |
 
@@ -638,6 +638,8 @@ Questions for the owner, and gaps found while building. Questions 33 to 35 were 
 | 36 | 2026-11-20 | 43 | **A finding of the prompt-integrity tests, for WP38.** The four checks of BLUEPRINT 20.12 all pass on today's prompts and are committed (`tests/test_prompts.py`). The backtick check bites on nothing today: no prompt names a key in backticks. A stricter reading — any board-key-shaped name in the prompt text must be one the role reads or writes — would fail in one place: `manager.md` names `memory/status`, a key `flows/stage_memory.py` does write, but MANAGER does not read it; the prompt explains a key the role never receives. Only WP38 changes a prompt: it decides whether the sentence goes or the manager gains the read. | — |
 | 37 | 2026-11-20 | 41 | **缺陷 D2 的复现窗口与 20.7 第 2 条所写不同。** 蓝图点名的场景——并行两位分析师、第二位的模型第一次尝试即抛意外错误、以空 holder 续跑——在 langgraph 1.2.22（checkpoint 4.3.2）下**本来就通过**：分析师分支节点不写任何图通道，失败的超步没有可复放的每任务写入（`_reapply_writes_to_succeeded_nodes` 只还给写过写入的任务），整个扇出超步在续跑时全体重跑、holder 重新填满。缺陷在**相邻窗口**真实复现：扇出超步的检查点已写、join 正按固定顺序入账时被中断（`tests/test_graph.py::test_interrupted_while_join_commits_resumes_to_the_same_board`，修前续跑后板缺 `fundamentals/analysis`）。修复照 20.7 第 2 条原文实现（join 就地补算缺位且该跑的分析师）；蓝图片名场景的测试保留为回归项。注意不变式 24：join 内中断会重做该节点已入账的调用，故该测试比值为"缺位的键补上、值相同、照常交付"，不比整块黑板。 | — |
 | 38 | 2026-11-20 | 42 | **`resume` 的模型来源不看 `IC_FORCE_OFFLINE`（版本 2.2 既有，非本包引入）。** `app/resume.py` 的 `_models` 只要 `.env` 里有密钥就构造真实档位，`force_offline` 只拦 `wiring._tiers`，不拦它：在离线环境（或测试夹具拦网）里跑 `insightcrew resume` 会对着真实端点发请求。WP42 写 D8 的测试时撞见（WP43 的拦网夹具把它拦成异常；两次**意外**的真实续跑因此发生，约 10 次快速档调用，见 WP42 日志）。未改：20.7 第 8 条没有点名它。WP42 的测试对 `_models` 打了补丁；WP45 接手 resume 时应请主人定夺（读法 A：`_models` 尊重 force_offline，一行 `if settings.force_offline: return Script({})`；读法 B：维持现状——续跑本来就是真实运行的事）。 | — |
+| 39 | 2026-11-20 | 46 | **结论卡 REVIEW 建议行"model_unavailable → 续跑"与续跑规则相抵。** 20.10 要结论卡对 `model_unavailable` 的 REVIEW 给"续跑"建议，但该原因的 Halt 会把运行降级为 review 并写 `run.finished`（`flows/analyze.py::_degrade`），而 resume 对已结束的运行一律拒绝（`该运行已经结束，无需续跑。`；20.8 第 3 条的 409 "already finished" 同）——真正能续跑的只有"中断"（无 `run.finished`）的运行，结论卡的中断态有续跑按钮。页面照蓝图原文写"模型不可用；等模型恢复后可以续跑这次运行。"。若要字面为真：要么允许 review+model_unavailable 的运行续跑（`app/resume.py` 与 WP45 的 `/api/resume` 各改一处），要么把这句改成"重新发起"。 | — |
+| 40 | 2026-11-20 | 46 | **两条信任行各链去哪一页签，蓝图文义。** 20.10 说"事实与规则"与"模型评审"各是"到它那一页签的链接"但未点名页签。WP46 按最终架构（20.10 各视图的归属）链：事实与规则 → 「规则与审计」（WP48），模型评审与 contested 的建议 → 「过程」（WP47）。今天这两节仍在「证据」页签里（WP47/WP48 落地后拆走）；若两者被 20.15 的止损规则砍掉，WP51 应把这几个链接改指「证据」。 | — |
 
 ### Version 2.3: shared-file requests
 
@@ -2123,6 +2125,34 @@ Unverified: resume 在真实模型下的行为未跑（离线验证到 calls_exh
 Files created or changed: `insightcrew/app/trace.py`（新）、`insightcrew/app/verify.py`（新）、`insightcrew/app/wiring.py`（D4＋run_flow 挂 tracer）、`insightcrew/app/resume.py`（resume_run 异步化、_requests、D8 按字节截残行、trace＋run.resumed）、`insightcrew/app/cli.py`（verify 命令、D6 命令行一半、观察者播报、_GATES/_STAGES、删两个死 handler）、`insightcrew/app/replay.py`（未结束不比较；`_one_line` 唯一定义处）、`insightcrew/app/check.py`（`_one_line` 改引入）、`tests/test_trace.py`（新 6 项）、`tests/test_verify.py`（新 13 项）、`tests/test_cli.py`（+8 项与问题 33 一行）、`tests/test_wiring.py`（+3 项）、`docs/HANDOFF.md`（状态行、问题 38、本条目）。
 Committed: 本包文件与本文件按路径一次提交，消息 `WP42: app hardening (D4, D3-app, D8, D6-CLI), trace.jsonl, verify command (BLUEPRINT 20.6, 20.7 items 7-14)`。未推送。
 For the next session: WP45 接手 resume_run/BadRequest 与 trace（问题 35、38 一并定夺）；WP38 归档记得带上 trace.jsonl 并对每份跑 verify；`_channel_names` 现在拒绝空元组之外的一切未知名，`RunRequest.channels` 的 None/() 语义与 prepare 已对齐。
+
+### 2026-11-20 (WP47) · page process 视图（辩论、修订对照、风险三方意见、评审） · delegated session (GLM-5.3, via ZCode)
+
+Result: done.
+
+Commands run, with the last lines of their output:
+  node --test tests/js/model.test.mjs tests/js/trace.test.mjs tests/js/process.test.mjs
+  ℹ tests 12  ℹ pass 12  ℹ fail 0            # 7 项 WP44 既有 + 本包 5 项
+  node --test tests/js/*.test.mjs
+  ℹ tests 42  ℹ pass 42  ℹ fail 0            # 各视图包的 Node 测试此刻全绿
+  uv run pytest tests/test_run_page.py tests/test_page_js.py tests/test_page_labels.py -q
+  29 passed                                 # 原有 16 项不变全绿；node --check 拼装脚本由 test_page_js 代跑，rc=0
+  uv run pytest -q → 880 passed in 24.31s   # 全仓
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  IC_FORCE_OFFLINE=1 uv run insightcrew scenarios → 34/34 ✓ 相符
+  for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew replay "$d"; done
+  43/43 一致（22 delivered+accepted、12 delivered+not reviewed、8 contested、1 malformed_output）
+  浏览器（IC_FORCE_OFFLINE=1，端口 9999，自开页签）：?run= 打开 demo / misquote / 全能力运行三份日志，过程页签逐节核对（DOM 快照）并截图 4 张：
+    demo（交付，审计打回一次：修订对照表 3 列字段、改动格 ▲、v1 下方检查项与"重做：交易员"）；
+    misquote（审计打回技术分析师：technical#1 折叠＋#2 展开，主管/交易员各两版均折叠，修订对照给出"随上游重做"说明）；
+    全能力（五通道＋宏观＋工具＋记忆＋风险辩论＋评审＋组合，五分析师并列两行、风险三列＋交易员修订摘要、评审一轮三卡＋汇总行）；截图另存会话产物。
+Not run, and why: `scripts/check.sh` 未代跑（其他视图包同刻在收尾，5.6 规则 6，证明按 19.3 手跑如上）；`replay.html` 静态打开核对此处未重做——嵌入侧 trace 由 WP44 的 render 落地、跨度配对与 call.ms 有 Node 测试覆盖，页面代码与直播同一条；无网络请求、无真实模型、未读未打印 `.env`。
+Unverified: 直播模式下卡片耗时显示"耗时无记录"——trace 随 SSE（`event: trace`）是 WP45 的 20.8 第 4 条，落地后直播也会有 ms；`replay.html`（嵌 trace）的耗时显示只经代码路径与 Node 测试确认，未在静态文件里再开一次。
+Files created or changed: `insightcrew/app/assets/js/35-process.js`（空视图改写为完整过程页签）、`insightcrew/app/assets/css/35-process.css`（卡片/并列/轮框/修订对照样式）、`tests/js/process.test.mjs`（新 5 项）、`docs/HANDOFF.md`（状态行与本条目）。仅动本包文件；共享页文件零改动（把握低/中/高等私有标签放本文件内）。
+两处读法（不构成问题，记录备考）：(1) 论点的修订对照在 manager/thesis 多于一版时一律出现——蓝图片名"评审否决论点"，审计把 owner 为 manager 的发现打回时同样成版，本视图两种来源都按实归属展示（审计检查项/评审反对票/随上游重做三分支）；(2) 全能力截图用临时合并场景 `runs/wp47_all_on.json`（git 忽略；`--scenario ../../runs/wp47_all_on` 经相对名装载，data/scenarios 未动、34 计数不变），合并自 channels_clean/macro_clean/sentiment_clean/tools_clean/memory_lessons/risk_shrinks_size 各角色的既有回复。
+Committed: 本包三个文件与本文件按路径一次提交，消息 `WP47: ...`。未推送。
+For the next session: WP51 质量过页时可注意——过程页签卡片在 1280px 下五分析师自动换两行（auto-fit，不算破损）；修订对照表在版本多时在自己的框里横滚（.tscroll）；抽屉打开时焦点管理仍是 WP51 的活。另：内置浏览器有其他代理共用，本会话一个自开页签中途被导航走，各自截图请自备页签并即用即拍。
 
 ## 9. Prompts for starting a session
 

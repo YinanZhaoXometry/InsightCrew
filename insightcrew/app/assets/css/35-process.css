@@ -1,1 +1,57 @@
-/* 35-process.css —— 过程页签（WP44 占位；WP47 填充）。 */
+/* 35-process.css —— 过程页签（WP47）：角色卡片、并列栏、辩论与风险的三栏、修订对照。 */
+
+/* 各节的容器 */
+#view-process h3 { margin-top:22px; }
+#view-process h4.psub { margin:14px 0 6px; }
+.solo { display:block; }
+.pcol { display:flex; flex-direction:column; gap:10px; min-width:0; }
+
+/* 并列栏：并行分析师 / 一轮评审 / 风险三方，并排放不下时自动换列 */
+.par-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:10px; align-items:start; }
+
+/* 卡片：一位角色的一次出场 */
+.pcard { border:1px solid var(--line); border-radius:var(--radius); background:var(--card); overflow:hidden; }
+.pcard > summary { list-style:none; cursor:pointer; padding:8px 12px; background:var(--lane);
+                   display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.pcard > summary::-webkit-details-marker { display:none; }
+.pcard[open] > summary { border-bottom:1px solid var(--line); }
+.pcard.old > summary .who { text-decoration:line-through; color:var(--muted); }
+.pcard.old { border-style:dashed; }
+.phead { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; min-width:0; }
+.phead .who { font-size:13px; }
+.phead .step { color:var(--muted); font-size:11px; }
+.phead .meta-bit { color:var(--muted); font-size:11.5px; }
+.phead .old-tag { color:var(--warn); }
+.pcard .ctl.raw { flex:none; font-size:11.5px; padding:3px 10px; min-height:26px; }
+.pbody { padding:10px 12px; }
+.pbody > * { margin:0; }
+.pbody > * + * { margin-top:8px; }
+.pnar { font-size:13.5px; line-height:1.65; }
+.fail { color:var(--bad); font-size:13px; }
+.rebuttal { font-size:12.5px; color:var(--soft); border-left:3px solid var(--line); padding-left:10px; }
+.inval b { display:block; font-size:12px; color:var(--muted); margin-bottom:2px; }
+.inval ul { margin:0; padding-left:18px; font-size:12.5px; color:var(--soft); }
+.plist { margin:0; padding-left:18px; font-size:13px; }
+.plist li { margin:4px 0; line-height:1.55; }
+.chips { display:inline-flex; flex-wrap:wrap; gap:4px; vertical-align:baseline; }
+
+/* 辩论与风险：一轮一框，多空两栏 / 风险三栏 */
+.de-round { position:relative; margin:10px 0 14px; padding:14px 10px 10px; border:1px solid var(--line);
+            border-radius:var(--radius); background:var(--lane); }
+.round-tag { position:absolute; top:-9px; left:12px; font-size:10.5px; padding:0 8px; border-radius:4px;
+             background:var(--accent-bg); color:var(--accent); border:1px solid #c9d3f7; }
+.de-two { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:10px; }
+.risk-three { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px; }
+@media (max-width:760px) { .de-two, .risk-three { grid-template-columns:1fr; } }
+
+/* 修订对照：一版一列；表宽时在自己的框里横滚 */
+.rev { margin-top:6px; }
+.tscroll { overflow-x:auto; }
+.tscroll table { min-width:420px; }
+.tscroll td .diff, .tscroll th .diff { background:var(--warn-bg); border-radius:4px; padding:1px 5px;
+                                       font-weight:600; }
+.tscroll td .diff::after { content:" ▲"; font-size:10px; }
+.sentback { margin:8px 0 0; padding:8px 12px; border-left:3px solid var(--warn); background:var(--lane);
+            border-radius:0 8px 8px 0; }
+.sentback .note { margin:0 0 4px; }
+.quorum { font-weight:600; color:var(--soft); }
