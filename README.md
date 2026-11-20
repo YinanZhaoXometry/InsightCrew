@@ -19,7 +19,7 @@ uv run insightcrew serve     # opens the local web app at http://127.0.0.1:8765
 
 Or run `./start.sh` (macOS, Linux) or `start.bat` (Windows), which check for uv, say how to install it if it is missing, and then run the two commands above.
 
-**No API key is needed to try it.** Without one, every run uses scripted model replies, and the page says so in a badge on every screen (`离线演示 · 脚本化模型`). Pick the `demo` scenario in the form: the audit rejects the Trader's first proposal, the Trader fixes it, and the judges accept it 2 to 1.
+**No API key is needed to try it.** Without one, every run uses scripted model replies, and the page says so in a badge on every screen (`离线演示 · 脚本化模型`). After `uv sync`, trying it uses no network at all: the demo, the page and the audit run entirely on your machine, so you can disconnect. Pick the `demo` scenario in the form: the audit rejects the Trader's first proposal, the Trader fixes it, and the judges accept it 2 to 1.
 
 **With a key**, copy `.env.example` to `.env` and set `DEEPSEEK_API_KEY`. Each run then calls DeepSeek; the measured cost is about 0.03 USD for the version-2.0 configuration and 0.017 to 0.048 USD for the runs with the version 2.2 capabilities on (nine cells plus a pilot, [docs/EVALUATION.md](docs/EVALUATION.md#3c-the-version-22-cells-on-a-real-model)). Check the connection with `uv run insightcrew check`.
 
