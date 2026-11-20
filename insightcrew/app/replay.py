@@ -50,6 +50,10 @@ def run(settings: Settings, run_dir: str) -> int:
     if started is None:
         print(f"运行日志 {path} 里没有 run.started 事件，无法重放")
         return 1
+    if not any(e.type == "run.finished" for e in events):
+        # 20.7 第 13 条：未结束的运行没有可与重放对照的结果，说清楚，不打印差异清单
+        print("该运行没有结束（日志里没有 run.finished 事件），无法比较；可用 insightcrew resume 续跑。")
+        return 1
 
     original = Board.fold(events).snapshot()
     request = dict(started.data.get("request") or {})

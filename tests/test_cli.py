@@ -1,14 +1,22 @@
 """命令行的测试：WP5 的验收条目写成测试；用户敲错的东西得到一行说明与退出码 2，不是回溯。"""
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
 import pytest
+from pydantic_ai.models import Model
 from typer.testing import CliRunner
 
+from insightcrew.adapters.scripted import Script
+from insightcrew.app import cli as cli_module
+from insightcrew.app import resume as resume_cmd
 from insightcrew.app import wiring
 from insightcrew.app.cli import app
+from insightcrew.app.settings import Settings, load
+from insightcrew.evals.scenarios import load_one
+from insightcrew.kernel.runtime import Role
 
 RATING_WORDS = ("Buy", "Sell", "Overweight", "Underweight")
 
@@ -40,7 +48,8 @@ def test_analyze_with_nothing_runs_the_demo_and_writes_four_files(runs: Path) ->
     assert "闸门 审计：发现 1 个问题（max_risk_per_trade_pct）" in output
     assert "打回：从 交易员 重跑" in output
     assert {p.name for p in _only_run(runs).iterdir()} == {"journal.jsonl", "report.md", "board.json",
-                                                            "replay.html", "checkpoints.sqlite"}
+                                                            "replay.html", "checkpoints.sqlite",
+                                                            "trace.jsonl"}
 
 
 def test_quiet_prints_the_outcome_only(runs: Path) -> None:
@@ -175,3 +184,129 @@ def test_channels_open_the_analysts_in_a_scenario(runs: Path) -> None:
     assert code == 0
     assert "fundamentals#1" in output and "disclosures#1" in output
     assert "结果：delivered" in output
+
+
+# ---- 意外中断与观察者（BLUEPRINT 20.7 第 10、11 条：缺陷 D6、问题 33）----
+
+
+def test_analyze_reports_an_unexpected_stop_and_points_at_resume(runs: Path,
+                                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    """D6 的命令行一半：运行抛出意外异常时，页面照写（写当时已有的），一行说明、退出码 1。"""
+
+    async def _boom(run: object, request: object, deps: object, flow: object = None) -> None:
+        raise RuntimeError("模拟缺陷")
+
+    monkeypatch.setattr(cli_module, "run_flow_with_checkpoints", _boom)
+    code, output = _invoke("analyze", "--no-open")
+    run_dir = _only_run(runs)
+    assert code == 1
+    assert "RuntimeError" in output and f"可用 insightcrew resume {run_dir} 续跑" in output
+    assert (run_dir / "replay.html").exists()                  # 页面为已存在的部分照写
+
+
+def test_show_prints_a_line_when_a_role_starts_and_when_it_ends(runs: Path) -> None:
+    """--show（缺省）：观察者逐行播报角色开始与结束，结束行带时长（20.7 第 11 条）。"""
+    code, output = _invoke("analyze", "--scenario", "clean", "--no-open")
+    assert code == 0
+    assert "technical#1 开始调用" in output and "完成，用时" in output
+    assert "trader#1 开始调用" in output
+
+
+def test_the_label_tables_cover_the_version_22_stages_and_gates() -> None:
+    """_GATES 与 _STAGES 补上版本 2.2 的闸门与阶段（20.7 第 11 条）。"""
+    assert {"intake", "ledger", "evidence", "audit", "tools"} <= set(cli_module._GATES)
+    assert {"technical", "fundamentals", "disclosures", "news", "sentiment",
+            "debate", "manager", "trader"} <= set(cli_module._STAGES)
+
+
+# ---- resume：续跑（BLUEPRINT 20.7 第 8、9、10 条：缺陷 D3 的 app 一半、D8）----
+
+
+class _CrashOn:
+    """模型端口替身：第一次问到 crash_on 时抛普通异常（模拟进程被杀），之后照常回答。"""
+
+    def __init__(self, replies: dict, crash_on: str) -> None:
+        self._script, self._crash_on, self._armed = Script(replies), crash_on, True
+
+    def for_role(self, role: Role) -> Model:
+        if role.name == self._crash_on and self._armed:
+            self._armed = False
+            raise RuntimeError("模拟中断")
+        return self._script.for_role(role)
+
+
+def _crashed_run(settings: Settings, runs: Path) -> Path:
+    """一个真的中断了的运行：demo 场景跑到交易员之前崩溃。日志没有 run.finished，检查点留在 manager。"""
+    scenario = load_one("demo")
+    job = wiring.prepare(settings, scenario="demo")
+    run, deps = wiring.open_run(settings, job.request, scenario=scenario, flow=job.flow,
+                                runs_dir=runs)
+    run.models = _CrashOn(scenario.replies, "trader")
+    with pytest.raises(RuntimeError):
+        asyncio.run(wiring.run_flow(run, job.request, deps, job.flow))
+    assert not [e for e in run.journal.events if e.type == "run.finished"]
+    assert deps.out_dir is not None
+    return deps.out_dir
+
+
+def test_resume_carries_the_requests_already_spent(runs: Path,
+                                                   monkeypatch: pytest.MonkeyPatch) -> None:
+    """D3 的 app 一半：续跑把已用请求数复原。上限 6、崩溃时已花 4 次：再调两次后第三次
+    admit 就停机（calls_exhausted），而不是把上限当成从零开始（那会得出 ok）。"""
+    settings = load(wiring.ROOT, force_offline=True, limits={"max_requests": 6})
+    run_dir = _crashed_run(settings, runs)
+    before = len((run_dir / "journal.jsonl").read_text(encoding="utf-8").splitlines())  # 续跑前的事件数
+    scenario = load_one("demo")
+    monkeypatch.setattr(resume_cmd, "_models", lambda s, e: Script(scenario.replies))
+    outcome = asyncio.run(resume_cmd.resume_run(settings, run_dir / "journal.jsonl"))
+    assert (outcome.status, outcome.reason) == ("delivered", "calls_exhausted")
+    assert outcome.judgment == "not reviewed: calls_exhausted"
+    text = (run_dir / "journal.jsonl").read_text(encoding="utf-8")
+    journal = [json.loads(line) for line in text.splitlines()]
+    called = [e for e in journal if e["type"] == "model.called"]
+    assert len(called) == 6                                     # 4 次是崩溃前的，2 次是续跑新花的
+    assert (run_dir / "trace.jsonl").exists()                   # 续跑也写 trace（20.6）
+    trace = (run_dir / "trace.jsonl").read_text(encoding="utf-8").splitlines()
+    resumed = [json.loads(line) for line in trace if '"run.resumed"' in line]
+    assert resumed and resumed[0]["after_seq"] == before        # after_seq 是续跑前日志的最后序号
+
+
+def test_resume_truncates_a_torn_last_line(runs: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """D8：最后一行写了一半（没有换行、也解析不过）先截到完整行，说一行，然后照常续跑。
+
+    续跑用的模型来源换成空剧本（问题 37：resume 的 _models 不看 IC_FORCE_OFFLINE，
+    不换会在离线测试里对着 .env 的密钥发真请求）。"""
+    settings = load(wiring.ROOT, force_offline=True)
+    run_dir = _crashed_run(settings, runs)
+    monkeypatch.setattr(resume_cmd, "_models",
+                        lambda s, e: Script(load_one("demo").replies))
+    journal = run_dir / "journal.jsonl"
+    with journal.open("a", encoding="utf-8") as f:
+        f.write('{"seq": 999, "type": "artifact.wri')           # 进程在追加中途被杀的残行
+    code, output = _invoke("resume", str(run_dir))
+    assert code == 0 and "已截" in output                        # 一行说明 + 照常续跑
+    lines = journal.read_text(encoding="utf-8").splitlines()
+    assert all(json.loads(line) for line in lines)              # 剩下的每一行都完整
+
+
+def test_resume_still_refuses_a_bad_line_in_the_middle(runs: Path) -> None:
+    """D8 的另一半：坏行不在最后，就仍是错，不截、不续。"""
+    settings = load(wiring.ROOT, force_offline=True)
+    run_dir = _crashed_run(settings, runs)
+    journal = run_dir / "journal.jsonl"
+    lines = journal.read_text(encoding="utf-8").splitlines()
+    lines[3] = "不是 JSON"
+    journal.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    code, output = _invoke("resume", str(run_dir))
+    assert code == 1 and "无法读取运行日志" in output and "已截" not in output
+
+
+# ---- replay：未结束的运行（BLUEPRINT 20.7 第 13 条）----
+
+
+def test_replay_says_an_unfinished_run_cannot_be_compared(runs: Path) -> None:
+    """没有 run.finished 的日志：说明运行没有结束、无法比较，退出 1；不打印差异清单。"""
+    settings = load(wiring.ROOT, force_offline=True)
+    run_dir = _crashed_run(settings, runs)
+    code, output = _invoke("replay", str(run_dir))
+    assert code == 1 and "没有结束" in output and "不一致" not in output

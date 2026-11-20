@@ -1,18 +1,25 @@
-"""resume 命令：把一次被中断的运行从检查点接着跑完（BLUEPRINT 19.5 第 6 条）。
+"""resume 命令：把一次被中断的运行从检查点接着跑完（BLUEPRINT 19.5 第 6 条、20.7 第 8、9 条）。
 
 前提：运行目录里有 journal.jsonl（尚未 run.finished）与 checkpoints.sqlite。做法：
-Journal.load 读旧事件；请求、流程与设置按 run.started 复原（与 replay 相同的规则）；
-黑板从旧事件折叠且保持可写；预算把已发生的每次模型调用重放进去（这样续跑结束时的
-run/usage 与一次 uninterrupted 运行相同）；模型、上限、输出方式同样复原。
-然后重算运行签名，与 run.started 记录的不一致就拒绝；一致则以该签名为线程 ID，
-用 SQLite 检查点 drive(resume=True) 继续图，收尾与 analyze 相同。
+先看最后一行是否写了一半（D8：进程在追加中途被杀）——没有换行又解析不过的残行
+截到最后一行为止，说一行；Journal.load 读旧事件；请求、流程与设置按 run.started
+复原（与 replay 相同的规则）；黑板从旧事件折叠且保持可写；预算把已发生的每次模型
+调用重放进去、已用请求计数（D3 的 app 一半）同样复原，这样续跑结束时的 run/usage
+与一次 uninterrupted 运行相同，max_requests 也从真实已用数接着算；模型、上限、输出
+方式同样复原。然后重算运行签名，与 run.started 记录的不一致就拒绝；一致则以该签名
+为线程 ID，用 SQLite 检查点 drive(resume=True) 继续图，收尾与 analyze 相同。
 
-每个节点在自己的末尾提交事件（决策 42），所以崩溃后的日志恰好包含已完成的节点，
-检查点与日志一致；被中断的那个调用花掉的部分不在日志里，也不在预算里。
+resume_run 是续跑本身（异步，供网页的运行控制调用，BLUEPRINT 20.8 第 3 条）；
+拒绝一律抛 BadRequest，中文说明。同步的 run(settings, run_dir) 包着它：找日志、
+打印、退出码。trace（20.6）：续跑也写，先记一行 run.resumed（after_seq 是续跑前
+日志的最后序号）。每个节点在自己的末尾提交事件（决策 42），所以崩溃后的日志恰好
+包含已完成的节点，检查点与日志一致；被中断的那个调用花掉的部分不在日志里，也不在
+预算里。
 """
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +34,7 @@ from ..kernel.events import Event, Journal
 from ..kernel.runtime import Limits, Run, RunUsage  # RunUsage 经内核重导出：预算重放需要该类型
 from .replay import _one_line  # 同一层的复用：压缩异常文本为一行
 from .settings import LimitsSection, RunSection, Settings
+from .trace import Tracer, mark
 from .wiring import ROOT, BadRequest, build_deps, checkpoint, run_signature, write_page
 
 
@@ -59,37 +67,65 @@ def _steps_used(events: tuple[Event, ...]) -> dict[str, int]:
     return steps
 
 
-class _ResumingRun(Run):
-    """续跑的 Run：把已用过的步骤计数一并复原，被中断角色之后的 step_id 不会重号。"""
+def _requests_used(events: tuple[Event, ...]) -> int:
+    """日志里已经花掉的模型请求数（D3 的 app 一半）：max_requests 从真实已用数接着算。"""
+    return sum((event.data.get("usage") or {}).get("requests", 0)
+               for event in events if event.type == "model.called")
 
-    def __init__(self, *, steps: dict[str, int], **kwargs: Any) -> None:
+
+def _truncate_torn_line(path: Path) -> bool:
+    """D8：最后一行没有换行、又解析不过，是进程在追加中途被杀的残行。
+    截到最后一行完整行为止；其余情况（有换行、或残行恰好能解析）都不动。返回是否截了。
+    按字节截：truncate 收字节数，而日志里有双字节字符，按字符数截会切在多字节字符中间。"""
+    raw = path.read_bytes()
+    if not raw or raw.endswith(b"\n"):
+        return False
+    last = raw.rsplit(b"\n", 1)[-1]
+    try:
+        json.loads(last)
+    except ValueError:
+        with path.open("r+b") as f:
+            f.truncate(len(raw) - len(last))
+        return True
+    return False
+
+
+class _ResumingRun(Run):
+    """续跑的 Run：把已用过的步骤计数与请求数一并复原，被中断角色之后的 step_id
+    不会重号，max_requests 也不会被当成从零开始。"""
+
+    def __init__(self, *, steps: dict[str, int], requests: int = 0, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._steps = dict(steps)
+        self._requests = requests
 
 
-def run(settings: Settings, run_dir: str) -> int:
-    """把 RUN_DIR 里被中断的运行从检查点续跑完。已结束或签名不符的运行拒绝续跑。"""
-    path = _journal_path(run_dir)
-    if path is None:
-        print(f"找不到运行日志：{run_dir}（应是一个包含 journal.jsonl 的运行目录）")
-        return 1
+def _load_for_resume(path: Path) -> tuple[Event, ...]:
+    """读一份要续跑的日志：先看最后一行残没残（D8），再整份读入。
+    找不到、读不了都以 BadRequest 拒绝；截了残行就说一行。"""
+    if not path.is_file():
+        raise BadRequest(f"找不到运行日志：{path}（应是一个包含 journal.jsonl 的运行目录）")
+    if _truncate_torn_line(path):
+        print(f"运行日志 {path} 的最后一行不完整，已截去，从最后一条完整事件续跑。")
     try:
-        events = Journal.load(path)
+        return Journal.load(path)
     except (OSError, ValidationError) as e:
-        print(f"无法读取运行日志 {path}：{_one_line(str(e))}")
-        return 1
+        raise BadRequest(f"无法读取运行日志 {path}：{_one_line(str(e))}") from e
+
+
+async def resume_run(settings: Settings, path: Path) -> Outcome:
+    """把 path（journal.jsonl）里被中断的运行从检查点续跑完，返回结果。
+    每一种拒绝都抛 BadRequest，中文说明；网页的运行控制直接调它（20.8 第 3 条）。"""
+    events = _load_for_resume(path)
     started = next((e for e in events if e.type == "run.started"), None)
     if started is None:
-        print(f"运行日志 {path} 里没有 run.started 事件，无法续跑")
-        return 1
+        raise BadRequest(f"运行日志 {path} 里没有 run.started 事件，无法续跑")
     if any(e.type == "run.finished" for e in events):
-        print("该运行已经结束，无需续跑。")
-        return 1
+        raise BadRequest("该运行已经结束，无需续跑。")
     try:
         flow = FlowConfig(**(started.data.get("flow") or {}))
     except ValidationError as e:
-        print(f"run.started 里记录的设置无法复原：{_one_line(str(e))}")
-        return 1
+        raise BadRequest(f"run.started 里记录的设置无法复原：{_one_line(str(e))}") from e
 
     board = Board.fold(events)
     request = dict(started.data.get("request") or {})
@@ -100,40 +136,47 @@ def run(settings: Settings, run_dir: str) -> int:
     try:
         deps = build_deps(restored)
     except OSError as e:
-        print(f"数据集 {restored.run.universe!r} 读不出来：{e}")
-        return 1
+        raise BadRequest(f"数据集 {restored.run.universe!r} 读不出来：{e}") from e
 
     recorded_thread = started.data.get("thread")
     recomputed = run_signature(request, deps, flow,
                                dict(started.data.get("models") or {}))
     if recorded_thread is None:
-        print("运行日志里没有运行签名（版本 2.2 之前的运行），无法续跑。")
-        return 1
+        raise BadRequest("运行日志里没有运行签名（版本 2.2 之前的运行），无法续跑。")
     if recomputed != recorded_thread:
-        print(f"运行签名不一致：日志记录 {recorded_thread}，现在重算 {recomputed}。"
-              "代码、日期、流程配置、档位或组合与原运行不同，拒绝续跑。")
-        return 1
+        raise BadRequest(f"运行签名不一致：日志记录 {recorded_thread}，现在重算 {recomputed}。"
+                         "代码、日期、流程配置、档位或组合与原运行不同，拒绝续跑。")
 
     journal = _ResumeJournal(path)
+    trace = path.parent / "trace.jsonl"
     run_ctx = _ResumingRun(id=path.parent.name, journal=journal,
                            board=_ResumingBoard(journal, events),
                            models=_models(restored, started), budget=_budget(started.data, events),
                            limits=Limits(**_limits(started.data, restored)),
                            output_mode=restored.run.output_mode,
-                           steps=_steps_used(events))
+                           steps=_steps_used(events), requests=_requests_used(events),
+                           observe=Tracer(trace))
+    mark(trace, "run.resumed", after_seq=events[-1].seq)
 
-    async def _continue() -> Outcome:
-        async with checkpoint(path.parent) as saver:
-            return await drive_flow(run_ctx, request, deps, flow, checkpointer=saver,
-                                    thread_id=recomputed, resume=True)
-
-    try:
-        outcome = asyncio.run(_continue())
-    except BadRequest as e:                       # drive 不抛这个；留作将来 prepare 级检查
-        print(f"无法续跑：{e}")
-        return 1
+    async with checkpoint(path.parent) as saver:
+        outcome = await drive_flow(run_ctx, request, deps, flow, checkpointer=saver,
+                                   thread_id=recomputed, resume=True)
 
     write_page(run_ctx, deps)
+    return outcome
+
+
+def run(settings: Settings, run_dir: str) -> int:
+    """命令行入口：解析 RUN_DIR，调 resume_run，保持退出码（拒绝为 1，续跑完成为 0）。"""
+    path = _journal_path(run_dir)
+    if path is None:
+        print(f"找不到运行日志：{run_dir}（应是一个包含 journal.jsonl 的运行目录）")
+        return 1
+    try:
+        outcome = asyncio.run(resume_run(settings, path))
+    except BadRequest as e:
+        print(str(e))
+        return 1
     print(_summary(outcome, path.parent))
     return 0
 

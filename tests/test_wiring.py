@@ -201,6 +201,27 @@ def test_an_unknown_channel_is_refused(settings: Settings) -> None:
         prepare(settings, ticker="ACME", channels=("nope",))
 
 
+# ---- [flow] channels 设置（BLUEPRINT 20.7 第 7 条：缺陷 D4）----
+
+
+def test_the_settings_channels_apply_when_the_flag_is_absent() -> None:
+    """D4：设置里开了通道、没给 --channels 时，任务带着那条通道（修复前 prepare 总拿空元组覆盖它）。"""
+    settings = load(ROOT, force_offline=True, flow={"channels": ["fundamentals"]})
+    assert prepare(settings, ticker="ACME").flow.channels == ("fundamentals",)
+
+
+def test_the_channels_flag_overrides_the_settings_and_empty_means_none() -> None:
+    settings = load(ROOT, force_offline=True, flow={"channels": ["fundamentals"]})
+    assert prepare(settings, ticker="ACME", channels=("disclosures",)).flow.channels == ("disclosures",)
+    assert prepare(settings, ticker="ACME", channels=()).flow.channels == ()    # 显式点名"一个也不开"
+
+
+def test_a_scenario_ignores_both_the_settings_channels_and_the_flag() -> None:
+    settings = load(ROOT, force_offline=True, flow={"channels": ["fundamentals"]})
+    job = prepare(settings, scenario="clean", channels=("disclosures",))
+    assert job.flow.channels == load_one("clean").config.flow.channels == ()    # 场景说了算
+
+
 def test_build_deps_wires_the_evidence_ports(settings: Settings) -> None:
     from insightcrew.app.wiring import build_deps
     deps = build_deps(settings)

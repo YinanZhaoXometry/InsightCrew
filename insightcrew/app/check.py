@@ -24,6 +24,7 @@ from ..kernel.board import Board
 from ..kernel.budget import Budget
 from ..kernel.events import Journal
 from ..kernel.runtime import Halt, Malformed, OutputMode, Role, Run, run_role
+from .replay import _one_line  # 同一层的复用（20.7 第 14 条）：压缩异常文本为一行，只定义一次
 from .settings import Settings
 
 _MODES: tuple[OutputMode, ...] = ("auto", "native", "tool", "prompted")
@@ -99,8 +100,3 @@ async def _probe(tier: str, model: Any, mode: OutputMode) -> str:
     tokens = f"{usage['input_tokens']}+{usage['output_tokens']} token"
     price = "已定价" if cost is not None else "未定价"
     return f"  {tier} · {mode}：模型 {name}，{verdict}，{tokens}，{price}"
-
-
-def _one_line(text: str) -> str:
-    """把异常文本压成一行，保证结果行的"一行"名副其实。"""
-    return " ".join(text.split())

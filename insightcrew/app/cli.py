@@ -3,7 +3,7 @@
 用户敲错的东西（设置文件里的未知键、无法解析的日期、不存在的场景）在这里变成一行中文说明
 和退出码 2，不是一段回溯。回溯只留给真正的缺陷。
 
-check、replay、eval、fetch 四个命令各调用自己模块里的一个函数（BLUEPRINT 10.3）。
+check、replay、resume、verify、eval、fetch 等命令各调用自己模块里的一个函数（BLUEPRINT 10.3）。
 选项用 Annotated 写法：默认值保持字面量，Typer 的说明放在注解里。
 """
 from __future__ import annotations
@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import tempfile
 import webbrowser
+from collections.abc import Mapping
 from datetime import date as date_type
 from functools import partial
 from pathlib import Path
@@ -41,6 +42,7 @@ from . import replay as replay_cmd
 from . import resume as resume_cmd
 from . import server as server_cmd
 from . import settle as settle_cmd
+from . import verify as verify_cmd
 from .settings import Settings, load
 from .wiring import ROOT, BadRequest, Job, build_deps, describe_models, open_run, prepare, write_page
 from .wiring import run_flow as run_flow_with_checkpoints
@@ -48,8 +50,10 @@ from .wiring import run_flow as run_flow_with_checkpoints
 app = typer.Typer(help="InsightCrew：带独立审计的多智能体交易辅助系统。没有密钥时运行离线演示。",
                   no_args_is_help=True, add_completion=False, pretty_exceptions_show_locals=False)
 
-_GATES = {"intake": "范围", "ledger": "账本", "evidence": "证据", "audit": "审计"}
+_GATES = {"intake": "范围", "ledger": "账本", "evidence": "证据", "audit": "审计",
+          "tools": "工具"}                       # 版本 2.2 的闸门（BLUEPRINT 20.7 第 11 条）
 _STAGES = {"technical": "技术分析", "fundamentals": "基本面分析", "disclosures": "公告分析",
+           "news": "新闻分析", "sentiment": "情感分析",          # 版本 2.2 的两个分析师责任人
            "debate": "多空辩论", "manager": "研究主管", "trader": "交易员"}
 _CHANNEL_STATE = {"available": "可用", "empty": "窗口内没有公告", "unavailable": "不可用"}
 
@@ -117,7 +121,12 @@ def analyze(
             print(f"未使用真实模型：{reason}。" + ("改为运行离线演示场景 demo。" if job.scenario
                                            else "没有场景可依，需要模型的步骤会以 REVIEW 结束。"))
 
-    outcome = asyncio.run(_run(run, deps, job, show=not quiet))   # _run 经 wiring 的检查点入口
+    try:
+        outcome = asyncio.run(_run(run, deps, job, show=not quiet))   # _run 经 wiring 的检查点入口
+    except Exception as e:            # 意外中断（D6 的命令行一半，20.7 第 11 条）：留可续跑的现场
+        write_page(run, deps)         # 页面为当时已有的部分照写
+        print(f"运行意外中断（{type(e).__name__}）：可用 insightcrew resume {deps.out_dir} 续跑")
+        raise typer.Exit(1) from None
     page = write_page(run, deps)
     print(_outcome_line(outcome))
     print(f"运行目录：{deps.out_dir}")
@@ -127,10 +136,22 @@ def analyze(
         webbrowser.open(page.as_uri())
 
 
+def _say_role_lines(kind: str, data: Mapping[str, Any]) -> None:
+    """观察者形式的逐行播报（20.7 第 11 条）：一个角色开始调用、结束时带时长各一行。"""
+    if kind == "role.started":
+        print(f"· {data['step']} 开始调用（{data['model']}）")
+    elif kind == "role.finished":
+        print(f"· {data['step']} 完成，用时 {data['ms']} 毫秒")
+
+
 async def _run(run: Run, deps: Deps, job: Job, *, show: bool) -> Outcome:
     """跑流程，同时把新出现的事件逐行打印出来：真实模型的运行要一分钟上下，过程应当边跑边看得到。
 
-    经 wiring 的 run_flow 进入：带 SQLite 检查点与运行签名，被中断的运行可以用 resume 续跑。"""
+    经 wiring 的 run_flow 进入：带 SQLite 检查点、运行签名与 trace，被中断的运行可以用
+    resume 续跑。show 时把逐行播报挂成观察者：run_flow 会把 trace 与它串起来（先测量、
+    后播报），两边的次序与内容互不干扰。"""
+    if show:
+        run.observe = _say_role_lines
     task = asyncio.create_task(run_flow_with_checkpoints(run, job.request, deps, job.flow))
     shown = 0
     while True:
@@ -316,6 +337,14 @@ def check() -> None:
 
 
 @app.command()
+def verify(
+    run_dir: Annotated[str, typer.Argument(help="运行目录，如 runs/20260101-120000-ACME-…-abcd")],
+) -> None:
+    """离线核对一份运行日志的结构：不调模型、不跑流程，通过或逐条列出问题。"""
+    raise typer.Exit(verify_cmd.run(run_dir))
+
+
+@app.command()
 def fetch(
     tickers: Annotated[list[str], typer.Argument(help="一个或多个代码")],
     years: Annotated[int, typer.Option("--years", min=1, help="下载几年的日线")] = 3,
@@ -334,10 +363,7 @@ def settle(
     known_by: Annotated[str, typer.Option("--known-by", help="结算到哪一天（YYYY-MM-DD）；缺省用今天")] = "",
 ) -> None:
     """结算持有期已走完的决策，并让反思者写下课程（19.13）。"""
-    try:
-        raise typer.Exit(settle_cmd.run(_settings(), known_by))
-    except NotImplementedError as e:
-        _fail(str(e))
+    raise typer.Exit(settle_cmd.run(_settings(), known_by))
 
 
 @app.command()
@@ -350,11 +376,8 @@ def backtest(
     yes: Annotated[bool, typer.Option("--yes", help="真实模型下的回测需要显式确认")] = False,
 ) -> None:
     """按交易日网格回测：逐日先结算再分析，记忆开着（19.13）。"""
-    try:
-        raise typer.Exit(backtest_cmd.run(_settings(), tuple(tickers), from_date, to_date,
-                                          every, run_id, yes))
-    except NotImplementedError as e:
-        _fail(str(e))
+    raise typer.Exit(backtest_cmd.run(_settings(), tuple(tickers), from_date, to_date,
+                                      every, run_id, yes))
 
 
 @app.command(name="eval")

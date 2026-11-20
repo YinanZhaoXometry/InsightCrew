@@ -19,7 +19,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -59,6 +59,7 @@ from ..kernel.events import Event, Journal
 from ..kernel.runtime import Limits, Models, Run
 from . import replay_html, report
 from .settings import Settings
+from .trace import Tracer
 
 ROOT = Path(__file__).resolve().parent.parent.parent      # 仓库根：insightcrew.toml、data/、runs/
 RUNS = ROOT / "runs"
@@ -246,7 +247,9 @@ def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: 
         request = {**chosen.request, **request}
 
     base = chosen.config.flow if chosen else settings.flow
-    names = None if chosen is not None else tuple(_channel_names(channels))
+    # D4（BLUEPRINT 20.7 第 7 条）：场景说了算；没有场景时，--channels 没给（None）就用
+    # 设置里的 [flow] channels，给了（含空元组）才是这一次运行的显式覆盖。
+    names = None if chosen is not None or channels is None else tuple(_channel_names(channels))
     overrides = {key: value for key, value in
                  (("judges", judges), ("debate_rounds", debate_rounds), ("channels", names),
                   ("parallel", parallel), ("risk_rounds", risk_rounds), ("tools", tools))
@@ -263,11 +266,10 @@ def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: 
 _CHANNEL_NAMES = ("fundamentals", "disclosures", "news", "sentiment", "macro")
 
 
-def _channel_names(channels: tuple[str, ...] | None) -> tuple[str, ...]:
+def _channel_names(channels: tuple[str, ...]) -> tuple[str, ...]:
     """把 --channels 的名字校验成通道名；未知名在这里拒绝，不等到运行里。
-    macro 需要同时点名 news（19.12：宏观证据随新闻通道一起收集）。"""
-    if channels is None:
-        return ()
+    macro 需要同时点名 news（19.12：宏观证据随新闻通道一起收集）。
+    从不以 None 调用（D4 修复后 prepare 先判 None），空元组表示"一个也不开"。"""
     unknown = [name for name in channels if name not in _CHANNEL_NAMES]
     if unknown:
         raise BadRequest(f"未知的证据通道：{'、'.join(unknown)}。"
@@ -394,9 +396,11 @@ async def checkpoint(run_dir: Path) -> AsyncIterator[AsyncSqliteSaver]:
 
 async def run_flow(run: Run, request: dict[str, Any], deps: Deps,
                    flow: FlowConfig | None = None) -> Outcome:
-    """命令行与网页的真实运行入口：带 SQLite 检查点与运行签名，供 resume 续跑。
+    """命令行与网页的真实运行入口：带 SQLite 检查点、运行签名与 trace，供 resume 续跑。
 
-    场景、测试与 replay 直接调 flows.analyze.analyze（无检查点）。
+    场景、测试与 replay 直接调 flows.analyze.analyze（无检查点、无 trace）。
+    trace（BLUEPRINT 20.6）在这里挂成 run.observe：调用方已挂的观察者（命令行 --show
+    的逐行播报）不被顶掉，先记测量、再转交。测量不影响日志（不变量 22）。
     """
     cfg = flow or FlowConfig()
     started = next((e for e in run.journal.events if e.type == "run.started"), None)
@@ -404,6 +408,15 @@ async def run_flow(run: Run, request: dict[str, Any], deps: Deps,
     thread = run_signature(request, deps, cfg, dict(names))
     if deps.out_dir is None:
         return await drive_flow(run, request, deps, cfg)
+    tracer = Tracer(deps.out_dir / "trace.jsonl")
+    prior = run.observe
+
+    def _observing(kind: str, data: Mapping[str, Any]) -> None:
+        tracer(kind, data)
+        if prior is not None:
+            prior(kind, data)
+
+    run.observe = _observing
     async with checkpoint(deps.out_dir) as saver:
         return await drive_flow(run, request, deps, cfg, checkpointer=saver, thread_id=thread)
 
