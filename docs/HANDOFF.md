@@ -2435,6 +2435,7 @@ Packaging（提交 `84b9c7c` 后从 HEAD 重建，见下）：
   该目录内 uv sync → 成功（本地缓存即成，无证书错误、无需重试）
   该目录内 uv run pytest -q → 906 passed in 31.53s
   该目录内 IC_FORCE_OFFLINE=1 uv run insightcrew analyze --no-open → 结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified（演示场景，脚本化模型，未读任何密钥；.zip 里本就没有 .env）。运行目录六件齐全：journal.jsonl、trace.jsonl、report.md、board.json、replay.html、checkpoints.sqlite
+  补记提交（b506dfc，仅本条目数行）后：zip 从当时的 HEAD 再建，并在又一个全新目录（/tmp/wp39-final-verify）完整复验——uv sync OK、906 passed、无密钥 analyze 交付。随后本行入库为最后一个提交，交付的 ../InsightCrew.zip 从该最终 HEAD 重建；它与上一次完整复验的树只差日志里这几行文字，代码与数据零差别。
 
 Not run, and why: 未发任何网络请求（uv sync 走本地缓存即成，未触碰远端）、未调真实模型、未读未打印 `.env`、未推送；`serve` 未启动（本包不需要看页面）。
 
