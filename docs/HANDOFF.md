@@ -2429,12 +2429,12 @@ Commands run, with the last lines of their output:
   链接检查（自写小脚本，文件与锚点）→ all links resolve（首查抓到 README 一处旧锚点，已改）
   无 Node 复核 → PATH 去掉 node 跑 tests/test_page_js.py → 2 skipped（文档所写 904+2 的依据）
 
-Packaging（提交后从 HEAD 重建，见下）：
-  git archive --format=zip -o ../InsightCrew.zip HEAD → 成功
-  全新空目录解包 → unzip 列出顶层即仓库内容；确认无 .env、无 runs/、无 data/market/real/、无 .venv（git 忽略，git archive 自然排除；逐项验证）
-  该目录内 uv sync → 成功（本地包缓存，未发网络请求）
-  该目录内 uv run pytest -q → 906 passed
-  该目录内 IC_FORCE_OFFLINE=1 uv run insightcrew analyze --no-open → 结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified（演示场景，脚本化模型，未读任何密钥；.zip 里本就没有 .env）
+Packaging（提交 `84b9c7c` 后从 HEAD 重建，见下）：
+  git archive --format=zip -o ../InsightCrew.zip HEAD → 成功（4,451,446 字节，485 个条目）
+  全新空目录 /tmp/wp39-fresh-verify 解包 → 顶层即仓库内容；unzip 清单 grep 不到 .env、runs/、data/market/real/、.venv（git 忽略，git archive 自然排除；解包后逐项再验：无 .env，data/market/ 只有 synthetic）
+  该目录内 uv sync → 成功（本地缓存即成，无证书错误、无需重试）
+  该目录内 uv run pytest -q → 906 passed in 31.53s
+  该目录内 IC_FORCE_OFFLINE=1 uv run insightcrew analyze --no-open → 结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified（演示场景，脚本化模型，未读任何密钥；.zip 里本就没有 .env）。运行目录六件齐全：journal.jsonl、trace.jsonl、report.md、board.json、replay.html、checkpoints.sqlite
 
 Not run, and why: 未发任何网络请求（uv sync 走本地缓存即成，未触碰远端）、未调真实模型、未读未打印 `.env`、未推送；`serve` 未启动（本包不需要看页面）。
 
@@ -2442,7 +2442,7 @@ Unverified: CI 工作流在真实 runner 上的行为（从未运行，文档照
 
 Files created or changed: `README.md`、`AGENTS.md`、`docs/ARCHITECTURE.md`、`docs/EVALUATION.md`、`docs/ROADMAP.md`、`THIRD_PARTY_NOTICES.md`（一句）、`docs/HANDOFF.md`（状态行、Last updated、本条目）。start.sh/start.bat 复查后未改；仓库外 `../InsightCrew.zip` 重建。`insightcrew/`、`tests/`、`scripts/`、`.github/`、`pyproject.toml`、`uv.lock` 零改动。
 
-Committed: 本包文件与本文件按路径一次提交，消息 `WP39: ...`。未推送。
+Committed: 本包文件与本文件按路径一次提交 `84b9c7c`，消息 `WP39: ...`（本条目的打包段落数字是提交后补记，随后续小提交入库）。未推送。
 
 For the next session: 版本 2.3 全部工作包收口（40–52、38、39 皆 done）。剩余是 owner 的验收与第 7 节问题 36–46 的裁决；提交截止 2026-11-23 23:59。
 
