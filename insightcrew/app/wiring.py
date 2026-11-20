@@ -60,6 +60,7 @@ from ..kernel.runtime import Limits, Models, Run
 from . import replay_html, report
 from .settings import Settings
 from .trace import Tracer
+from .trace import load as load_trace
 
 ROOT = Path(__file__).resolve().parent.parent.parent      # 仓库根：insightcrew.toml、data/、runs/
 RUNS = ROOT / "runs"
@@ -433,11 +434,14 @@ def closes(market: MarketData, ticker: str, as_of: date) -> list[dict[str, Any]]
 
 
 def write_page(run: Run, deps: Deps) -> Path | None:
-    """把运行页面（replay.html）写进运行目录。准入通过的运行带上价格序列。"""
+    """把运行页面（replay.html）写进运行目录。准入通过的运行带上价格序列；
+    运行留了轨迹（20.6）就把轨迹一并嵌进静态页（20.8 第 10 条）。"""
     if deps.out_dir is None:
         return None
     bars = None
     if run.board.has("request/scope"):
         scope = run.board.get("request/scope", Scope)
         bars = closes(deps.market, scope.ticker, date.fromisoformat(scope.as_of)) or None
-    return replay_html.write(deps.out_dir, run.journal.events, bars)
+    trace_path = deps.out_dir / "trace.jsonl"
+    trace = load_trace(trace_path) if trace_path.is_file() else None
+    return replay_html.write(deps.out_dir, run.journal.events, bars, trace)
