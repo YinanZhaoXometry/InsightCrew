@@ -1,0 +1,4 @@
+/* 50-usage.css —— 用量与耗时。 */
+.meter { height:8px; border-radius:999px; background:var(--lane); border:1px solid var(--line); overflow:hidden; margin-top:6px; }
+.meter i { display:block; height:100%; background:var(--accent); }
+.meter.over i { background:var(--bad); }

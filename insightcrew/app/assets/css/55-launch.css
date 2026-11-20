@@ -1,0 +1,36 @@
+/* 55-launch.css —— 发起运行的表单、历史列表，以及流水线（运行状态区，WP50 接手）。 */
+
+/* 流水线 */
+#pipeline { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.stage { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; font-size:12.5px;
+         border:1px solid var(--line); background:var(--card); color:var(--muted); }
+.stage .kind { font-size:10px; padding:0 5px; border-radius:4px; border:1px solid currentColor; opacity:.75; }
+.stage .ms { font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.stage.done { background:var(--good-bg); border-color:#bfe0cd; color:var(--good); }
+.stage.running { background:var(--accent-bg); border-color:var(--accent); color:var(--accent); font-weight:600; }
+.stage.revised { background:var(--warn-bg); border-color:#edd9ac; color:var(--warn); }
+.stage.halted { background:var(--bad-bg); border-color:#f4c7c1; color:var(--bad); font-weight:600; }
+.arrow { color:var(--line); font-size:12px; }
+/* 并行分析师组：几位分析师同时跑，画成一个框里的并列泳道 */
+.parallel { display:flex; flex-direction:column; gap:4px; padding:6px 8px 6px; border:1px dashed var(--accent);
+            border-radius:9px; background:var(--card); position:relative; margin:2px 0; }
+.parallel .par-tag { position:absolute; top:-8px; left:10px; font-size:10px; padding:0 6px; border-radius:4px;
+                     background:var(--accent-bg); color:var(--accent); border:1px solid #c9d3f7; }
+.parallel .stage { background:var(--card); }
+
+/* 发起运行（实时模式） */
+#form { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+#form label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+#form label.inline { flex-direction:row; align-items:center; gap:6px; padding-bottom:7px; color:var(--soft); }
+#form input, #form select { font:inherit; color:var(--ink); padding:6px 9px; border:1px solid var(--line);
+                            border-radius:7px; background:var(--card); min-height:34px; }
+#form input:disabled, #form select:disabled { background:var(--lane); color:var(--muted); }
+#f-scenario { min-width:230px; } #f-ticker { width:130px; } #f-rounds { width:70px; }
+#f-risk-rounds { width:70px; } #f-portfolio { width:230px; }
+.primary { padding:7px 20px; min-height:34px; border-radius:7px; border:1px solid var(--accent);
+           background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+.primary:hover { filter:brightness(1.08); }
+.linkish { border:0; background:none; padding:0; color:var(--accent); cursor:pointer; text-decoration:underline; }
+.error { margin:10px 0 0; font-size:12.5px; color:var(--bad); }
+details { margin-top:12px; } summary { cursor:pointer; color:var(--soft); font-size:13px; }
+#history-body { max-height:340px; overflow:auto; }

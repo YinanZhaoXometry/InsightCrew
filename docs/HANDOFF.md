@@ -87,7 +87,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 41 | Version 2.3: flow hardening (risk debate awaited, resume across the analyst fan-out and with tools, siblings' spend) | done | 20.7 第 1–6 条全部落地，四项先红后绿：D1 `stage_risk.risk` 异步直跑（线程桥/asyncio.run/ThreadPoolExecutor 全删，图的 risk 节点 await；测试：慢速剧本辩论期间同循环心跳持续推进——修前 0 次）；D2 join 按 `analysts_group[_rerun_start:]` 逐位入账、缺位且该跑的就地 `run_role_deferred` 补算（蓝图点名的窗口在 langgraph 1.2.22 下本就全超步重跑、测试不红——见问题 37；缺陷在相邻窗口复现：join 入账中途被中断、续跑直接落回 join 时缺 `fundamentals/analysis`）；D3 流程一半 `drive(resume=True)` 重建 `run.tools` 并 `ToolBox.seed` 装回板上 `tools/facts`（修前按 app/resume 重建 Run 续跑即 `KeyError: 'indicator'`）；兄弟花费：`drive` 的 Halt 处理先按固定顺序入账 holder 里已算完的分支（忽略 Malformed）再降级（修前第一位分析师的 `model.called` 不在日志）。第 5 条 `wall_on_board`/`_record_wall`/`run/wall_ms` 全删（无任何调用方与测试读它们）；第 6 条 `call` 只在 analyze 定义一份，graph 与 stage_risk 引入（drive 函数体内才引入 graph，模块加载无环）。`tests/test_flow_hardening.py` 新增 3 项、`tests/test_graph.py` 新增 2 项（既有全绿）、`test_stage_portfolio_risk.py` 两处直调改 await（问题 34）。本包文件 ruff/pyright 干净；全仓 pytest 845 过、9 挂全在 WP42/WP44 进行中的文件（见日志）；34/34 场景 ✓；43/43 重放一致。 |
 | 42 | Version 2.3: app hardening (`[flow] channels`, resume, torn journal line), the trace, the `verify` command | in progress | Needs WP40 (done). On WP38's path. |
 | 43 | Version 2.3: test harness, prompt-integrity tests, `scripts/check.sh`, the CI file | done | `tests/conftest.py` 网络夹具加拦 `connect_ex`，新增 autouse 夹具移除所有 `*_API_KEY` 环境变量；830 项既有测试无一因此失败。`tests/test_prompts.py` 四项检查今天全过（发现见问题 36）。`scripts/check.sh` 六阶段（三项检查、34 场景、43 重放、eval all）全过退出 0。`.github/workflows/ci.yml` 仅是文件：从未推送、从未运行。 |
-| 44 | Version 2.3: page foundation (the split into modules, the assembler, the model, the labels, the shell) | in progress | Needs WP40. Critical path of the page; give it the strongest agent. |
+| 44 | Version 2.3: page foundation (the split into modules, the assembler, the model, the labels, the shell) | done | 按任务书次序四步走：先无行为变化的拆分（`tests/test_run_page.py` 原有 16 项不变全绿）→ `fold(events, trace, live)` 模型（视图私有折叠全部换掉）→ 页签外壳（过程/证据/规则与审计/用量与耗时/原始事件；过程与规则为空页签，写明 WP47/WP48 填充；结论与图置顶；`run/wall_ms` 的读取保留）→ 令牌与基础样式（含暗色一套）。`replay_html.py` 拼装 `/*@@css*/`、`/*@@js*/` 两标记行（缺失或源文件含 `</script` 即报错；输出确定），`render`/`write` 增 `trace` 参数。新增 `tests/js/`（Node 内建 runner，7 项：版本与 superseded、rounds、cited_by、status、跨度配对/失败/无轨迹）、`tests/test_page_js.py`（无 node 时跳过并说明）、`tests/test_page_labels.py`（rules.toml 14 规则、domain 17 检查名、flows 12 停机原因全部有标签）、`tests/test_run_page.py` 加 8 项。浏览器核对（端口 9999，IC_FORCE_OFFLINE=1）：demo 从表单起跑直播、channels_clean 看 ?run=、两者的 `replay.html` 静态打开，均显示 2.2 页面原有内容；发现并修复渲染循环在 rAF 冻结（隐藏页签/内嵌浏览器）下整页不画的问题（150ms 定时器兜底）。全仓剩余失败均在 WP42 进行中的文件。 |
 | 45 | Version 2.3: server API and run control (checkpointed web runs, cancel, resume, trace in the stream, exports, plan preview) | not started | Needs WP41 and WP42. |
 | 46 | Version 2.3: page, verdict and chart | not started | Needs WP44. |
 | 47 | Version 2.3: page, process (debate, revisions with the audit's findings, risk, judges) | not started | Needs WP44. |
@@ -2069,6 +2069,31 @@ Files created or changed: `insightcrew/flows/stage_risk.py`、`insightcrew/flows
 Committed: 本包文件与本文件按路径一次提交（见 git log），消息 `WP41: ...`。未推送。
 
 For the next session: WP38 的前提（WP41、WP42 与干净结合检查）还差 WP42 与结合检查；WP38 读问题 36（提示词）与 37（D2 窗口）。
+
+### 2026-11-20 (WP44) · page foundation：拆分、拼装、模型、标签、外壳 · delegated session (GLM-5.3, via ZCode)
+
+Result: done.
+
+Commands run, with the last lines of their output:
+  uv run pytest tests/test_run_page.py tests/test_page_js.py tests/test_page_labels.py -q
+  ............................. [100%]  29 passed            # 16 项原有不变 + 新增
+  uv run pytest -q --ignore=tests/test_trace.py --ignore=tests/test_verify.py
+  2 failed, 860 passed                                     # 2 个失败均为 tests/test_cli.py 的 resume 两项（WP42 进行中）
+  uv run ruff check .        # 剩余 6 处全在 WP42 的 check.py/resume.py/verify.py/test_trace.py/test_verify.py
+  uv run pyright             # 0 errors, 0 warnings, 0 informations（全仓）
+  uv run insightcrew scenarios（IC_FORCE_OFFLINE=1）
+  ✓ tools_out_of_range：相符 …… ✓ unknown：相符   # 34/34 相符
+  for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew replay "$d"; done
+  43 / 43 replays 一致
+  node --test tests/js/model.test.mjs tests/js/trace.test.mjs
+  ℹ tests 7  ℹ pass 7  ℹ fail 0        # node --check 拼装脚本由 test_page_js.py 代跑，rc=0
+Not run, and why: 前半程 `insightcrew` 命令被 WP42 未写完的 `cli.py`（import verify）挡住，场景与重放证明改经同一代码路径的库调用完成，WP42 落地 verify.py 后又用命令行原样补跑一遍（上面就是命令行输出）；`scripts/check.sh` 未代跑（WP42 仍在进行，5.6 规则 6）；无网络请求、无真实模型、未读未打印 `.env`。
+Unverified: 无——本包四步各自验证；浏览器核对见下。
+Files created or changed: `insightcrew/app/assets/js/`（00-core/05-labels/10-model/20-shell/25-activity/30-verdict/35-process/40-evidence/45-audit/50-usage/55-launch/60-events/90-boot，13 个）、`insightcrew/app/assets/css/`（00-tokens/10-base/30-verdict/35-process/40-evidence/50-usage/55-launch，7 个）、`insightcrew/app/assets/page.html`（外壳与两标记行）、`insightcrew/app/replay_html.py`（拼装 + `trace` 参数）、`tests/js/`（helpers + model + trace）、`tests/test_page_js.py`、`tests/test_page_labels.py`、`tests/test_run_page.py`（加 8 项，原有不动）、`docs/HANDOFF.md`（状态行与本条目）。
+浏览器核对（IC_FORCE_OFFLINE=1，端口 9999，`create_app` 直起——当时 cli.py 尚被 WP42 挡着）：直播模式从表单发起 demo，流水线推进、`进行中`→`交付` 状态胶囊、审计打回的 ↺1 段、结论卡与三价位图线、五个页签逐个点开（证据页签在 channels_clean 上显示两条通道"可用"、基本面事实表、公告条目表与信号；原始事件 49 张卡片、播放控制、事件详情抽屉含提示词）；`replay.html` 经静态服务打开（file: 不可导航，用 python http.server 同端口），完整渲染。四张截图存会话产物。图形浏览器核对此处已做，不留给协调者。
+发现并修复一处真缺陷：渲染循环只挂 rAF，而隐藏页签/内嵌浏览器会冻结 rAF，页面整页不画；现在 rAF 之外兜一个 150ms 定时器（内嵌浏览器隐藏页签实测生效）。另修 `collectCites` 的 else 悬挂（无花括号的 for/if 链使递归永不执行，Node 测试抓到）。
+Committed: 本包文件与本文件按路径一次提交（见 git log），消息 `WP44: ...`。未推送。
+For the next session: WP46–WP50 可开工；两处对后续包的提示——(1) 空页签 35-process/45-audit 的占位文案与"规则表、评审仍在证据页签"的现状按任务书保留，WP47/WP48 接手时拆走；(2) `cite(id)` 徽章与引用抽屉已在 00-core/60-events 落地（点开显示事实/条目与"谁引用了它"），WP48 换成完整证据面板即可。
 
 ## 9. Prompts for starting a session
 

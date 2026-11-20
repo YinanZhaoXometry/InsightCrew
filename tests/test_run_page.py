@@ -3,12 +3,17 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 
+import pytest
+
+from insightcrew.app import replay_html
 from insightcrew.app.replay_html import live_page, render, write
 from insightcrew.kernel.events import Event
 
 ASSET = live_page()
+ASSETS = Path(replay_html.__file__).resolve().parent / "assets"
 
 
 def _events() -> list[Event]:
@@ -206,3 +211,72 @@ def test_v22_events_are_embedded() -> None:
         assert key in keys
     actors = {e["actor"] for e in payload["events"]}
     assert "risk.aggressive" in actors
+
+
+# ---- 版本 2.3（BLUEPRINT 20.9）：源文件拆分、拼装、页签外壳与轨迹嵌入 ----
+
+
+def test_the_source_layout_is_the_one_of_20_9() -> None:
+    assert sorted(path.name for path in (ASSETS / "js").glob("*.js")) == [
+        "00-core.js", "05-labels.js", "10-model.js", "20-shell.js", "25-activity.js",
+        "30-verdict.js", "35-process.js", "40-evidence.js", "45-audit.js", "50-usage.js",
+        "55-launch.js", "60-events.js", "90-boot.js"]
+    assert sorted(path.name for path in (ASSETS / "css").glob("*.css")) == [
+        "00-tokens.css", "10-base.css", "30-verdict.css", "35-process.css",
+        "40-evidence.css", "50-usage.css", "55-launch.css"]
+    assert (ASSETS / "page.html").is_file()
+
+
+def test_the_page_assembles_every_module_in_file_order() -> None:
+    page = live_page()
+    last = -1
+    for folder, suffix in (("css", ".css"), ("js", ".js")):      # 样式在前，脚本在后，各自按文件名序
+        for path in sorted((ASSETS / folder).glob("*" + suffix)):
+            at = page.index(path.read_text(encoding="utf-8").strip())
+            assert at > last, f"{path.name} 不在拼装顺序里"
+            last = at
+
+
+def test_the_shell_declares_the_tabs_and_empty_views_say_who_fills_them() -> None:
+    for tab in ("过程", "证据", "规则与审计", "用量与耗时", "原始事件"):
+        assert tab in ASSET, tab
+    for view in ("view-process", "view-evidence", "view-audit", "view-usage", "view-events"):
+        assert f'id="{view}"' in ASSET, view
+    assert "fold" in ASSET and "registerView" in ASSET           # 唯一的模型与视图注册表
+    assert "WP47" in ASSET and "WP48" in ASSET                   # 空页签写明由哪个包填充
+    assert "run-state" in ASSET                                  # 页头的运行状态
+
+
+def test_render_embeds_the_trace_beside_events_and_bars() -> None:
+    trace: list[dict[str, object]] = [{"ts": "2026-11-20T00:00:01.000+00:00", "kind": "role.started",
+              "step": "technical#1", "role": "technical", "model": "scripted"}]
+    payload = _embedded(render(_events(), bars=[{"date": "2026-09-29", "close": 173.24}], trace=trace))
+    assert payload["trace"] == trace
+    assert payload["bars"] == [{"date": "2026-09-29", "close": 173.24}]
+
+
+def test_render_without_a_trace_embeds_null() -> None:
+    assert _embedded(render(_events()))["trace"] is None
+
+
+def test_live_page_is_deterministic() -> None:
+    assert live_page() == live_page()
+
+
+def test_the_assembler_refuses_a_shell_without_markers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    bad = tmp_path / "page.html"
+    bad.write_text("<html><style></style><script>(() => {})();</script></html>", encoding="utf-8")
+    monkeypatch.setattr(replay_html, "_PAGE", bad)
+    with pytest.raises(RuntimeError):
+        live_page()
+
+
+def test_the_assembler_refuses_a_script_that_closes_the_tag(tmp_path: Path,
+                                                            monkeypatch: pytest.MonkeyPatch) -> None:
+    assets = tmp_path / "assets"
+    shutil.copytree(ASSETS, assets)
+    bad_js = assets / "js" / "99-bad.js"
+    bad_js.write_text("const bad = 1; // " + chr(60) + "/script>\n", encoding="utf-8")
+    monkeypatch.setattr(replay_html, "_ASSETS", assets)
+    with pytest.raises(RuntimeError):
+        live_page()

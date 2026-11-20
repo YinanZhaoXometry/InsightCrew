@@ -1,0 +1,3 @@
+/* 40-evidence.css —— 证据与规则审计页签（规则与审计两节暂随证据页签，WP48 拆走）。 */
+.signals { margin:6px 0; padding-left:18px; } .signals li { margin:3px 0; }
+.signals .mono { margin-right:4px; }

@@ -1,0 +1,17 @@
+/* 00-tokens.css —— 设计令牌：颜色、间距、字号、圆角；暗色一套在 prefers-color-scheme: dark 下生效。 */
+:root {
+  --ink:#18202c; --soft:#4a5565; --muted:#7a8496; --line:#e2e7ee; --bg:#f4f6f9; --card:#ffffff; --lane:#f7f9fc;
+  --accent:#3451d1; --accent-bg:#eaeefc; --good:#18794e; --good-bg:#e6f4ec; --bad:#b42318; --bad-bg:#fdecea;
+  --warn:#96600c; --warn-bg:#fdf3df; --code:#0f7b8a; --code-bg:#e4f4f6; --radius:10px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --fs-1:11px; --fs-2:12.5px; --fs-3:13.5px; --fs-4:14px; --fs-5:18px; --fs-6:22px;
+  --radius-s:7px; --radius:10px; --radius-l:14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink:#e7ecf3; --soft:#b3bdcc; --muted:#8b96a8; --line:#313b4c; --bg:#12161e; --card:#1a2029; --lane:#20262f;
+    --accent:#8fa5f5; --accent-bg:#232c4d; --good:#5ec894; --good-bg:#173226; --bad:#f08a80; --bad-bg:#3a1d1a;
+    --warn:#e0b05e; --warn-bg:#382b14; --code:#66c4d0; --code-bg:#123237;
+  }
+}

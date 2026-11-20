@@ -1,0 +1,61 @@
+/* 00-core.js —— 小工具：DOM 助手、格式化、引用徽章与视图注册表。
+   本文件（以及一切编号 20 以下的源文件）在加载时不碰 document 或 window，
+   只有被调用时才会，这样 Node 测试不用浏览器就能加载它们（BLUEPRINT 20.9）。 */
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+const $ = (id) => document.getElementById(id);
+
+function el(tag, props, ...kids) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props || {})) {
+    if (value === null || value === undefined || value === false) continue;
+    if (key === "class") node.className = value;
+    else if (key === "on") for (const [name, fn] of Object.entries(value)) node.addEventListener(name, fn);
+    else node.setAttribute(key, value === true ? "" : String(value));
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    node.append(kid instanceof Node ? kid : String(kid));       // 字符串成为文本节点，不会被当作标记
+  }
+  return node;
+}
+
+function svg(tag, attrs, text) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs || {})) node.setAttribute(key, String(value));
+  if (text !== undefined) node.textContent = String(text);
+  return node;
+}
+
+function fill(node, ...kids) {
+  node.replaceChildren(...kids.flat(Infinity).filter((kid) => kid !== null && kid !== undefined && kid !== false));
+}
+
+function num(value, places = 4) {                 // 展示格式：至多 places 位小数，去掉多余的零
+  if (value === null || value === undefined) return "—";
+  const text = Number(value).toFixed(places).replace(/\.?0+$/, "");
+  return text === "" || text === "-" || text === "-0" ? "0" : text;
+}
+const count = (value) => Number(value || 0).toLocaleString("en-US");
+const reasonText = (reason) => REASON[reason] || reason || "";
+const withUnit = (value, unit) => value === undefined || value === null ? "—"
+  : num(value) + (unit === "%" ? "%" : unit ? " " + unit : "");
+
+function table(header, rows, numeric = []) {
+  const cell = (tag, value, i) => el(tag, { class: numeric.includes(i) ? "num" : null }, value);
+  return el("table", null,
+    el("thead", null, el("tr", null, header.map((h, i) => cell("th", h, i)))),
+    el("tbody", null, rows.map((row) => el("tr", { class: row.cls || null }, row.map((v, i) => cell("td", v, i))))));
+}
+
+/* 视图注册表：每个视图 {id, title, render(model, element)}，可选 always（总在渲染的部分）。
+   外壳每帧至多调一次 render，只画可见页签与总在渲染的部分（BLUEPRINT 20.9）。 */
+const VIEWS = [];
+const registerView = (view) => VIEWS.push(view);
+
+/* 引用徽章：角色在文本里引用的事实或条目编号，点开它指名的内容（WP48 会换成完整的证据面板） */
+function cite(id) {
+  return el("button", { class: "chip mono", type: "button", title: "引用：" + id,
+                        on: { click: () => openCite(id) } }, id);
+}
