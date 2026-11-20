@@ -10,9 +10,14 @@ run_role 是系统里唯一运行智能体的地方。它做且只做五件事�
 run_role 等于两半相连，产生的事件与拆分前完全一致。带工具的角色在计算这半
 把 Run.tools 点名的函数交给 Agent；内核只加统一的限次与重复缓存包装，
 不认识任何一个具体的工具名。
+
+版本 2.3（BLUEPRINT 20.5）加上唯一的观察者钩子：Run.observe 在每次模型调用
+开始与结束时收到通知（role.started / role.finished / role.failed），仅供测量；
+观察者抛异常不影响运行，无观察者时不多走一次时钟，也从不写日志。
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import time
 from collections.abc import Callable, Mapping
@@ -106,6 +111,7 @@ class Run:
     output_mode: OutputMode = "auto"   # auto：由模型的能力档案决定用哪种结构化输出方式
     tools: Mapping[str, Callable[..., Any]] = field(default_factory=dict)   # 工具名 -> 函数；默认没有工具
     clock: Callable[[], float] = time.monotonic
+    observe: Callable[[str, Mapping[str, Any]], None] | None = None   # 观察者钩子（BLUEPRINT 20.5）
     _steps: dict[str, int] = field(default_factory=dict)
     _requests: int = 0
     _started: float | None = None
@@ -226,6 +232,17 @@ class Deferred:
     failure: Exception | None          # output 为 None 时的原因，commit 时转为 Malformed
 
 
+def _notify(run: Run, kind: str, **data: Any) -> None:
+    """观察者钩子的唯一入口（BLUEPRINT 20.5）：只报事，不参与运行。
+    观察者抛任何异常都被吞掉（不变量 23）；调用点各自先守卫 run.observe，
+    无观察者时一次时钟也不多走。"""
+    observer = run.observe
+    if observer is None:
+        return
+    with contextlib.suppress(Exception):
+        observer(kind, data)
+
+
 async def run_role_deferred(run: Run, role: Role) -> Deferred:
     """run_role 的前半段：取视图、渲染、过闸门、运行智能体、备好入账材料。
 
@@ -241,6 +258,11 @@ async def run_role_deferred(run: Run, role: Role) -> Deferred:
     functions = tuple(run.tools[name] for name in role.tools)   # 点名的工具才可见
     ledger = _ToolLedger(role.max_tool_calls) if role.tools else None
     model = run.models.for_role(role)
+    began = 0.0
+    if run.observe is not None:                          # 无观察者时一次时钟也不多走
+        began = run.clock()
+        _notify(run, "role.started", step=step, role=role.name, tier=role.tier,
+                model=model.model_name)
     usage = RunUsage()
     output: BaseModel | None = None
     failure: Exception | None = None
@@ -259,6 +281,9 @@ async def run_role_deferred(run: Run, role: Role) -> Deferred:
             run.spent(usage.requests)
             run.journal.append("model.failed", step=step, actor=role.name,
                                data={"model": model.model_name, "error": str(e)})
+            if run.observe is not None:
+                _notify(run, "role.failed", step=step, role=role.name,
+                        ms=int((run.clock() - began) * 1000))
             raise Halt("model_unavailable", str(e)) from e
 
     responses = [m for m in messages if isinstance(m, ModelResponse)]
@@ -276,6 +301,12 @@ async def run_role_deferred(run: Run, role: Role) -> Deferred:
     if ledger is not None:                             # 工具角色的两项计数（工具调用与结果本身在 messages 里）
         data["tool_calls"] = ledger.calls
         data["repeated_tool_calls"] = ledger.repeated
+    if run.observe is not None:
+        _notify(run, "role.finished", step=step, role=role.name,
+                ms=int((run.clock() - began) * 1000), ok=output is not None,
+                requests=usage.requests, input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                tool_calls=ledger.calls if ledger is not None else 0)
     return Deferred(role=role, step=step, caused_by=tuple(causes), data=data,
                     output=output, usage=usage, cost=cost, failure=failure)
 

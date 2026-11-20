@@ -83,7 +83,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 38 | Real-model runs and ablation, as amended by BLUEPRINT 20.14 | not started | **Runs on `v2.3`, after WP41 and WP42 and a clean join check.** Cap 2 USD (owner, 2026-11-20): no further asking below it; at 1.60 USD spent, stop and ask. The offline scaffold (`evals/v22.py`, nine cells) is in place. |
 | 39 | Documents, notices, packaging, as amended by BLUEPRINT 20.14 | in progress | The version 2.2 documents and the notices list are done (02:05 session). **Runs last, after version 2.3 is done or cut:** describe 2.3 as built, move BLUEPRINT 20.16's list to ROADMAP, rebuild and verify the zip. |
 
-| 40 | Version 2.3: tag `v2.2`, branch `v2.3`, the plan committed, the kernel observer hook | in progress | Alone. The only package that edits `insightcrew/kernel/`. |
+| 40 | Version 2.3: tag `v2.2`, branch `v2.3`, the plan committed, the kernel observer hook | done | Tag `v2.2` on `549c40f`; branch `v2.3`; plan commit `45b5b06`. Kernel change exactly 20.5 (`Run.observe`, `_notify` in `contextlib.suppress`, three guarded calls in `run_role_deferred`; only `contextlib` imported); `test_kernel.py`/`test_kernel_v22.py` untouched and green; 5 new tests in `tests/test_kernel_v23.py` (no-observer identity incl. the clock count, observer order and fields, tool role's `tool_calls`, raising observer journal-equal, `role.failed` before the Halt). 830 tests, ruff/pyright clean; 34/34 scenarios ✓; 43/43 replays 一致. |
 | 41 | Version 2.3: flow hardening (risk debate awaited, resume across the analyst fan-out and with tools, siblings' spend) | not started | Needs WP40. On WP38's path. |
 | 42 | Version 2.3: app hardening (`[flow] channels`, resume, torn journal line), the trace, the `verify` command | not started | Needs WP40. On WP38's path. |
 | 43 | Version 2.3: test harness, prompt-integrity tests, `scripts/check.sh`, the CI file | not started | Needs WP40. |
@@ -1974,6 +1974,31 @@ Files created or changed: `docs/BLUEPRINT.md` (section 20, one introduction bull
 Committed: no. WP40 commits the plan as `Plan: version 2.3` after it creates the branch.
 
 For the next session: WP40, alone, with the prompt in section 9. Then WP41 to WP44 at the same time.
+
+### 2026-11-20 (WP40) · tag `v2.2`, branch `v2.3`, plan committed, kernel observer hook · delegated session (GLM-5.3, via ZCode)
+
+Result: done — `git tag v2.2` on `549c40f`, `git switch -c v2.3`, the plan (`docs/BLUEPRINT.md`, `docs/HANDOFF.md`, `AGENTS.md`) committed as `45b5b06` `Plan: version 2.3`; the kernel change of BLUEPRINT 20.5 and nothing more, plus `tests/test_kernel_v23.py`.
+
+The kernel change, exactly 20.5: `Run` gains `observe: Callable[[str, Mapping[str, Any]], None] | None = None` after `clock`; module-level `_notify(run, kind, **data)` calls the observer inside `contextlib.suppress(Exception)` (with a `None` early return so pyright stays clean); `run_role_deferred` calls it in three places, each guarded by `if run.observe is not None:` — after `model = run.models.for_role(role)` it records `began = run.clock()` and notifies `role.started` (step, role, tier, model); in the `except (ModelAPIError, UserError)` branch, before `raise`, `role.failed` (step, role, ms); before `return Deferred(...)`, `role.finished` (step, role, ms, ok, requests, input_tokens, output_tokens, tool_calls = `ledger.calls` or 0). `ms = int((run.clock() - began) * 1000)`. The only new import is `contextlib`; the module docstring gained a version 2.3 paragraph. Nothing else: no file written, no journal event, `commit` untouched.
+
+Commands run, with the last lines of their output:
+  uv run pytest -q → 830 passed in 25.69s（825 + 5 新增）
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  uv run insightcrew scenarios → 34 个全部 ✓ 相符
+  43 个归档逐一 IC_FORCE_OFFLINE=1 replay → OK=43 FAIL=0
+  git tag -l → v1-data-analyst v2.0 v2.1 v2.2
+  git diff v2.2 -- insightcrew/kernel/ → 仅 runtime.py 的钩子四处改动（`refname 'v2.2' is ambiguous` 是分支与标签同名的常规警告，v2.1 亦然，非歧义错误）
+
+新测试（tests/test_kernel_v23.py，20.5 的四项验收 + 时钟计数）: 无观察者时事件与 2.2 逐条一致、`model.called` 数据键集恰为六键、时钟恰走 2 次（有观察者才 4 次，正是 test_kernel.py:142 计数时钟所查）；记录观察者依序收到 `role.started`（step/role/tier/model 逐一相符）与 `role.finished`（八个字段恰为其集，ok/requests/tokens/tool_calls 逐值，ms 为非负 int）；带工具角色 `tool_calls` 记实际执行数（1）、requests=2；观察者抛异常时日志与无观察者运行完全相等、照常交付（不变量 23）；剧本无回答 → Halt `model_unavailable` 之前收到 `role.failed`（恰 step/role/ms），日志仍只有 `model.failed`。
+
+Not run, and why: 未启动 serve、未发任何网络请求、未读 `.env`、未花真实模型（本包一样都不需要）；未动 WP41 起的任何文件。
+
+Files created or changed: `insightcrew/kernel/runtime.py`（仅 20.5）、`tests/test_kernel_v23.py`（新）、`docs/HANDOFF.md`（状态行与本条目）。
+
+Committed: 计划 `45b5b06`（Plan: version 2.3）；随后本包文件按路径一次提交（runtime、新测试与本文件），消息 `WP40: tag v2.2, branch v2.3, plan committed; kernel observer hook (BLUEPRINT 20.5)`。未推送。
+
+For the next session: WP41 · WP42 · WP43 · WP44 可同时开始（5.6 第 2 步）；内核自本包后冻结，谁需要改内核就停下问。
 
 ## 9. Prompts for starting a session
 
