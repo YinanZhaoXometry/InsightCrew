@@ -4,7 +4,7 @@ The status board for the rewrite described in [BLUEPRINT.md](BLUEPRINT.md). The 
 
 **Every session reads this file first, and before it ends updates [section 2](#2-status) and appends to [section 8](#8-session-log).**
 
-Last updated: 2026-11-21 00:35, by the fixes of questions 43, 44 and 45 (owner-authorised, after version 2.3 closed; question 38 at 00:30). Submission is 2026-11-23 23:59.
+Last updated: 2026-11-21 01:10, by the README new-user check (owner-asked; questions 38 and 43 to 45 earlier tonight). Submission is 2026-11-23 23:59.
 
 > **Version 2.3 is built: work packages 40 to 52, WP38 and WP39 are done** (status table below); what remains is the owner's acceptance and the open questions of section 7. Questions 38, 43, 44 and 45 were fixed on 2026-11-21 (session log). The rest of this paragraph was written before the build and is kept as history. Version 2.3 was planned and authorised as work packages 40 to 52, in [BLUEPRINT.md section 20](BLUEPRINT.md#20-version-23-hardening-run-control-and-the-workbench-page). It fixes the defects a review of version 2.2 found (five of them before WP38 spends money), adds a timing trace beside the journal, cancel and resume from the page, and rebuilds the run page around the user's questions. Start with WP40 (alone). [Section 5.6](#56-version-23-work-packages-40-to-52) says which packages run at the same time and which files each owns; [section 4](#4-what-the-owner-has-authorised) the version 2.3 authorisations. **WP38 now runs on `v2.3`, after WP41 and WP42, with a cap of 2 USD. WP39 comes last.** Version 2.2 as built stays at the tag `v2.2`, which WP40 creates.
 
@@ -2481,6 +2481,23 @@ Commands run, with the last lines of their output:
   提交 `32fd8e9` 后 git archive 重建 `../InsightCrew.zip`（484 个文件，无 .env、runs/、data/market/real/、.venv）；空目录 /tmp/q4x-fresh 解包 → uv sync 成功 → 910 passed → IC_FORCE_OFFLINE=1 analyze --no-open「结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified」。本段入库后 zip 从最终 HEAD 再建一次（与已验证的树只差本段文字）。
 
 Not run, and why: 浏览器里的"首检查点前取消→续跑"未重做（取消须落在约 46ms 内，WP51 也只能经 API 背靠背做到；路径已由 resume_run 的测试覆盖，网页续跑调的是同一个函数）。无网络请求、无真实模型、未读未打印 `.env`。
+
+### 2026-11-21 01:10 · README 新用户核验 · coordinator session (ZCode)
+
+Result: done — owner 要求核验 README 对新用户是否充分（上手启动、断网试用、真实 AI 联网、Windows/macOS、说明与支持），并批准了"前 2 条"（提交改动、重建 zip）。
+
+核验（全新用户模拟：`git archive HEAD` 解压到空目录，无 `.env`，`uv sync` 走离线缓存）：
+  上手：`uv sync` → `analyze --no-open` → `serve --no-open`（`GET /` 200、页面自包含 212KB、`/api/runs` 列出该次 run 且 mode=scripted；启动日志自带无 key 原因与「Ctrl-C 停止」）→ `verify` → 通过，全部一次成功。
+  断网：macOS `sandbox-exec '(version 1)(allow default)(deny network*)'` 下无 key demo 完整交付（`delivered（原因 ok）；accepted 2/3；verified`，exit 0）——README 此前只说"无需 key"，未说装好后可断网。
+  真实 AI：文档核验（`.env.example` 变量名与 README 一致；成本区间出自 EVALUATION 的归档 journal）；未实跑——每笔花费须先问 owner。
+  Windows/macOS：`start.sh` 实证跑通；`start.bat` 逐行审查（`cd /d`、`where uv`、缺 uv 时给 PowerShell 安装命令并 `pause`）；「Without uv」一节含 Windows 路径。Windows 端未实跑（本机为 macOS）。
+  结论：五项中四项达标；断网试用功能达标但 README 未明说——Quick start 补了一句："After `uv sync`, trying it uses no network at all: the demo, the page and the audit run entirely on your machine, so you can disconnect."
+
+Commands run, with the last lines of their output:
+  提交 `b5a9ad2`（README 一行，按路径）后 `git archive` 重建 `../InsightCrew.zip`（484 个文件；无 `.env` 本体、`runs/`、`data/market/real/`、`.venv/`；新句在包内）。
+  空目录 `/tmp/zipverify` 解包 → `uv sync` 成功 → `uv run pytest -q` → `910 passed in 43.93s` → `IC_FORCE_OFFLINE=1 analyze --no-open`「结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified」exit 0。本段入库后 zip 从最终 HEAD 再建一次（与已验证的树只差本段文字）。
+
+Not run, and why: 真实模型 `analyze` 未跑（花费须先问；owner 未选可选项 3）。网络仅 127.0.0.1 本地 serve；未读未打印 `.env`。
 
 ## 9. Prompts for starting a session
 
