@@ -80,7 +80,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 35 | Version 2.2: memory, `settle`, `backtest` | done | Overnight session. stage_memory 正文（lessons：重放替身的 journaled_lessons 原样奉还（决策 44）、场景内联字典行先校验再 select_lessons、空时写 none_known；record：交付运行按黑板组 DecisionRecord，替身写入为空操作）；flows/settle：待决逐条两路核对六个计算字段，一致才落账（分歧保持待决并汇报），基准经同一行情端口读（宇宙没有 SPY/_HSI 时两端无价、结果照算——问题 22 的读法），每个新结果在 runs/memory/settle/<id>/ 开小运行跑 reflector、lesson_findings 审计通过才把教训随结果一次 resolve 落账（问题 31 的读法），复盘不可用或审计不过则结果照落、教训留空；settle/backtest 命令落地（真实模型没有 --yes 拒绝、退出码 2；进度 progress.json 原子写、同 --run-id 续跑跳过已完成格子、批次预算超限即停、收尾把 to 结一遍、按评级汇总笔数/已结算/平均收益/平均超额/先触止损/目标）。两场景 ✓（memory_lessons 只见分析日前的教训、memory_record 空起点照常交付）；tests/test_memory_flow.py 8 项 + tests/test_backtest.py 7 项绿（三日期网格 08-03/08-10/08-17、先结算后分析、不变量 20 逐格核对、同 --run-id 复跑不做新事、batch_tokens=15000 停后加预算续跑补第三格）；test_memory/test_decision_log 原样绿；本包文件 ruff/pyright 干净；21 个既有场景逐一 ✓、归档重放抽 1 个一致（43/43 由 WP36 当夜全量验证）。遗留：test_v22_switches 的 memory 项因 WP29 决策日志锁文件先于 _write 建目录而挂（第 7 节 WP35 请求行）；问题 31（resolve 与教训的次序）、32（场景空 memory 的 falsy 缝）。 |
 | 36 | Version 2.2: report, page, `serve` | done | Overnight session. 六个新节全部按键驱动（组合状态/风险三方意见（只立场与批评）/工具事实进事实表并标注/新闻与宏观（预测市场单列"来源原话，未经核验"）/社交情感/用到的课程；run/wall_ms 在板上才画墙钟——问题 20 的 C 案下从不出现，分支已备）；页面：news/sentiment/risk 流水线段与泳道、ACTOR_STAGE/KEY_STAGE 映射、并行分析师组（≥2 位时并列成框、无箭头）、墙钟标签、镜像报告的证据区块、表单五字段（组合文件/风险轮数/工具/记忆/通道多选）经 prepare/open_run 透传，坏组合文件 422 且回复不带路径；replay_html.py 无需改动。本包文件 pytest 71 项绿、ruff/pyright 干净、页面 JS 过 node --check；demo 与 uncovered 的报告新旧模块逐字节相同；21 个既有场景逐一 ✓ 相符；43/43 归档重放一致；新增 13 场景中 12 个的报表已实跑核对（portfolio×3、risk×2、sentiment_clean、news_uncovered、memory×2、tools_out_of_range、news_clean、tools_clean——守卫修复落地后最后两个转绿）；仅 macro_clean 仍被挡：刚刚落地的 stages.audit 守卫把 `board.get("macro/facts", [])` 的第二参（应为类型）写成了列表，macro 键在板即 `TypeAdapter([])` 崩（该行的修正属 stages.py 的 owner）；宏观区块的报表在单元测试里以手造板键验证。续跑标记未做：日志没有续跑标记事件（按指示跳过）。全仓 pytest 的失败全在他人文件（见日志）。 |
 | 37 | Version 2.2: evaluations | done | Overnight session (问题 29 授权)。`eval all` 打印全部新行并退出 0：inject 加版本 2.2 块（组合状态翻转 ×2、新闻 claim 引未知宏观事实、情绪信号引未知帖、情绪分出带、教训带数字——6/6 发现、0/2 误报）；consistency 加工具块（7 家族 × 3 分析日 × 3 窗口 = 63 次调用，flows/tools 内部两路 + evals 独立复算 recompute 比对）与宏观块（4 序列 × 3 变换 × 8 分析日 = 96 点，macro vs macro_sql）；pit 加六块（新闻 9、社交 9、宏观 91 含 cpi 两次重述逐日 329.4→329.5/337.0→337.2、预测市场 6（fetched_on==as_of，评测自建临时档案、就地实现 19.8 规则，与 WP34 的 stage_news._markets 同一条规则各持一份）、教训 5（含边界日成员断言）、工具 63（漏 bar 检查，诚实端口 vs 无视 as_of 的坏端口同答案））。新测试 16 项（tests/test_inject.py、test_consistency.py、test_pit.py，各含伪造分歧/泄漏的检出用例）。run.py 仅 docstring（`all` 三项未变，新行随各评测打印）。 |
-| 38 | Real-model runs and ablation, as amended by BLUEPRINT 20.14 | in progress | **Runs on `v2.3`, after WP41 and WP42 and a clean join check** (both done; join check clean, coordinator-verified). Cap 2 USD (owner, 2026-11-20): no further asking below it; at 1.60 USD spent, stop and ask. The offline scaffold (`evals/v22.py`, nine cells) is in place. |
+| 38 | Real-model runs and ablation, as amended by BLUEPRINT 20.14 | done | One pilot + all nine cells run on the real model (2026-11-20 evening), archived with `trace.jsonl`; every archive replays 一致 and passes `verify` (53/53 incl. the 43 old). 8 delivered + 1 review (`acme_all_off`, contested). Spent **0.3174 USD of the 2 USD cap** (pilot 0.0383 + cells 0.2791), plus 0.0249 journaled + one aborted in-flight call (≤0.014) wasted on a first attempt routed without the trace (see log). No prompt was changed: no journal showed a fault; question 36's sentence stays (manager outputs never mention `memory/status`). Model client retries confirmed from installed source (20.2). Real-bar cells: news/sentiment/macro (and fundamentals/disclosures) channels all `unavailable`, as the amendment says. Timing from the traces: the five-analyst group in `acme_all_on` overlapped (sum 48.0s vs span 13.7s). |
 | 39 | Documents, notices, packaging, as amended by BLUEPRINT 20.14 | in progress | The version 2.2 documents and the notices list are done (02:05 session). **Runs last, after version 2.3 is done or cut:** describe 2.3 as built, move BLUEPRINT 20.16's list to ROADMAP, rebuild and verify the zip. |
 
 | 40 | Version 2.3: tag `v2.2`, branch `v2.3`, the plan committed, the kernel observer hook | done | Tag `v2.2` on `549c40f`; branch `v2.3`; plan commit `45b5b06`. Kernel change exactly 20.5 (`Run.observe`, `_notify` in `contextlib.suppress`, three guarded calls in `run_role_deferred`; only `contextlib` imported); `test_kernel.py`/`test_kernel_v22.py` untouched and green; 5 new tests in `tests/test_kernel_v23.py` (no-observer identity incl. the clock count, observer order and fields, tool role's `tool_calls`, raising observer journal-equal, `role.failed` before the Halt). 830 tests, ruff/pyright clean; 34/34 scenarios ✓; 43/43 replays 一致. |
@@ -2289,6 +2289,57 @@ Unverified: keep-alive 的 15 秒间隔只经代码路径（测试里运行秒�
 Files created or changed: `insightcrew/app/server.py`（重写运行控制与 API 部分）、`insightcrew/app/wiring.py`（仅 `write_page` 与一行 import）、`tests/test_server.py`（+8 更 6）、`docs/HANDOFF.md`（状态行、问题 42/43、本条目）。他人未提交改动（assets/ 的 12 个页面文件属 WP51 性质、cli.py 与 evals/ 属 WP38）一律未动未提交。
 Committed: 本包三文件与本文件按路径一次提交，消息 `WP45: ...`。未推送。
 For the next session: WP50 的 Unverified 清单可对上：plan 200 实样、cancel 202/409、resumable、导出 HEAD/GET、事件流 trace 行（直播在飞计时器与瀑布自此有数据）；WP46 的中断态续跑按钮、WP49 的直播瀑布同理。问题 40（model_unavailable 建议句）若主人选"允许 review 续跑"，`/api/runs/{id}/resume` 的服务端拒绝与 `app/resume.py` 各改一处；问题 43（带组合的运行续不了跑）在 `app/resume.py`（WP42 域）。
+
+### 2026-11-20 21:15 · WP38（版本 2.2 真实模型运行，按 20.14 修正案在 v2.3 执行） · delegated session (GLM-5.3, via ZCode)
+
+Result: done — 一个试点 + 九个格子全部在真实模型上跑完并归档（各带 trace.jsonl），全部重放一致、全部 verify 通过；共花 0.3174 USD（另有一次走错入口的作废尝试 0.0249 USD 已入账 + 一次被中断的在飞调用 ≤0.014 USD 未入账），远低于 1.60 USD 停下线。8 格交付、1 格 review（acme_all_off，评审 contested——真实结果，不是故障）。提示词一个都没改：没有任何日志显示故障。
+
+20.2 的重试确认（试点前读安装源码，记录在案）：**模型客户端已经重试瞬时错误，内核不需要加。** 链路：`adapters/models.py::build("deepseek:…")` → pydantic_ai `DeepSeekProvider` → `_OpenAISDKProvider._create_openai_client` 构造 `openai.AsyncOpenAI` 时不传 `max_retries` → openai 3.51.0 的 `openai/_constants.py:8` `DEFAULT_MAX_RETRIES = 2` 生效。SDK 的 `_base_client.py` 在以下情况指数退避重试（初 0.5s、封顶 8s、抖动 0–25%、Retry-After 最多遵 120s）：连接错误与请求超时、HTTP 408/409/429/≥500（`_should_retry`）。pydantic_ai 自身不加一层也不改数字（`models/_sdk_retries.py::with_max_retries` 只在 ModelSettings 点名 max_retries 时才换客户端副本，本项目从不设）。本次 9 格 + 试点共 102 次调用里只出现 2 次 requests>1（acme_all_off 与 wall_serial 各 1），重试由该层消化，无一上抛。
+
+试点（runs/20261120-202059-ACME-2026-09-30-a7c3，已归档）：ACME@2026-09-30 全能力（五通道+风险辩论+工具+记忆+并行），CLI analyze 起，delivered / accepted 2/3 / verified，审计 0 发现、0 重试，成本 0.038309 USD。读日志结论：通道全 available 且主管论点真引用了通道证据（D1/D2 与基本面事实）；技术分析师收到了 indicator 工具（TECHNICAL_TOOLS）但账本已给足所需事实，0 次调用（后续所有格子同样 0 次——工具机制由 WP33 的两个脚本化场景与内核测试证明，真实模型在事实齐备时不主动调工具，记录为发现，不是故障）；问题 36 的 `memory/status` 句：试点与全部记忆开启运行的主管论点都没有提及它，无故障迹象——**句子保留，manager 不加读**，问题 36 留给主人终裁。
+
+九个格子（`eval v22`，串行执行，逐格累计成本；汇总在 `evals/archive/v22.json`，运行目录已留在 runs/）：
+
+| 格子 | 运行 | 结果 | 评级 | 调用/重试 | token | 成本 USD |
+|---|---|---|---|---|---|---|
+| acme_all_on | …-203125-ACME-…-2794 | delivered ok | Hold | 15/0 | 113906 | 0.045239 |
+| acme_all_off | …-203551-ACME-…-84eb | review contested | — | 12/1 | 107299 | 0.048487 |
+| acme_risk_on | …-204118-ACME-…-fa62 | delivered ok | Hold | 12/0 | 84220 | 0.028055 |
+| acme_tools_on | …-204440-ACME-…-34af | delivered ok | Hold | 7/0 | 41946 | 0.017182 |
+| acme_portfolio | …-204632-ACME-…-7bbf | delivered ok | Hold | 8/0 | 56956 | 0.027410 |
+| aapl_risk_on | …-204953-AAPL-…-023a | delivered ok | Hold | 12/0 | 86248 | 0.032170 |
+| aapl_tools_on | …-205319-AAPL-…-e0d1 | delivered ok | Hold | 8/0 | 47417 | 0.016503 |
+| hk_all_on | …-205454-0700.HK-…-a6d5 | delivered ok | Underweight | 12/0 | 83446 | 0.027859 |
+| wall_serial | …-205745-ACME-…-a933 | delivered ok | Hold | 11/1 | 96528 | 0.036200 |
+
+真实行情格子（AAPL、0700.HK）按修正案没有 news/sentiment/macro 归档（线上数据源从未拉取）， fundamentals/disclosures 也无文件——五个通道全部 `unavailable`（带原因，见结果表），运行照常交付，通道分析师按闸门跳过。记忆开启的运行按 19.13 幂等写入决策日志：试点的 ACME@2026-09-30 先落一条，acme_all_on 同日同标的被忽略，0700.HK 新增一条（待结算）。
+
+并行对串行（全部取自轨迹）：acme_all_on 的五位分析师（technical+四通道）各调用之和 48.0s、组跨度 13.7s——**并行重叠省约 34.3s**（串行等效的 3.5 倍速），这是"并行省墙钟"的直接证据。同形最小一对 acme_all_off（并行）326.9s 对 wall_serial（串行）261.1s **不可作机制结论**：能力全关时分析师组只有 technical 一人（无并行可重），且并行那格走了 contested（多一轮评审与返工、多 1 次调用 1 次重试），差值是模型延迟方差与路径差，不是并行机制的开销。蓝图片名的这对格子只能读出"全关时并行开关不改变行为"（与不变量 19 一致），省时证据以组重叠为准。
+
+作废尝试（如实记录）：第一次跑 `eval v22` 时发现 cli 的 eval 命令把 `flows.analyze.analyze`（无检查点、无 trace）当作 analyze 传给评测——首格 acme_all_on 跑了 9 次调用（0.0249 USD 入账）才发现运行目录没有 trace.jsonl/checkpoints.sqlite，立即停止（另有 1 次在飞 manager 调用被中断，未入日志、估 ≤0.014 USD）。修复：eval 的 v22 分支改传 `wiring.run_flow`（`run_flow_with_checkpoints`，与 analyze 命令同入口；channels 评测维持原入口不动——它的归档是 2.1 时代的证据）。九格随后重跑全部带 trace 与检查点。此修复属"eval 命令（仅当格子需要）"授权范围：没有它，20.14 的"归档轨迹"与"计时取自轨迹"都不可能。
+
+Commands run, with the last lines of their output:
+  IC_FORCE_OFFLINE=1 uv run insightcrew eval v22 → 退出码 2：列出 9 个格子与"需要真实模型"（离线行为保持）
+  冒烟（/tmp 一次性脚本，剧本模型 + 隔离 runs/archive 根）→ 9 格全部 review/model_unavailable、通道状态与表格/归档/停止线逻辑全部按预期，未写仓库
+  uv run insightcrew analyze ACME --date 2026-09-30 --channels … --risk-rounds 1 --tools --memory --no-open → 试点 delivered（accepted 2/3，verified）
+  uv run insightcrew eval v22 → 上表九行 + 结果表 + 计时对比 + 合计 0.2791 USD，退出码 0
+  10 个新归档逐个 IC_FORCE_OFFLINE=1 replay → 全部"一致：…与黑板快照完全相同"
+  10 个新归档逐个 uv run insightcrew verify → 全部"通过"
+  全量 53 个归档 replay → OK=53 FAIL=0；全量 verify → OK=53 FAIL=0
+  uv run pytest -q → 888 passed in 26.77s（880 + WP45 的 8）
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  IC_FORCE_OFFLINE=1 uv run insightcrew scenarios → 34/34 ✓ 相符
+
+Not run, and why: `scripts/check.sh` 未代跑（WP45 同刻在收尾、assets/ 有他人未提交改动，5.6 规则 6；六阶段等价命令已逐一手跑如上）；未发任何数据源网络请求（真实格子的行情用 data/market/real/ 已有文件；news/social/macro 无归档即 unavailable）；未读未打印 `.env`；`insightcrew.toml` 一个开关都没动（全能力经 eval 格子自己的 FlowConfig 打开，等主人定夺默认开关）；`resume` 一次没跑（问题 38）。
+
+Unverified: 真实模型下 tools 格子的"工具被调用"路径——DeepSeek 在账本事实齐备时选择不调用（4 次运行均 0 次），该路径只有脚本化场景（tools_clean/tools_out_of_range）与内核测试覆盖；若主人想让评测真实锻炼一次工具，需改 technical.md 的措辞（属提示词变更，须主人点头）。acme_all_off 的 contested 与两次 requests>1 是模型行为方差，无法复跑验证（每跑一次都花钱）。
+
+Files created or changed: `insightcrew/evals/v22.py`（重写：格子定义原样保留，新增 CellResult/读数/轨迹计时（仅标准库解析，evals 不 import app）/归档/结果表/计时对比/run_cells/main/write_archive，停止线 1.60 USD 内建）、`insightcrew/evals/run.py`（v22 入口：交来 open_run/analyze 即跑，否则列格子退出 2）、`insightcrew/app/cli.py`（仅 eval 命令：opener 加 portfolio 透传（acme_portfolio 需要）、v22 改传 wiring.run_flow）、`evals/archive/` 下 10 个新目录（各 journal.jsonl + trace.jsonl）与 `v22.json`、`docs/HANDOFF.md`（状态行与本条目）。roles/prompts/*.md 与 insightcrew.toml 零改动。
+
+Committed: 本包文件按路径一次提交，消息 `WP38: nine real-model cells + pilot archived with traces, 0.32 USD of the 2 USD cap, all replays 一致 and verify 通过, no prompt changes`。未推送。工作树里 assets/ 的 12 个未提交页面改动不是本包的，未动未提交。
+
+For the next session: WP39 收尾时——文档引用本条的结果表与 53 个归档数（43 旧 + 10 新，其中试点一个）；EVALUATION.md 可引 v22.json；剩余额度 2.00 − 0.3174 − 0.0249（作废）≈ 1.66 USD，若主人还想加"全能力串行"格子（与 acme_all_on 同形、只差并行）可比现在更直接地测端到端墙钟，约 0.05 USD 一格。
 
 ## 9. Prompts for starting a session
 

@@ -396,9 +396,14 @@ def evaluate(
                                       base=settings.flow))
     real = _settings(run={"universe": "real"})          # AAPL 与 0700.HK 的格子用 real 数据集
     def opener(request: dict[str, str], *, flow: FlowConfig | None = None,
-               universe: str = "synthetic") -> tuple[Run, Deps]:
-        return open_run(real if universe == "real" else settings, request, flow=flow)
-    raise typer.Exit(eval_cmd.run(ROOT, name, open_run=opener, analyze=run_flow,
+               universe: str = "synthetic", portfolio: str = "") -> tuple[Run, Deps]:
+        # portfolio 由 v22 的 acme_portfolio 格子传入（WP38）；channels 评测不用它。
+        return open_run(real if universe == "real" else settings, request, flow=flow,
+                        portfolio=portfolio)
+    # v22（WP38）走 wiring 的入口：带 SQLite 检查点与 trace.jsonl（20.14 修正案要归档轨迹）；
+    # channels 维持原入口不变（它的归档是 2.1 时代的证据）。
+    analyze_entry = run_flow_with_checkpoints if name == "v22" else run_flow
+    raise typer.Exit(eval_cmd.run(ROOT, name, open_run=opener, analyze=analyze_entry,
                                   base=settings.flow))
 
 

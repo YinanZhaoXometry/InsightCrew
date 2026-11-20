@@ -1,0 +1,14 @@
+{"ts": "2026-11-20T12:44:40.350+00:00", "kind": "role.started", "step": "technical#1", "role": "technical", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:44:53.211+00:00", "kind": "role.finished", "step": "technical#1", "role": "technical", "ms": 12861, "ok": true, "requests": 1, "input_tokens": 3183, "output_tokens": 2326, "tool_calls": 0}
+{"ts": "2026-11-20T12:44:53.215+00:00", "kind": "role.started", "step": "bull#1", "role": "bull", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:44:57.578+00:00", "kind": "role.finished", "step": "bull#1", "role": "bull", "ms": 4363, "ok": true, "requests": 1, "input_tokens": 1652, "output_tokens": 688, "tool_calls": 0}
+{"ts": "2026-11-20T12:44:57.579+00:00", "kind": "role.started", "step": "bear#1", "role": "bear", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:45:06.195+00:00", "kind": "role.finished", "step": "bear#1", "role": "bear", "ms": 8616, "ok": true, "requests": 1, "input_tokens": 2001, "output_tokens": 1186, "tool_calls": 0}
+{"ts": "2026-11-20T12:45:06.196+00:00", "kind": "role.started", "step": "manager#1", "role": "manager", "tier": "deep", "model": "deepseek-v4-pro"}
+{"ts": "2026-11-20T12:45:55.003+00:00", "kind": "role.finished", "step": "manager#1", "role": "manager", "ms": 48806, "ok": true, "requests": 1, "input_tokens": 3178, "output_tokens": 4014, "tool_calls": 0}
+{"ts": "2026-11-20T12:45:55.006+00:00", "kind": "role.started", "step": "trader#1", "role": "trader", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:46:00.078+00:00", "kind": "role.finished", "step": "trader#1", "role": "trader", "ms": 5071, "ok": true, "requests": 1, "input_tokens": 4843, "output_tokens": 727, "tool_calls": 0}
+{"ts": "2026-11-20T12:46:00.083+00:00", "kind": "role.started", "step": "judge.evidence#1", "role": "judge.evidence", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:46:28.126+00:00", "kind": "role.finished", "step": "judge.evidence#1", "role": "judge.evidence", "ms": 28042, "ok": true, "requests": 1, "input_tokens": 6421, "output_tokens": 4595, "tool_calls": 0}
+{"ts": "2026-11-20T12:46:28.130+00:00", "kind": "role.started", "step": "judge.conservative#1", "role": "judge.conservative", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:46:32.936+00:00", "kind": "role.finished", "step": "judge.conservative#1", "role": "judge.conservative", "ms": 4806, "ok": true, "requests": 1, "input_tokens": 6424, "output_tokens": 708, "tool_calls": 0}

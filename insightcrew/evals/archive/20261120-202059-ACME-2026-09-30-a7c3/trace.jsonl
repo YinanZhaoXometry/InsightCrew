@@ -1,0 +1,30 @@
+{"ts": "2026-11-20T12:21:00.127+00:00", "kind": "role.started", "step": "disclosures#1", "role": "disclosures", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:21:00.229+00:00", "kind": "role.started", "step": "fundamentals#1", "role": "fundamentals", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:21:00.237+00:00", "kind": "role.started", "step": "news#1", "role": "news", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:21:00.247+00:00", "kind": "role.started", "step": "sentiment#1", "role": "sentiment", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:21:00.253+00:00", "kind": "role.started", "step": "technical#1", "role": "technical", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:21:05.814+00:00", "kind": "role.finished", "step": "disclosures#1", "role": "disclosures", "ms": 5687, "ok": true, "requests": 1, "input_tokens": 1295, "output_tokens": 521, "tool_calls": 0}
+{"ts": "2026-11-20T12:21:09.601+00:00", "kind": "role.finished", "step": "news#1", "role": "news", "ms": 9364, "ok": true, "requests": 1, "input_tokens": 2620, "output_tokens": 1242, "tool_calls": 0}
+{"ts": "2026-11-20T12:21:09.705+00:00", "kind": "role.finished", "step": "fundamentals#1", "role": "fundamentals", "ms": 9475, "ok": true, "requests": 1, "input_tokens": 2104, "output_tokens": 1325, "tool_calls": 0}
+{"ts": "2026-11-20T12:21:11.303+00:00", "kind": "role.finished", "step": "technical#1", "role": "technical", "ms": 11050, "ok": true, "requests": 1, "input_tokens": 3183, "output_tokens": 1753, "tool_calls": 0}
+{"ts": "2026-11-20T12:21:14.086+00:00", "kind": "role.finished", "step": "sentiment#1", "role": "sentiment", "ms": 13838, "ok": true, "requests": 1, "input_tokens": 1617, "output_tokens": 1942, "tool_calls": 0}
+{"ts": "2026-11-20T12:21:14.093+00:00", "kind": "role.started", "step": "bull#1", "role": "bull", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:21:25.047+00:00", "kind": "role.finished", "step": "bull#1", "role": "bull", "ms": 10954, "ok": true, "requests": 1, "input_tokens": 3604, "output_tokens": 1985, "tool_calls": 0}
+{"ts": "2026-11-20T12:21:25.049+00:00", "kind": "role.started", "step": "bear#1", "role": "bear", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:21:41.265+00:00", "kind": "role.finished", "step": "bear#1", "role": "bear", "ms": 16216, "ok": true, "requests": 1, "input_tokens": 4199, "output_tokens": 2508, "tool_calls": 0}
+{"ts": "2026-11-20T12:21:41.269+00:00", "kind": "role.started", "step": "manager#1", "role": "manager", "tier": "deep", "model": "deepseek-v4-pro"}
+{"ts": "2026-11-20T12:22:46.920+00:00", "kind": "role.finished", "step": "manager#1", "role": "manager", "ms": 65647, "ok": true, "requests": 1, "input_tokens": 5748, "output_tokens": 5287, "tool_calls": 0}
+{"ts": "2026-11-20T12:22:46.925+00:00", "kind": "role.started", "step": "trader#1", "role": "trader", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:22:51.795+00:00", "kind": "role.finished", "step": "trader#1", "role": "trader", "ms": 4870, "ok": true, "requests": 1, "input_tokens": 4720, "output_tokens": 732, "tool_calls": 0}
+{"ts": "2026-11-20T12:22:51.798+00:00", "kind": "role.started", "step": "risk.aggressive#1", "role": "risk.aggressive", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:23:06.992+00:00", "kind": "role.finished", "step": "risk.aggressive#1", "role": "risk.aggressive", "ms": 15193, "ok": true, "requests": 1, "input_tokens": 5143, "output_tokens": 2723, "tool_calls": 0}
+{"ts": "2026-11-20T12:23:06.995+00:00", "kind": "role.started", "step": "risk.conservative#1", "role": "risk.conservative", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:23:30.737+00:00", "kind": "role.finished", "step": "risk.conservative#1", "role": "risk.conservative", "ms": 23742, "ok": true, "requests": 1, "input_tokens": 5628, "output_tokens": 3778, "tool_calls": 0}
+{"ts": "2026-11-20T12:23:30.740+00:00", "kind": "role.started", "step": "risk.neutral#1", "role": "risk.neutral", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:23:47.948+00:00", "kind": "role.finished", "step": "risk.neutral#1", "role": "risk.neutral", "ms": 17208, "ok": true, "requests": 1, "input_tokens": 6391, "output_tokens": 2920, "tool_calls": 0}
+{"ts": "2026-11-20T12:23:47.950+00:00", "kind": "role.started", "step": "trader#2", "role": "trader", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:23:56.293+00:00", "kind": "role.finished", "step": "trader#2", "role": "trader", "ms": 8342, "ok": true, "requests": 1, "input_tokens": 6863, "output_tokens": 1417, "tool_calls": 0}
+{"ts": "2026-11-20T12:23:56.302+00:00", "kind": "role.started", "step": "judge.evidence#1", "role": "judge.evidence", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:24:21.159+00:00", "kind": "role.finished", "step": "judge.evidence#1", "role": "judge.evidence", "ms": 24856, "ok": true, "requests": 1, "input_tokens": 9747, "output_tokens": 3936, "tool_calls": 0}
+{"ts": "2026-11-20T12:24:21.163+00:00", "kind": "role.started", "step": "judge.conservative#1", "role": "judge.conservative", "tier": "quick", "model": "deepseek-flash"}
+{"ts": "2026-11-20T12:24:28.501+00:00", "kind": "role.finished", "step": "judge.conservative#1", "role": "judge.conservative", "ms": 7338, "ok": true, "requests": 1, "input_tokens": 9750, "output_tokens": 1108, "tool_calls": 0}

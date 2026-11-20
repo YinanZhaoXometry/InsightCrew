@@ -39,13 +39,16 @@ def run(root: Path, name: str, *, open_run: Callable[..., tuple[Run, Deps]] | No
         module = ablation if name == "ablation" else channels
         return asyncio.run(module.main(open_run, analyze, base))
     if name == "v22":
-        # WP38 的脚手架（BLUEPRINT 19.16）：格子已定义，真实运行等 owner 的花费上限（问题 14/29）。
-        from .v22 import cells, no_spend_reason
-        print(f"v22 评测格子（{len(cells())} 个）：")
-        for cell in cells():
-            print(f"  {cell.name}: {cell.ticker} @{cell.as_of}（{cell.universe}）— {cell.about}")
-        print(no_spend_reason())
-        return 2
+        # WP38（BLUEPRINT 19.16、20.14 修正）：真实运行要调用方交来开运行的函数与流程入口；
+        # 没交（离线、无密钥）就列出格子并说明原因，退出码 2。
+        from . import v22
+        if open_run is None or analyze is None:
+            print(f"该评测需要真实模型：{no_model_reason or '调用方没有提供开运行的函数'}")
+            print(f"v22 评测格子（{len(v22.cells())} 个）：")
+            for cell in v22.cells():
+                print(f"  {cell.name}: {cell.ticker} @{cell.as_of}（{cell.universe}）— {cell.about}")
+            return 2
+        return asyncio.run(v22.main(open_run, analyze, base))
     return _dispatch(root, name)
 
 
