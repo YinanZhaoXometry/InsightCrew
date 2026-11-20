@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
@@ -174,6 +175,89 @@ async def test_interrupted_after_manager_resumes_to_the_same_board():
     assert crashed.board.snapshot() == whole.board.snapshot()
     assert [(e.type, e.actor) for e in crashed.journal.events] == \
         [(e.type, e.actor) for e in whole.journal.events]
+
+
+async def test_interrupted_during_the_analyst_fanout_resumes_to_the_same_board(monkeypatch):
+    """D2（BLUEPRINT 20.7 第 2 条）：并行扇出中途崩溃——第二位分析师的模型第一次尝试
+    就抛错。续跑时 holder 是空的：join 必须补算缺位的分析师，黑板才与一次未中断的运行相同。"""
+    def _available(run, deps, channels):              # 与上面的并行测试同一替身：点名即可用
+        for channel in channels:
+            run.board.put(f"{channel}/status",
+                          {"channel": channel, "state": "available", "reason": ""}, by="evidence")
+        run.journal.append("gate.checked", actor="evidence", data={"gate": "evidence", "findings": 0})
+
+    monkeypatch.setattr(fake_stages, "evidence", _available)
+    fundamentals = {"claims": [{"fact": "revenue_fy", "value": 1081.0, "reading": "收入扩大"}],
+                    "narrative": "基本面稳健"}
+    replies = {**REPLIES, "fundamentals": [fundamentals]}
+    cfg = FlowConfig(channels=("fundamentals",))
+
+    whole = _run(replies)
+    await analyze(whole, REQUEST, None, cfg)
+
+    crashed = _run(replies)
+    crashed.models = _CrashOnce(replies, "fundamentals")       # type: ignore[assignment]
+    saver = InMemorySaver()
+    with pytest.raises(RuntimeError):
+        await drive(crashed, REQUEST, None, cfg, checkpointer=saver, thread_id="fanout-resume")
+    assert not [e for e in crashed.journal.events if e.type == "model.called"]   # 入账在 join，还没到
+
+    await drive(crashed, REQUEST, None, cfg, checkpointer=saver, thread_id="fanout-resume",
+                resume=True)                                   # 新 holder 为空：join 补算缺位者
+    assert crashed.board.snapshot() == whole.board.snapshot()
+    assert crashed.board.has("technical/analysis") and crashed.board.has("fundamentals/analysis")
+
+
+class _DieOnKey(Board):
+    """黑板替身：第一次写 die_on 键时抛普通异常（模拟进程恰在 join 两次入账之间被杀）。"""
+
+    def __init__(self, journal: Journal, die_on: str):
+        super().__init__(journal)
+        self._die_on, self._armed = die_on, True
+
+    def put(self, key: str, value: Any, *, by: str, step: str = "", caused_by: Any = ()) -> int:
+        if key == self._die_on and self._armed:
+            self._armed = False
+            raise RuntimeError("模拟中断")
+        return super().put(key, value, by=by, step=step, caused_by=caused_by)
+
+
+async def test_interrupted_while_join_commits_resumes_to_the_same_board(monkeypatch):
+    """D2 的另一个窗口（BLUEPRINT 20.7 第 2 条）：扇出超步已过检查点、join 正在按固定
+    顺序入账时被中断（第二位分析师上板前一刻）。续跑直接落回 join、holder 为空：
+    join 必须补算本轮该跑的分析师，黑板才与一次未中断的运行相同。"""
+    def _available(run, deps, channels):
+        for channel in channels:
+            run.board.put(f"{channel}/status",
+                          {"channel": channel, "state": "available", "reason": ""}, by="evidence")
+        run.journal.append("gate.checked", actor="evidence", data={"gate": "evidence", "findings": 0})
+
+    monkeypatch.setattr(fake_stages, "evidence", _available)
+    fundamentals = {"claims": [{"fact": "revenue_fy", "value": 1081.0, "reading": "收入扩大"}],
+                    "narrative": "基本面稳健"}
+    replies = {**REPLIES, "fundamentals": [fundamentals]}
+    cfg = FlowConfig(channels=("fundamentals",))
+
+    whole = _run(replies)
+    await analyze(whole, REQUEST, None, cfg)
+
+    journal = Journal()
+    crashed = Run("t", journal, _DieOnKey(journal, "fundamentals/analysis"), Script(replies), Budget())
+    saver = InMemorySaver()
+    with pytest.raises(RuntimeError):
+        await drive(crashed, REQUEST, None, cfg, checkpointer=saver, thread_id="join-resume")
+    actors = [e.actor for e in crashed.journal.events if e.type == "model.called"]
+    assert actors == ["technical", "fundamentals"]                  # 入账先记日志：两条都在
+    assert crashed.board.has("technical/analysis")
+    assert not crashed.board.has("fundamentals/analysis")           # 但 fundamentals 没上板
+
+    await drive(crashed, REQUEST, None, cfg, checkpointer=saver, thread_id="join-resume",
+                resume=True)                                        # 新 holder 为空：join 补算缺位者
+    # 不变式 24：节点内中断会重做该节点的调用（这里把已入账的两位分析师又各补算一次），
+    # 所以不比整块黑板，比的是缺位的键补上了、值与未中断的运行相同、运行照常交付。
+    assert crashed.board.get("fundamentals/analysis") == whole.board.get("fundamentals/analysis")
+    assert crashed.board.get("technical/analysis") == whole.board.get("technical/analysis")
+    assert crashed.board.get("run/outcome")["status"] == "delivered"
 
 
 async def test_resume_from_sqlite_with_rebuilt_journal_and_budget(tmp_path: Path):

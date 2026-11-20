@@ -52,15 +52,25 @@ class ToolBox(dict[str, Callable[..., Any]]):
     """build_tools 的返回值：一张名字到工具的映射，附上本次运行收集到的工具事实。
 
     facts 是按调用顺序收集的事实（同一条不重复收集）；提交角色输出的节点把它写上
-    黑板键 tools/facts。工具自己绝不写黑板键。
+    黑板键 tools/facts。工具自己绝不写黑板键。seed 把板上已有的工具事实装回（续跑，
+    BLUEPRINT 20.7 第 3 条）：重跑同一调用不重复收集，新事实接在旧事实之后。
     """
 
     def __init__(self, facts: list[Fact]):
         super().__init__()
         self.facts = facts
+        self._seen: set[str] = set()
+
+    def seed(self, facts: Iterable[Fact]) -> None:
+        """把已有的工具事实装回：已见过的 ID 与已收集的事实一并恢复（续跑入口调用）。"""
+        for fact in facts:
+            if fact.id in self._seen:
+                continue
+            self._seen.add(fact.id)
+            self.facts.append(fact)
 
 
-def build_tools(run: Run, deps: Deps, specs: Iterable[_ToolSpec]) -> dict[str, Callable[..., Any]]:
+def build_tools(run: Run, deps: Deps, specs: Iterable[_ToolSpec]) -> ToolBox:
     """构建本次运行的工具；分析日在此绑定，工具从此不接收任何日期（蓝图 19.8 第 5 条）。
 
     必须在 intake 写下 request/scope 之后调用。specs 是 tool_indicators.toml 装出来的
@@ -74,8 +84,8 @@ def build_tools(run: Run, deps: Deps, specs: Iterable[_ToolSpec]) -> dict[str, C
     rows = [(instrument.ticker, bar.date.isoformat(), bar.open, bar.high, bar.low,
              bar.close, bar.volume) for bar in bars]
     by_family = {spec.key: spec for spec in specs}
-    facts: list[Fact] = []
-    seen: set[str] = set()
+    box = ToolBox([])
+    facts, seen = box.facts, box._seen
 
     def indicator(name: str, n: int) -> dict[str, Any] | str:
         """这段 docstring 会被 build_tools 换成由声明拼出的工具说明（见 _describe）。"""
@@ -118,7 +128,6 @@ def build_tools(run: Run, deps: Deps, specs: Iterable[_ToolSpec]) -> dict[str, C
         return result
 
     indicator.__doc__ = _describe(by_family)
-    box = ToolBox(facts)
     box["indicator"] = indicator
     return box
 

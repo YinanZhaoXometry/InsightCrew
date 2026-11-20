@@ -84,8 +84,8 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 39 | Documents, notices, packaging, as amended by BLUEPRINT 20.14 | in progress | The version 2.2 documents and the notices list are done (02:05 session). **Runs last, after version 2.3 is done or cut:** describe 2.3 as built, move BLUEPRINT 20.16's list to ROADMAP, rebuild and verify the zip. |
 
 | 40 | Version 2.3: tag `v2.2`, branch `v2.3`, the plan committed, the kernel observer hook | done | Tag `v2.2` on `549c40f`; branch `v2.3`; plan commit `45b5b06`. Kernel change exactly 20.5 (`Run.observe`, `_notify` in `contextlib.suppress`, three guarded calls in `run_role_deferred`; only `contextlib` imported); `test_kernel.py`/`test_kernel_v22.py` untouched and green; 5 new tests in `tests/test_kernel_v23.py` (no-observer identity incl. the clock count, observer order and fields, tool role's `tool_calls`, raising observer journal-equal, `role.failed` before the Halt). 830 tests, ruff/pyright clean; 34/34 scenarios ✓; 43/43 replays 一致. |
-| 41 | Version 2.3: flow hardening (risk debate awaited, resume across the analyst fan-out and with tools, siblings' spend) | in progress | Needs WP40. On WP38's path. |
-| 42 | Version 2.3: app hardening (`[flow] channels`, resume, torn journal line), the trace, the `verify` command | not started | Needs WP40. On WP38's path. |
+| 41 | Version 2.3: flow hardening (risk debate awaited, resume across the analyst fan-out and with tools, siblings' spend) | done | 20.7 第 1–6 条全部落地，四项先红后绿：D1 `stage_risk.risk` 异步直跑（线程桥/asyncio.run/ThreadPoolExecutor 全删，图的 risk 节点 await；测试：慢速剧本辩论期间同循环心跳持续推进——修前 0 次）；D2 join 按 `analysts_group[_rerun_start:]` 逐位入账、缺位且该跑的就地 `run_role_deferred` 补算（蓝图点名的窗口在 langgraph 1.2.22 下本就全超步重跑、测试不红——见问题 37；缺陷在相邻窗口复现：join 入账中途被中断、续跑直接落回 join 时缺 `fundamentals/analysis`）；D3 流程一半 `drive(resume=True)` 重建 `run.tools` 并 `ToolBox.seed` 装回板上 `tools/facts`（修前按 app/resume 重建 Run 续跑即 `KeyError: 'indicator'`）；兄弟花费：`drive` 的 Halt 处理先按固定顺序入账 holder 里已算完的分支（忽略 Malformed）再降级（修前第一位分析师的 `model.called` 不在日志）。第 5 条 `wall_on_board`/`_record_wall`/`run/wall_ms` 全删（无任何调用方与测试读它们）；第 6 条 `call` 只在 analyze 定义一份，graph 与 stage_risk 引入（drive 函数体内才引入 graph，模块加载无环）。`tests/test_flow_hardening.py` 新增 3 项、`tests/test_graph.py` 新增 2 项（既有全绿）、`test_stage_portfolio_risk.py` 两处直调改 await（问题 34）。本包文件 ruff/pyright 干净；全仓 pytest 845 过、9 挂全在 WP42/WP44 进行中的文件（见日志）；34/34 场景 ✓；43/43 重放一致。 |
+| 42 | Version 2.3: app hardening (`[flow] channels`, resume, torn journal line), the trace, the `verify` command | in progress | Needs WP40 (done). On WP38's path. |
 | 43 | Version 2.3: test harness, prompt-integrity tests, `scripts/check.sh`, the CI file | done | `tests/conftest.py` 网络夹具加拦 `connect_ex`，新增 autouse 夹具移除所有 `*_API_KEY` 环境变量；830 项既有测试无一因此失败。`tests/test_prompts.py` 四项检查今天全过（发现见问题 36）。`scripts/check.sh` 六阶段（三项检查、34 场景、43 重放、eval all）全过退出 0。`.github/workflows/ci.yml` 仅是文件：从未推送、从未运行。 |
 | 44 | Version 2.3: page foundation (the split into modules, the assembler, the model, the labels, the shell) | in progress | Needs WP40. Critical path of the page; give it the strongest agent. |
 | 45 | Version 2.3: server API and run control (checkpointed web runs, cancel, resume, trace in the stream, exports, plan preview) | not started | Needs WP41 and WP42. |
@@ -636,6 +636,7 @@ Questions for the owner, and gaps found while building. Questions 33 to 35 were 
 | 34 | 2026-11-20 | 41 | **`stage_risk.risk` becomes `async`.** BLUEPRINT 19 called its synchronous signature final (WP31). The fix for defect D1 changes it; tests that call it change only how they call it. | Applied as part of the hardening the owner chose. If overruled: D1 stays, and the risk cells of WP38 are run from the command line only. |
 | 35 | 2026-11-20 | 45 | **What cancel means.** The plan: a cancelled run is unfinished and resumable; nothing is written to the journal; the trace records `run.cancelled` (BLUEPRINT decision 55). The alternative: cancel finishes the run as `review` with a new reason `cancelled`, writes the report, and the run cannot be resumed; that needs a special case in `replay`. | The plan's reading, recommended. The owner may choose the alternative before WP45 starts. |
 | 36 | 2026-11-20 | 43 | **A finding of the prompt-integrity tests, for WP38.** The four checks of BLUEPRINT 20.12 all pass on today's prompts and are committed (`tests/test_prompts.py`). The backtick check bites on nothing today: no prompt names a key in backticks. A stricter reading — any board-key-shaped name in the prompt text must be one the role reads or writes — would fail in one place: `manager.md` names `memory/status`, a key `flows/stage_memory.py` does write, but MANAGER does not read it; the prompt explains a key the role never receives. Only WP38 changes a prompt: it decides whether the sentence goes or the manager gains the read. | — |
+| 37 | 2026-11-20 | 41 | **缺陷 D2 的复现窗口与 20.7 第 2 条所写不同。** 蓝图点名的场景——并行两位分析师、第二位的模型第一次尝试即抛意外错误、以空 holder 续跑——在 langgraph 1.2.22（checkpoint 4.3.2）下**本来就通过**：分析师分支节点不写任何图通道，失败的超步没有可复放的每任务写入（`_reapply_writes_to_succeeded_nodes` 只还给写过写入的任务），整个扇出超步在续跑时全体重跑、holder 重新填满。缺陷在**相邻窗口**真实复现：扇出超步的检查点已写、join 正按固定顺序入账时被中断（`tests/test_graph.py::test_interrupted_while_join_commits_resumes_to_the_same_board`，修前续跑后板缺 `fundamentals/analysis`）。修复照 20.7 第 2 条原文实现（join 就地补算缺位且该跑的分析师）；蓝图片名场景的测试保留为回归项。注意不变式 24：join 内中断会重做该节点已入账的调用，故该测试比值为"缺位的键补上、值相同、照常交付"，不比整块黑板。 | — |
 
 ### Version 2.3: shared-file requests
 
@@ -2026,6 +2027,48 @@ Files created or changed: `tests/conftest.py`（编辑）、`tests/test_prompts.
 Committed: 本包四个文件与本文件按路径一次提交，消息 `WP43: test harness (connect_ex + *_API_KEY fixtures), 4 prompt-integrity tests, scripts/check.sh (six stages green), ci.yml (never pushed, never run)`。未推送。
 
 For the next session: WP38 与 WP51 起跑前、WP39 起跑前，按 5.6 规则 6 在无他人工作时跑 `scripts/check.sh` 做结合检查。WP38 改提示词时先读问题 36。
+
+### 2026-11-20 (WP41) · flow hardening（D1、D2、D3、兄弟花费，20.7 第 1–6 条） · delegated session (GLM-5.3, via ZCode)
+
+Result: done — BLUEPRINT 20.7 第 1 到 6 条全部落地；第 1 到 4 条各有一条先红后绿的测试（输出见下）。
+
+先红（修复前的失败输出，逐条摘录）：
+  D1 `test_the_event_loop_stays_available_while_the_debate_runs` → `AssertionError: 辩论期间事件循环被阻塞：风控等待窗口内心跳只走了 0 次 / assert 0 >= 10`
+  D2 `test_interrupted_while_join_commits_resumes_to_the_same_board` → 续跑后 `assert crashed.board.snapshot() == whole.board.snapshot()` 失败：板缺 `fundamentals/analysis`（右列表多这一项），`audit/status` 的序号也错位
+  D3 `test_a_tools_run_interrupted_after_manager_resumes_and_delivers` → `KeyError: 'indicator'`（insightcrew/kernel/runtime.py:258，取 `run.tools[name]` 处）——按 app/resume.py 的方式从日志重建 Run 续跑才复现；同一 Run 直接续跑时 `run.tools` 尚在，缺陷不现（见下"解释"）
+  兄弟花费 `test_a_halting_branch_still_journals_its_siblings_spend` → `assert [] == ['technical']`：停机后第一位分析师的 `model.called` 不在日志
+
+做了什么：
+  第 1 条（D1）：`stage_risk.risk` 改为 `async def risk(run, deps, cfg) -> None`，直接 `await _debate(...)`；线程桥（`asyncio.get_running_loop` 探测、`asyncio.run`、`ThreadPoolExecutor`）全删。图的 `risk_node` 改为 `await stage_risk.risk(...)`。`tests/test_stage_portfolio_risk.py` 两处同步直调改为 `await`（问题 34 的读法：只改调用方式）。新测试用 `_SlowRisk` 剧本（风控角色的回答先在事件循环上 `asyncio.sleep`）加同循环 5ms 心跳，只数风控在等的窗口：修前 0 次（主循环被 `.result()` 阻塞整段辩论），修后约 40+ 次。
+  第 2 条（D2）：`join` 改为按 `analysts_group[_rerun_start(state["route"]):]` 逐位处理——先从 holder 取 Deferred，取不到且该跑（technical 或 `stages.channel_ready`）就就地 `run_role_deferred` 补算再 `commit`；打回轮次里起点之前的分析师既不入账也不补算。蓝图点名的窗口（第二位分析师首次尝试即崩）在 langgraph 1.2.22 下本来就全超步重跑、holder 重新填满，测试不红——缺陷在相邻窗口（扇出超步已过检查点、join 正在入账时被中断，用 `_DieOnKey` 黑板替身注入）复现并转绿；详见问题 37。两个测试都保留。
+  第 3 条（D3 流程一半）：`drive` 开头 `resume and cfg.tools and run.board.has("request/scope")` 时调 `_rebuild_tools(run, deps)`——重建 `run.tools`，板上有 `tools/facts` 就 `ToolBox.seed(...)` 装回；`ToolBox` 增加 `seed`（连 `_seen` 一并恢复，重跑同一调用不重复收集、新事实接在旧事实之后），`build_tools` 的返回注解收紧为 `ToolBox`。新测试按 `app/resume.py` 的重建路径（`_ResumeJournal`/`_ResumingBoard`/`_ResumingRun`/`_budget`/`_steps_used` + SQLite 检查点）续跑：第一轮技术分析师调 sma 30、引用不存在的事实，续跑后审计打回，技术分析师重跑调 sma 50，最终 `tools/facts` 为 `[sma_30, sma_50]`。
+  第 4 条（兄弟花费）：`drive` 的 `except Halt` 先 `_commit_siblings(run, holder)`——按 `ANALYST_ORDER` 固定顺序把 holder 里剩余的 Deferred 逐个 `commit`（`contextlib.suppress(Malformed)`），然后才 `_degrade`。新测试：第二位分析师的模型延迟 50ms 后 `ModelAPIError`（保证兄弟先算完），第一位分析师的 `model.called` 进日志、1300 token 进 `run/usage`，停机原因仍是 `model_unavailable`、结果 review。
+  第 5 条：`drive` 的 `wall_on_board` 参数、`holder["wall_ms"]` 的写与图里的 `_record_wall`（含串行/并行两处 `run.clock()` 计时）全删。仓库无任何调用方或测试把墙钟交给流程（`wiring.run_flow` 从不传；`tests/test_report.py`、`tests/test_run_page.py` 只测读者、未动，它们从此见不到该键）。
+  第 6 条：`call` 只在 `flows/analyze.py` 定义一份（19.5 本就这么分派），`flows/graph.py` 与 `flows/stage_risk.py` 的两份 `_call` 删除、改为 `from .analyze import call`。为此 `drive` 在函数体内才引入 graph（模块加载顺序任一方向都无环：analyze → tools/stages；graph → analyze → …；stage_risk → analyze）。固定顺序常量 `ANALYST_ORDER` 放 analyze，graph 的 `_ANALYSTS` 成为它的别名。
+
+Commands run, with the last lines of their output:
+  uv run pytest tests/test_flow_hardening.py tests/test_graph.py tests/test_stage_portfolio_risk.py tests/test_flow.py -q → 48 passed in 3.85s
+  uv run pytest -q → 845 passed, 9 failed（失败全在他人进行中的文件，见下）
+  uv run ruff check insightcrew/flows/ tests/test_flow_hardening.py tests/test_graph.py tests/test_stage_portfolio_risk.py → All checks passed!
+  uv run pyright → 4 errors, 0 warnings（全在 `tests/test_page_js.py`，WP44 进行中的新文件；我的文件零错误）
+  uv run insightcrew scenarios → 34 行全部 ✓ 相符
+  for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew replay "$d"; done → 43 份全部"一致：…与黑板快照完全相同"（脚本计数 OK=43 FAIL=0）
+
+全仓三项检查里的失败，均不在本包文件（WP42、WP44 正在进行，失败是它们先写好的红测试/半成品）：
+  pytest：`tests/test_cli.py` 7 项、`tests/test_wiring.py` 1 项（D4 等 WP42 项）、`tests/test_page_js.py` 1 项（WP44）。
+  ruff：`tests/test_cli.py` 6 个未用导入（WP42）。
+  pyright：`tests/test_page_js.py` 4 个（WP44）。
+  本包八个文件（四个 flows、三个测试文件）三项检查全部干净；`insightcrew/kernel/`、`pyproject.toml`、`uv.lock`、`tests/test_flow.py` 未动（git diff 为空）。
+
+解释与发现（问题 37 的由来）：蓝图 20.1 对 D2 的复现窗口判断有误——langgraph 1.2.22 的每任务 `put_writes` 只复放"写过通道写入"的任务，而 `_deferred_analyst` 分支节点不写任何通道，所以扇出超步失败后续跑会整体重跑、holder 重新填满；D2 实际发生在 join 入账中途被中断的窗口。D3 的同 Run 续跑也不复现（`run.tools` 还在），必须走 app/resume 的重建路径——这与缺陷表"app/resume.py restores _steps but not _requests"一句一致。两处都已按"先写失败测试"的要求用可复现的窗口证明。
+
+Not run, and why: 未启动 `serve`、未发任何网络请求、未调真实模型、未读未打印 `.env`（本包一样都不需要）；`scripts/check.sh`（WP43 刚完成）未代跑——5.6 规则 6 要求它在无人并行工作时运行，此刻 WP42/WP44 正在工作中，故按任务书以 19.3 的两条命令手工完成同一证明。
+
+Files created or changed: `insightcrew/flows/stage_risk.py`、`insightcrew/flows/graph.py`、`insightcrew/flows/analyze.py`、`insightcrew/flows/tools.py`、`tests/test_graph.py`（新增 2 项，既有未动）、`tests/test_stage_portfolio_risk.py`（两处直调改 await）、`tests/test_flow_hardening.py`（新，3 项）、`docs/HANDOFF.md`（状态行、问题 37、本条目）。
+
+Committed: 本包文件与本文件按路径一次提交（见 git log），消息 `WP41: ...`。未推送。
+
+For the next session: WP38 的前提（WP41、WP42 与干净结合检查）还差 WP42 与结合检查；WP38 读问题 36（提示词）与 37（D2 窗口）。
 
 ## 9. Prompts for starting a session
 

@@ -166,18 +166,18 @@ def _risk_replies() -> dict:
     return replies
 
 
-def test_stage_risk_speaks_in_order_each_round():
+async def test_stage_risk_speaks_in_order_each_round():
     """两轮：每轮都是 激进、保守、中立、交易员；意见写上板，方案每轮修订一次。"""
     run = _seeded_run(_risk_replies())
-    risk_stage(run, _deps(), FlowConfig(risk_rounds=2))     # 同步直调：不在事件循环里
+    await risk_stage(run, _deps(), FlowConfig(risk_rounds=2))   # 20.7 第 1 条：异步直调
     assert _actors(run) == ["risk.aggressive", "risk.conservative", "risk.neutral", "trader"] * 2
     assert all(run.board.has(f"risk/{s}") for s in ("aggressive", "neutral", "conservative"))
     assert len(run.board.history("trader/proposal")) == 3   # 初版 + 两轮各修订一次
 
 
-def test_stage_risk_with_zero_rounds_calls_nobody():
+async def test_stage_risk_with_zero_rounds_calls_nobody():
     """risk_rounds=0：本阶段一个模型调用也不发起（图本就不该加这个节点，这里钉死下限）。"""
     run = _seeded_run(_risk_replies())
-    risk_stage(run, _deps(), FlowConfig(risk_rounds=0))
+    await risk_stage(run, _deps(), FlowConfig(risk_rounds=0))
     assert _actors(run) == []
     assert not run.board.has("risk/aggressive")

@@ -10,6 +10,10 @@ Run（黑板、日志、预算）与 deps 经 config["configurable"] 传递，�
 各自的轮数上限、法定人数、评审只能否决。路由决定由节点算出并写进
 state["route"]（路由事件也由节点就地记日志），条件边的 router 只读 state，
 纯函数，显式 path_map 列出它可能返回的每一个值。
+
+版本 2.3（BLUEPRINT 20.7）：risk 节点 await 异步的 stage_risk.risk（第 1 条）；
+join 对本轮该跑而 holder 里没有的分析师就地补算（第 2 条）；角色调用 call 从
+analyze 引入（第 6 条）；每分析师墙钟不再记录（第 5 条，改由侧车 trace 承担）。
 """
 from __future__ import annotations
 
@@ -38,6 +42,7 @@ from ..roles import (
     TRADER,
 )
 from . import stage_memory, stage_portfolio, stage_risk
+from .analyze import ANALYST_ORDER, call
 from .tools import build_tools
 
 # 审计发现的责任人顺序（原 PIPELINE 顺序 + v2.2 的两个分析师；debate 不是责任人）。
@@ -55,14 +60,6 @@ class GraphState(TypedDict):
     halt: dict[str, str] | None # 预留：节点内捕获的停机原因（停机仍以异常方式直达 analyze）
 
 
-async def _call(run: Run, role: Role) -> Any:
-    """调用一个角色；两次不合契约即停机（评审除外，见 judges 节点）。与 analyze.call 同一条规则。"""
-    try:
-        return await run_role(run, role)
-    except Malformed as e:
-        raise Halt("malformed_output", str(e)) from e
-
-
 def _ctx(config: RunnableConfig) -> dict[str, Any]:
     """Run、deps、request 都从 configurable 拿：它们不属于图状态。"""
     return config.get("configurable") or {}
@@ -75,7 +72,7 @@ def initial_state() -> GraphState:
 # ---- 路由表：显式列出每个 router 可能返回的每一个值 ----
 
 JUDGE_MAP: tuple[str, ...] = ("manager", "trader", "outcome")
-_ANALYSTS = ("technical", "fundamentals", "disclosures", "news", "sentiment")   # 打回时可能作为起点
+_ANALYSTS = ANALYST_ORDER   # 打回时可能作为起点的分析师（19.5 第 4 条的固定顺序）
 
 
 def audit_map(cfg: Any, owners: tuple[str, ...], *, parallel: bool = False) -> Any:
@@ -140,29 +137,19 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
             ctx = _ctx(config)
             run = ctx["run"]
             if ready is None or ready(run):
-                start = run.clock()
-                await _call(run, role)
-                _record_wall(ctx, name or role.name, start, run.clock())
+                await call(run, role)
             return {}
         node.__name__ = name or role.name
         return node
 
-    def _record_wall(ctx: dict[str, Any], name: str, start: float, end: float) -> None:
-        """每个分析师节点记录起止（19.5 第 5 条）。只暂存在 holder 里；
-        持久化方式（黑板键 run/wall_ms，需 replay 忽略）待 HANDOFF 问题 16 定夺。"""
-        ctx["holder"].setdefault("wall_ms", {})[name] = int((end - start) * 1000)
-
     def _deferred_analyst(role: Role, name: str) -> Callable[..., Awaitable[dict[str, Any]]]:
-        """并行模式的分析师分支：算好不入账（run_role_deferred），Deferred 与耗时暂存，join 统一入账。"""
+        """并行模式的分析师分支：算好不入账（run_role_deferred），Deferred 暂存，join 统一入账。"""
         async def node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
             ctx = _ctx(config)
             run = ctx["run"]
             if name != "technical" and not stages.channel_ready(run, name):
                 return {}
-            start = run.clock()
-            deferred = await run_role_deferred(run, role)
-            ctx["holder"].setdefault("deferred", {})[name] = deferred
-            _record_wall(ctx, name, start, run.clock())
+            ctx["holder"].setdefault("deferred", {})[name] = await run_role_deferred(run, role)
             return {}
         node.__name__ = name
         return node
@@ -193,16 +180,20 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
 
     async def join(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
         """汇聚点。并行模式：按固定顺序入账（technical、fundamentals、disclosures、…），
-        谁先算完不打紧，日志与串行相同（决策 42、不变量 19）。两种模式都把工具事实收账
-        （19.11：tools/facts 按调用顺序，tools 署名）。"""
+        谁先算完不打紧，日志与串行相同（决策 42、不变量 19）。分支结果只存在内存 holder
+        里、检查点不含它：续跑直接落回 join 时 holder 为空，本轮该跑而缺位的分析师
+        就在这里补算（20.7 第 2 条，D2）。两种模式都把工具事实收账（19.11：tools/facts
+        按调用顺序，tools 署名）。"""
         ctx = _ctx(config)
         run = ctx["run"]
         if cfg.parallel:
             pending: dict[str, Any] = ctx["holder"].get("deferred", {})
-            for name, _ in analysts_group:
+            for name, role in analysts_group[_rerun_start(state["route"]):]:
                 deferred = pending.pop(name, None)
                 if deferred is None:
-                    continue
+                    if name != "technical" and not stages.channel_ready(run, name):
+                        continue          # 本轮不该跑的分析师（通道不可用）：既没有也补不得
+                    deferred = await run_role_deferred(run, role)
                 try:
                     commit(run, deferred)
                 except Malformed as e:
@@ -215,16 +206,16 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
     async def debate(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
         run = _ctx(config)["run"]
         for _ in range(cfg.debate_rounds):
-            await _call(run, BULL)
-            await _call(run, BEAR)
+            await call(run, BULL)
+            await call(run, BEAR)
         return {}
 
     async def manager(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
-        await _call(_ctx(config)["run"], MANAGER)
+        await call(_ctx(config)["run"], MANAGER)
         return {}
 
     async def trader(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
-        await _call(_ctx(config)["run"], TRADER)
+        await call(_ctx(config)["run"], TRADER)
         return {}
 
     async def audit(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
@@ -330,7 +321,7 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
             ctx = _ctx(config)
             if ctx.get("deps", deps) is None:      # 替身阶段（tests/fake_stages）没有真依赖
                 return {}
-            stage_risk.risk(ctx["run"], ctx["deps"], cfg)
+            await stage_risk.risk(ctx["run"], ctx["deps"], cfg)   # 20.7 第 1 条：异步直跑，事件循环不被阻塞
             return {}
         graph.add_node("risk", risk_node)
     graph.add_node("audit", audit)
