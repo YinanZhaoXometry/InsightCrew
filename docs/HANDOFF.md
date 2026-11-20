@@ -92,7 +92,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 46 | Version 2.3: page, verdict and chart | done | 20.10 结论四态齐：交付（评级/操作/带货币价位/摘要/论点带引用徽章/失效条件/持有期/两条信任行链去页签）、REVIEW（无评级无价位＋原因＋下一步建议行＋脚本化提示）、中断（进度行＋续跑按钮，静态页说明不能续跑）、运行中（进度行＋结论形成中）；价格图保留 2.2 全部元素并加"分析日"竖线标记。新增 `tests/js/verdict.test.mjs` 5 项（12/12 绿）。共享页文件零改动。问题 39、40 记录在案。浏览器五查（demo、审计打回、全能力、中断、静态 replay.html）均过。 |
 | 47 | Version 2.3: page, process (debate, revisions with the audit's findings, risk, judges) | done | 20.10「Process」全条落地：分析师（并列，卡上标签/模型/耗时/token，产物按契约渲染：叙事→论断或信号带引用徽章→基调/情绪带与把握）、多空辩论（一轮一框、多空两列、回应在点下）、主管与交易员、修订对照（一版一列一字段一行、改动格加 ▲；被打回的版本列出检查项标签/主语/消息与流向——审计的按路由点名键主人归属，评审反对票与随上游重做也分得清；论点被评审否决时同样有对照）、风险三方意见（三列＋交易员修订摘要，标题保留"未经审计的意见"）、评审（一轮一卡＋汇总行）。被取代的旧版默认折叠；每卡「查看提示词与原始回复」开原有事件抽屉；四态（无运行/进行中/交付/中断/REVIEW 各有一句交代）。Node 测试 `tests/js/process.test.mjs` 5 项（含跨 realm JSON 比对）。截图 4 张（demo、misquote、全能力上下两幅）。 |
 | 48 | Version 2.3: page, evidence with clickable citations, rules and audit | in progress | Needs WP44 (done). Owns `assets/js/40-evidence.js`, `assets/js/45-audit.js`, `assets/css/40-evidence.css`, `tests/js/evidence.test.mjs`, `tests/js/audit.test.mjs`. |
-| 49 | Version 2.3: page, usage and timing with the trace waterfall | in progress | Needs WP44 (done). |
+| 49 | Version 2.3: page, usage and timing with the trace waterfall | done | 20.10「Usage and timing」全条落地：按角色（不再按角色组）一张表——调用、请求、输入/输出 token、token 合计、token 上限（该角色组的逐行照示）、成本（或未定价）、有轨迹时的耗时列与合计行；对上限三条进度条——token 对运行上限、请求对 `max_requests`、秒对 `max_seconds`（墙钟取轨迹覆盖范围，无轨迹记"未测量"）；调用瀑布——一次调用一条横杠、按角色分泳道、按最早开始排序、并行分析师的横杠互相重叠（channels_clean 实测三位分析师并排）、未收尾的跨度画黄色虚线、`run.resumed`/`run.cancelled` 两条竖线记号（含 after_seq 的悬停说明）；无轨迹（2.3 前的运行、场景、今天的直播流——WP45 之前事件流不带 trace）时耗时列与瀑布换成一行说明；既有附注三条保留（重试、成本上限、`run/wall_ms` 在板才画的墙钟行），新增"被中断的调用不记用量"。进行中无已完成调用时给一行说明、瀑布照画。`tests/js/usage.test.mjs` 8 项（自带装载器注入最小 state 与假 DOM）。截图 5 张（demo 回放含瀑布、revise_levels 审计打回（交易员两杠）、risk_shrinks_size --tools 全能力（11 角色）、channels_clean 并行重叠、手写轨迹的中断夹具（黄虚线＋续跑/取消记号））；直播 ?run= 的无轨迹态亦经浏览器核对。共享页文件零改动；`fold` 的 spans/usage 即全部数据源，记号从 `state.trace` 私推。 |
 | 50 | Version 2.3: page, launch form with plan preview, history, live activity, cancel and resume | in progress | Needs WP44 (done); final check after WP45. |
 | 51 | Version 2.3: page quality pass and the browser check | not started | Alone on the page files. Needs WP45 to WP50, or what the stop rule leaves of them. |
 | 52 | Version 2.3: approval gate (stretch) | not started | Only if BLUEPRINT 20.15 allows. Off by default. |
@@ -2153,6 +2153,57 @@ Files created or changed: `insightcrew/app/assets/js/35-process.js`（空视图�
 两处读法（不构成问题，记录备考）：(1) 论点的修订对照在 manager/thesis 多于一版时一律出现——蓝图片名"评审否决论点"，审计把 owner 为 manager 的发现打回时同样成版，本视图两种来源都按实归属展示（审计检查项/评审反对票/随上游重做三分支）；(2) 全能力截图用临时合并场景 `runs/wp47_all_on.json`（git 忽略；`--scenario ../../runs/wp47_all_on` 经相对名装载，data/scenarios 未动、34 计数不变），合并自 channels_clean/macro_clean/sentiment_clean/tools_clean/memory_lessons/risk_shrinks_size 各角色的既有回复。
 Committed: 本包三个文件与本文件按路径一次提交，消息 `WP47: ...`。未推送。
 For the next session: WP51 质量过页时可注意——过程页签卡片在 1280px 下五分析师自动换两行（auto-fit，不算破损）；修订对照表在版本多时在自己的框里横滚（.tscroll）；抽屉打开时焦点管理仍是 WP51 的活。另：内置浏览器有其他代理共用，本会话一个自开页签中途被导航走，各自截图请自备页签并即用即拍。
+
+### 2026-11-20 (WP46) · page：结论卡与价格图（四态 + 分析日标记） · delegated session (GLM-5.3, via ZCode)
+
+Result: done — 20.10「结论」视图全部落地：交付、REVIEW、中断、运行中四态，价格图保留 2.2 全部元素并加"分析日"标记；2.2 页面在该区域显示过的内容无一丢失。
+
+做了什么：
+  `30-verdict.js` 重写（文件上半纯推导、下半渲染）：四态判定 `verdictStatusOf(model, live, ended)`——直播页事件流已收尾而日志没有 run.finished 即"已中断"（fold 的 status 对此只会给 running，视图私有补上这一缝）；`verdictProgress` 私有归段（judge.* 看执行者、产物按 KEY_STAGE 前缀再按键首段、模型调用看执行者），给中断/运行中两态"已进行到「X」段；模型调用 n 次，事件 m 条"进度行；`verdictAdvice` 只对 20.10 点名的三种 REVIEW 原因给下一步（budget_exhausted 提高上限、contested 读反对意见并链去「过程」页签、model_unavailable 续跑——与 resume 拒绝已结束运行的张力记为问题 39）；交付态按蓝图次序给评级/操作/带货币的五个价位盒/摘要/论点（每点带 cite 徽章）/失效条件/方案说明，两条信任行"事实与规则""模型评审"各为链去「规则与审计」「过程」页签的按钮（映射记为问题 40，WP47/WP48 若被砍 WP51 应改指「证据」）；中断态给进度行＋续跑按钮（live 时 POST /api/runs/{id}/resume，202 即重接事件流，404/409 给中文说明；静态 replay.html 只给说明文字，不给需要服务器的控件）；运行中给进度行＋"结论形成中"（脉冲圆点）。价格图在 2.2 的收盘线/高低网格/价位虚线与错开标签/首末日期之外，加最后一条收盘处的"分析日 <as_of>"竖虚线（as_of 取 request/scope，退回 run.started 的请求）。`30-verdict.css` 加摘要/论点/失效条件/建议行/页签链接/形成中的样式。共享页文件零改动。
+  新测试 `tests/js/verdict.test.mjs`（Node，5 项）：四态判定（含直播流收尾→中断、静态缺 run.finished→中断）、进度行（段名/计数/空事件）、建议行（三种给出、其余 null）、verdictData 全字段与缺键兜底、归段（judge.* 执行者、macro→news、portfolio 不归段）。
+
+Commands run, with the last lines of their output:
+  node --test tests/js/model.test.mjs tests/js/trace.test.mjs tests/js/verdict.test.mjs → ℹ tests 12  ℹ pass 12  ℹ fail 0
+  uv run pytest tests/test_run_page.py tests/test_page_js.py tests/test_page_labels.py -q → 1 failed, 28 passed（失败是 node 聚合项，见下）
+  uv run pytest -q → 1 failed, 879 passed（失败同下）
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  uv run insightcrew scenarios → 34 行全部 ✓ 相符
+  for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew replay "$d"; done → OK=43 FAIL=0
+
+全仓失败均不在本包文件：`tests/test_page_js.py` 的 node 聚合项一度红在 WP49 `usage.test.mjs`（4 项）与 WP50 `launch.test.mjs`（1 项）进行中的文件上（收尾时重跑已全绿）；另有 `tests/test_wiring.py` 两项在带 `IC_FORCE_OFFLINE=1` 跑 pytest 时必红（该环境变量强制脚本化模型，with_model 夹具即失效）——不带该变量 35 项全过，是调用方式问题，不是代码问题。本包三个文件三项检查干净。
+
+浏览器核对（IC_FORCE_OFFLINE=1，端口 9999，自备页签）五张截图存会话产物：demo（…-8270，交付：评级/价位带货币/摘要/论点徽章/失效条件/信任行/图含分析日标记）、revise_levels（…-586f，审计打回后修订版交付：仓位 15%、方案说明写明"重做版"）、全能力脚本运行（…-22a9，`--scenario risk_shrinks_size --tools --memory --portfolio flat_usd`：风险辩论段完成、采纳保守方意见仓位降到 3%；场景运行按 D4 修复忽略 channels，五通道无法与场景同开，故这是场景规则下一次能开到的全部能力）、中断运行（demo 副本删 run.finished 行造出的崩溃窗口：胶囊"已中断"、进度行"已进行到「评审」段；模型调用 9 次，事件 46 条"、续跑按钮在）、静态 replay.html（22a9 的 replay 经 python http.server 同端口打开：交付结论与图表完整，无任何网络请求）。注：中断副本目录名需符合 RUN_ID 形状（INTERRUPTED-DEMO 被 404，改名 ACME 日期形状后即通）——该副本留在 runs/（git 忽略）。
+
+Not run, and why: `scripts/check.sh` 未代跑（WP47/49/50 同刻收尾，5.6 规则 6；证明按 19.3 两条手跑如上）；直播中断态未用真实取消验证（取消是 WP45 的 API，按钮对 404/409 的降级路径已写好）；无网络请求、无真实模型、未读未打印 `.env`。
+Unverified: 续跑按钮的 202 分支要等 WP45 的 /api/resume 存在才能真点通（当下点它得到"本地服务没有续跑接口。"，正是预期的 404 降级）；四态里的"运行中"只在直播页见过一次（另一代理同刻在用页签，未留截图），该态的渲染逻辑与中断态同一条路径，Node 测试覆盖判定。
+Files created or changed: `insightcrew/app/assets/js/30-verdict.js`（重写）、`insightcrew/app/assets/css/30-verdict.css`（重写）、`tests/js/verdict.test.mjs`（新）、`docs/HANDOFF.md`（状态行、问题 39/40、本条目）。仅动本包文件。
+Committed: 本包三个文件与本文件按路径一次提交，消息 `WP46: ...`。未推送。
+For the next session: WP51 若过页：(1) 两条信任行与 contested 建议链去「规则与审计」「过程」，WP47/WP48 已落地则正确，被砍则改指「证据」（问题 40）；(2) REVIEW 的 model_unavailable 建议句要不要随问题 39 的定夺改字；(3) 图上"分析日"标签与右侧价位标签在价位贴近分析日时会挤，可把分析日标签下沉一行。WP45 落地后直播运行中的"结论形成中"与中断态续跑按钮即有真实数据源。
+
+### 2026-11-20 (WP49) · page usage 视图（按角色的用量表、对上限三条、轨迹瀑布） · delegated session (GLM-5.3, via ZCode)
+
+Result: done — 20.10「Usage and timing」全部落地，四态（直播、已完成、已中断、replay.html）都工作；2.2 页面在该区域显示过的内容（按角色组的调用/请求/输入/输出/token 合计/token 上限/成本、token 计量条、重试/成本上限/墙钟三条附注）无一丢失，只是表从角色组细化到角色并加上耗时与瀑布。
+
+做了什么：
+  `50-usage.js` 重写：按角色一张表（调用、请求、输入/输出 token、token 合计、token 上限——`ceilings.roles` 该角色组的逐行照示、成本或未定价、有轨迹时的耗时列），合计行带运行 token 上限与总耗时；「与上限的比较」三条进度条——token 对 `ceilings.run_tokens`、请求对 `limits.max_requests`（run.started 里的 limits，2.0 起就有）、秒对 `limits.max_seconds`（墙钟取轨迹覆盖的首末时间戳之差，并行不重复计入；无轨迹记"未测量"）；「调用瀑布」从 `fold` 的 spans 画——一次调用一条横杠、按角色分泳道、泳道按最早开始排序、蓝=完成/红=失败/黄虚线=未收尾（进行中或被中断，画到轴末端）、时间轴含 `run.resumed`/`run.cancelled` 两条竖线记号（悬停给 after_seq 或"可以续跑"）；无轨迹（2.3 前的运行、场景、以及 WP45 之前直播流——事件流尚不带 trace）时耗时列与瀑布换成一行说明，表与上限条照画；三条既有附注保留，新增"被中断的调用不记用量"；进行中还没有已完成的调用时给一行说明、瀑布照画。`run/wall_ms` 的墙钟附注行保留（键在板才画，WP41 后不会再出现，但 2.2 的读法与 test_run_page 要的字符串都在）。`50-usage.css` 重写：.meter 沿用，加 .limits/.wf-* 瀑布样式（名称列/泳道/横杠/记号，记号用 CSS 变量对齐泳道列）。共享页文件零改动：`fold` 的 spans/usage 是全部数据源，`run.resumed`/`run.cancelled` 两行 fold 不收，从 `state.trace` 私推（60-events 读 state.events 的同一惯例）。
+  新测试 `tests/js/usage.test.mjs`（Node，8 项，自带装载器：编号 20 以下源文件 + 50-usage.js 同作用域求值，注入最小 state 与假 DOM 后真调 renderUsage 断言 DOM）：按角色表与耗时列/合计、无轨迹替换行、瀑布泳道排序与并行重叠与未收尾画到轴末端、记号私推与墙钟秒、三条上限（含旧运行无 limits 与秒未测量）、已中断（未收尾横杠＋取消记号＋未返回的调用不进表只进瀑布）、进行中无完成调用、视图注册与空态。
+
+Commands run, with the last lines of their output:
+  node --test tests/js/usage.test.mjs → ℹ tests 8  ℹ pass 8  ℹ fail 0
+  node --test tests/js/model.test.mjs tests/js/trace.test.mjs tests/js/usage.test.mjs → ℹ tests 15  ℹ pass 15  ℹ fail 0
+  node --check insightcrew/app/assets/js/50-usage.js → rc=0
+  uv run pytest tests/test_run_page.py tests/test_page_labels.py tests/test_page_js.py -q → 29 passed
+  uv run pytest -q → 880 passed in 23.81s（一度 2 failed 均在 WP47 进行中的 35-process.js/process.test.mjs，其收尾后全绿）
+  uv run ruff check . → All checks passed!   uv run pyright → 0 errors, 0 warnings, 0 informations
+  IC_FORCE_OFFLINE=1 uv run insightcrew scenarios → 34/34 ✓ 相符
+  for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew replay "$d"; done → 43/43 一致（22+12+8+1）
+浏览器核对（IC_FORCE_OFFLINE=1，自备页签；9999 被并行会话的 serve 占用，replay 静态核对经 127.0.0.1:9998 的 http.server，内置浏览器放行）：直播 ?run= 已完成的 demo——表无耗时列＋替换行＋三条上限（含"未测量 / 900 秒"），核对过文本；静态 replay.html 五张截图存会话产物：demo（含瀑布 8 泳道、交易员两杠）、revise_levels（审计打回：交易员 2 次调用 10 秒、瀑布两杠）、全能力 `--scenario risk_shrinks_size --tools`（11 角色行：风险三风控＋评审，token 6.5%/请求 27.5%/墙钟 12.8%）、channels_clean（技术/基本面/公告三条泳道时间上并排——瀑布要证明的并行重叠）、手写轨迹的中断夹具 runs/20261120-wp49-interrupted-ACME（demo 副本日志截到 route、轨迹按 20.6 行形状手写：收尾跨度配对＋trader#2 未收尾＋run.resumed(after_seq)+run.cancelled；胶囊"已中断"、黄虚线横杠、绿"续跑"/红"取消"两条竖线、附注可见——DOM 计数 bars=6 open=1 marks=2）。
+Not run, and why: `scripts/check.sh` 未代跑（WP46/47/48/50 同刻收尾，5.6 规则 6；证明按 19.3 两条手跑如上）；直播的瀑布要等 WP45 的 20.8 第 4 条（事件流带 trace）才有数据，当下的直播无轨迹态正是本视图要正确处理的形态，已核对；无网络请求、无真实模型、未读未打印 `.env`。
+Unverified: 直播运行中边跑边长的瀑布（数据源 WP45 之后才存在；跨度逐条到达时 render 重画，Node 测试覆盖同路径）。"全能力"截图受场景规则所限：`--channels` 与场景互斥（D4）、`--memory` 挂在无内联记录的场景上会写真实决策日志（问题 32 的缝），故取 risk_shrinks_size＋--tools（风险辩论＋工具＋评审＋辩论＋并行全开）为场景规则下一次能开到的全部能力；WP46 的 22a9 运行另证明 `--memory --portfolio flat_usd` 也能与场景同开。
+Files created or changed: `insightcrew/app/assets/js/50-usage.js`（重写）、`insightcrew/app/assets/css/50-usage.css`（重写）、`tests/js/usage.test.mjs`（新）、`docs/HANDOFF.md`（状态行与本条目）。仅动本包文件；`tests/test_run_page.py` 未动、全绿。
+Committed: 本包三个文件与本文件按路径一次提交，消息 `WP49: ...`。未推送。
+For the next session: WP45 落地事件流带 trace 后，直播运行的瀑布与秒条即有真实数据，无需改本视图；WP51 过页时可留意瀑布在 480px 下的横滚与记号悬停、以及"未收尾"横杠不只靠颜色区分（已有虚线边框与悬停文案）。截图所用的 4 个测试运行与中断夹具留在 runs/（git 忽略）；其 replay.html 经一次性脚本（/tmp，未进仓库）用 replay_html.write(events, bars, trace) 重写为带轨迹版——write_page 带 trace 是 WP45 的 20.8 第 10 条。
 
 ## 9. Prompts for starting a session
 

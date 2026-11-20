@@ -1,6 +1,70 @@
-/* 30-verdict.js —— 结论卡与价格图（WP44 放到位；WP46 接手）。总在渲染，不进页签。 */
+/* 30-verdict.js —— 结论卡与价格图（WP46，BLUEPRINT 20.10「结论」）。总在渲染，不进页签。
+   四种状态都要工作：直播运行、完成的运行（交付 / REVIEW）、被中断的运行、静态 replay.html。
+   文件上半是纯推导（进度、建议、字段、状态判定，Node 测试直接测），下半才是碰 DOM 的渲染。 */
 
-/* ---------- 结果 ---------- */
+/* ---------- 纯推导 ---------- */
+
+function verdictStatusOf(model, live, ended) {
+  /* 四态（20.10）：完成看 run.finished；直播页上事件流已收尾（end 已到）而日志没有
+     run.finished，说明运行被取消或崩溃，是被中断，不是仍在跑；静态页没有 run.finished 同样是中断。 */
+  if (model.finished) return model.finished.status === "delivered" ? "delivered" : "review";
+  return live && !ended ? "running" : "interrupted";
+}
+const verdictStatus = (model) => verdictStatusOf(model, state.live, state.ended);
+
+function verdictStageOf(e) {
+  /* 一条事件属于流水线的哪一段：评审先看执行者（judge.* 不在 ACTOR_STAGE 里）；
+     闸门看闸门名；产物先按键前缀（05-labels 的 KEY_STAGE），再按键的首段
+     （technical/analysis → technical）；模型调用与失败看执行者。 */
+  const actor = e.actor || "";
+  if (actor.startsWith("judge.")) return "judges";
+  if (e.type === "gate.checked") return e.data.gate || null;
+  if (e.type === "artifact.written") {
+    for (const [prefix, stage] of KEY_STAGE) if ((e.data.key || "").startsWith(prefix)) return stage;
+    const head = (e.data.key || "").split("/")[0];
+    return STAGE_NAME[head] ? head : null;
+  }
+  if (e.type === "model.called" || e.type === "model.failed") return ACTOR_STAGE[actor] || null;
+  return null;
+}
+
+function verdictProgress(events) {
+  /* 运行到了哪一步：最后一条能归段的事件所在的段，加上调用与事件计数。 */
+  let stage = null, calls = 0;
+  for (const e of events) {
+    if (e.type === "model.called") calls += 1;
+    const at = verdictStageOf(e);
+    if (at && at !== "report") stage = at;
+  }
+  const line = stage
+    ? "已进行到「" + (STAGE_NAME[stage] || stage) + "」段；模型调用 " + calls + " 次，事件 " + events.length + " 条。"
+    : (events.length ? "已收到 " + events.length + " 条事件；模型调用 " + calls + " 次。" : "正在等待第一条事件。");
+  return { stage, calls, line };
+}
+
+function verdictAdvice(reason) {
+  /* REVIEW 的下一步（20.10 只点名这三种）；tab 是这条建议链去哪一页看。 */
+  if (reason === "budget_exhausted")
+    return { text: "token 预算已用尽；提高预算上限后重新发起，运行就能在预算内跑完。", tab: null };
+  if (reason === "contested")
+    return { text: "评审多数反对；读各评审的反对意见，再决定要不要调整后重新发起。", tab: "process" };
+  if (reason === "model_unavailable")
+    return { text: "模型不可用；等模型恢复后可以续跑这次运行。", tab: null };
+  return null;
+}
+
+function verdictData(model) {
+  /* 结论卡用到的全部黑板字段；缺键时为 null / 空串，渲染端各自兜底。 */
+  const board = model.board;
+  return {
+    outcome: board["run/outcome"] || null,
+    thesis: board["manager/thesis"] || null,
+    proposal: board["trader/proposal"] || null,
+    currency: (board["ledger/instrument"] || {}).currency || "",
+  };
+}
+
+/* ---------- 两条信任行（20.10）：标签本身是链接，链去各自的页签 ---------- */
 
 function judgmentText(judgment) {
   if (!judgment) return "—";
@@ -13,46 +77,114 @@ function judgmentText(judgment) {
   return judgment;
 }
 
-function confidence(outcome) {
-  return el("ul", { class: "confidence" },
-    el("li", null, el("b", null, "事实与规则"), outcome.facts_and_rules === "verified"
-      ? "已核验：数字由代码计算并复算，规则由代码逐条检查。" : "未核验：审计没有确认当前版本。"),
-    el("li", null, el("b", null, "模型判断"), judgmentText(outcome.judgment)));
+function tabLink(tab, label, title) {
+  return el("button", { class: "tablink", type: "button", title: title || null,
+                        on: { click: () => selectTab(tab) } }, label);
 }
 
-function renderResult(model) {
-  const board = model.board, outcome = board["run/outcome"], box = $("result");
-  if (!outcome) {
-    fill(box, el("h2", null, "结果"),
-      el("div", { class: "muted" }, complete()
-        ? "这次运行没有留下结果。" : "运行尚未结束。结果在最后一步写出。"));
+function trustBlock(outcome) {
+  return el("ul", { class: "confidence" },
+    el("li", null, tabLink("audit", "事实与规则", "数字与规则的核验在「规则与审计」页签"),
+      outcome.facts_and_rules === "verified"
+        ? "已核验：数字由代码计算并复算，规则由代码逐条检查。"
+        : "未核验：审计没有确认当前版本。"),
+    el("li", null, tabLink("process", "模型评审", "评审的逐条意见在「过程」页签"),
+      judgmentText(outcome.judgment)));
+}
+
+/* ---------- 续跑（20.10：中断态给出续跑按钮；静态回放页不给需要服务器的控件） ---------- */
+
+async function verdictResume() {
+  const runId = state.runId;
+  const note = $("resume-note");
+  if (note) note.textContent = "正在请求续跑……";
+  let answer;
+  try {
+    answer = await getJSON("/api/runs/" + encodeURIComponent(runId) + "/resume", { method: "POST" });
+  } catch (_) {
+    if (note) note.textContent = "续跑请求发不出去：与本地服务的连接不可用。";
     return;
   }
-  if (outcome.status !== "delivered") {         // REVIEW：这一块不出现任何评级与价位
-    const kids = [el("h2", null, "结果"), el("div", { class: "verdict review" }, "REVIEW：未给出评级"),
+  if (answer.status === 202) { openRun(runId, false); return; }   // 重新接上这次运行的事件流
+  if (note) note.textContent = answer.status === 404
+    ? "本地服务没有续跑接口。"
+    : "不能续跑：" + ((answer.data && (answer.data.reason || answer.data.detail)) || "本地服务拒绝，原因未知") + "。";
+}
+
+function resumeControl() {
+  if (!state.live)
+    return el("p", { class: "note" }, "静态回放页不能续跑；在实时页面或命令行可以续跑这次运行。");
+  return el("p", { class: "note" },
+    el("button", { class: "ctl", type: "button", on: { click: () => { void verdictResume(); } } }, "续跑这次运行"),
+    " ", el("span", { id: "resume-note" }, ""));
+}
+
+/* ---------- 结果卡 ---------- */
+
+function renderResult(model) {
+  const box = $("result");
+  const status = verdictStatus(model);
+  const { outcome, thesis, proposal, currency } = verdictData(model);
+  const progress = verdictProgress(model.events);
+
+  if (status === "interrupted") {                    // 中断：到了哪一步；续跑按钮（静态页说明）
+    fill(box, el("h2", null, "结果"),
+      el("div", { class: "verdict review" }, "运行中断，未形成结论"),
+      el("p", { class: "muted" }, progress.line),
+      el("p", { class: "note" }, "这次运行没有正常结束；已完成的阶段仍可查看，已入账的模型调用都在日志里。"),
+      resumeControl());
+    return;
+  }
+  if (!outcome) {                                    // 运行中：知道了什么 + 结论形成中
+    fill(box, el("h2", null, "结果"),
+      el("div", { class: "verdict forming" }, "结论形成中"),
+      el("p", { class: "muted" }, progress.line),
+      el("p", { class: "note" }, complete()
+        ? "这次运行没有留下结果。"
+        : "运行尚未结束，结果在最后一步写出；每个数字由代码计算并复算。"));
+    return;
+  }
+  if (outcome.status !== "delivered") {              // REVIEW：这一块不出现任何评级与价位
+    const kids = [el("h2", null, "结果"),
+      el("div", { class: "verdict review" }, "REVIEW：未给出评级"),
       el("p", null, "原因：" + reasonText(outcome.reason) + "。")];
+    const advice = verdictAdvice(outcome.reason);
+    if (advice) kids.push(el("p", { class: "note advice" }, "下一步：" + advice.text + " ",
+      advice.tab ? tabLink(advice.tab, "查看", "这条建议所指的内容在这一页签") : null));
     const started = model.started;
     if (outcome.reason === "model_unavailable" && started && started.mode === "scripted") {
       kids.push(el("p", { class: "muted" }, "没有可用的真实模型；脚本化模型只能回答场景里写好的内容。"
         + (state.meta ? "可以选的离线场景：" + state.meta.scenarios.map((s) => s.name).join("、") + "。" : "")));
     }
-    kids.push(confidence(outcome));
+    kids.push(trustBlock(outcome));
     fill(box, kids);
     return;
   }
-  const thesis = board["manager/thesis"] || {}, proposal = board["trader/proposal"] || {};
-  const currency = (board["ledger/instrument"] || {}).currency || "";
+  const the = thesis || {}, prop = proposal || {};   // 交付：结论在上，证据与失效条件在下
   const level = (label, value) => el("div", { class: "level" }, el("b", null, value), el("span", null, label));
+  const withCur = (label) => currency ? label + "（" + currency + "）" : label;
+  const points = the.points || [], invalidation = the.invalidation || [];
   fill(box, el("h2", null, "结果"),
-    el("div", { class: "verdict" }, "评级 " + thesis.rating + " · 操作 " + proposal.action, el("small", null, currency)),
+    el("div", { class: "verdict" }, "评级 " + (the.rating || "—") + " · 操作 " + (prop.action || "—"),
+      currency ? el("small", null, currency) : null),
     el("div", { class: "levels" },
-      level("入场价", num(proposal.entry)), level("止损价", num(proposal.stop)), level("目标价", num(proposal.target)),
-      level("仓位（占权益）", num(proposal.size_pct) + "%"), level("持有（交易日）", proposal.horizon_days)),
-    proposal.rationale ? el("p", { class: "muted" }, "方案说明：" + proposal.rationale) : null,
-    confidence(outcome));
+      level(withCur("入场价"), num(prop.entry)),
+      level(withCur("止损价"), num(prop.stop)),
+      level(withCur("目标价"), num(prop.target)),
+      level("仓位（占权益）", num(prop.size_pct) + "%"),
+      level("持有（交易日）", prop.horizon_days === undefined || prop.horizon_days === null ? "—" : prop.horizon_days)),
+    the.summary ? el("p", { class: "summary" }, the.summary) : null,
+    points.length ? el("h3", { class: "v-h" }, "为什么（主管论点）") : null,
+    points.length ? el("ul", { class: "points" }, points.map((point) => el("li", null,
+      el("span", { class: "ptext" }, point.text), " ",
+      ...(point.cites || []).map((id) => cite(id))))) : null,
+    invalidation.length ? el("h3", { class: "v-h" }, "什么情况说明这个判断错了（失效条件）") : null,
+    invalidation.length ? el("ul", { class: "invalidation" }, invalidation.map((text) => el("li", null, text))) : null,
+    prop.rationale ? el("p", { class: "muted" }, "方案说明：" + prop.rationale) : null,
+    trustBlock(outcome));
 }
 
-/* ---------- 价格图 ---------- */
+/* ---------- 价格图：今天的收盘与价位照旧，另标出分析日 ---------- */
 
 function renderChart(model) {
   const box = $("chart"), bars = state.bars;
@@ -80,6 +212,14 @@ function renderChart(model) {
   chart.append(svg("polyline", { fill: "none", stroke: "#3451d1", "stroke-width": 1.6, "stroke-linejoin": "round",
     points: closes.map((c, i) => x(i).toFixed(1) + "," + y(c).toFixed(1)).join(" ") }));
   chart.append(svg("circle", { cx: x(closes.length - 1), cy: y(closes[closes.length - 1]), r: 3, fill: "#3451d1" }));
+  const scope = board["request/scope"] || {}, request = (model.started || {}).request || {};
+  const asOf = scope.as_of || request.as_of || "";                        // 分析日：最后一段收盘所在的那条竖线
+  if (asOf) {
+    const lastX = x(closes.length - 1);
+    chart.append(svg("line", { x1: lastX, x2: lastX, y1: T, y2: H - B, stroke: "#7a8496",
+                              "stroke-dasharray": "2 4", opacity: "0.9" }),
+      svg("text", { x: lastX - 6, y: T + 10, "text-anchor": "end", "font-size": 11, fill: "#7a8496" }, "分析日 " + asOf));
+  }
   const tags = levels.map(([label, value, color]) => ({ label, value, color, at: y(value) })).sort((a, b) => a.at - b.at);
   for (let i = 1; i < tags.length; i++) tags[i].at = Math.max(tags[i].at, tags[i - 1].at + 13);   // 价位挨得近时把标签错开
   for (const tag of tags) {
