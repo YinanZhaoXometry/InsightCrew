@@ -109,6 +109,17 @@ class Outcome(Contract):
     judgment: str                 # "accepted 2/3" | "contested" | "not reviewed: <原因>"
 
 
+class Approval(Contract):
+    """用户对已通过审计（与评审）的方案的确认（BLUEPRINT 20.11）。
+
+    只能接受或拒绝：人不能改方案，改过的方案必须重新通过审计（决策 59）。
+    写上黑板键 approval/decision 的 actor 是 "user"；重放时按决策 44 从日志取回。
+    """
+
+    decision: Literal["approved", "rejected"]
+    note: str                     # 一句备注，说明为什么接受或拒绝；可以为空
+
+
 class RuleSpec(Contract):
     """规则手册里一条规则的声明。由 adapters 从 data/rules.toml 读入，不进入看板。"""
 

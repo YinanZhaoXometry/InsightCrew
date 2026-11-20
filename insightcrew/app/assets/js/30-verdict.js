@@ -1,8 +1,27 @@
 /* 30-verdict.js —— 结论卡与价格图（WP46，BLUEPRINT 20.10「结论」）。总在渲染，不进页签。
    四种状态都要工作：直播运行、完成的运行（交付 / REVIEW）、被中断的运行、静态 replay.html。
-   文件上半是纯推导（进度、建议、字段、状态判定，Node 测试直接测），下半才是碰 DOM 的渲染。 */
+   WP52（BLUEPRINT 20.11）：approve 开着的运行在审批门暂停时，结论卡显示「待你确认」与
+   接受/拒绝两个按钮（决策 59：只能接受或拒绝，不能改方案）；REVIEW 的 rejected_by_user
+   在本文件私有标签（05-labels 是共享文件）。文件上半是纯推导，下半才是碰 DOM 的渲染。 */
 
 /* ---------- 纯推导 ---------- */
+
+/* 审批门相关原因的私有标签：05-labels.js 属共享文件（5.6 规则 3），本视图自己兜住；
+   未知原因照旧落生键名（20.10：宁可生键名，不可空白）。 */
+const APPROVAL_LABEL = { rejected_by_user: "你否决了这次方案" };
+const approvalReasonText = (reason) => APPROVAL_LABEL[reason] || reasonText(reason);
+
+function waitingApprovalOf(model, live, ended) {
+  /* 审批门暂停的判定（20.11）：流程开了 approve、运行未结束、没人给过决定，
+     而且已经到了门口——评审已给出接受（或评审关闭而审计通过）。取消或崩溃的
+     中断不满足门口条件，仍走一般的中断态。 */
+  if (verdictStatusOf(model, live, ended) !== "interrupted") return false;
+  const flow = ((model.started || {}).flow) || {};
+  if (!flow.approve || model.board["approval/decision"]) return false;
+  if (flow.judges) return String(model.board["judges/status"] || "").startsWith("accepted");
+  return (model.board["audit/status"] || {}).verdict === "pass";
+}
+const waitingApproval = (model) => waitingApprovalOf(model, state.live, state.ended);
 
 function verdictStatusOf(model, live, ended) {
   /* 四态（20.10）：完成看 run.finished；直播页上事件流已收尾（end 已到）而日志没有
@@ -64,6 +83,9 @@ function verdictData(model) {
   };
 }
 
+const level = (label, value, cls) =>
+  el("div", { class: "level" + (cls ? " " + cls : "") }, el("b", null, value), el("span", null, label));
+
 /* ---------- 两条信任行（20.10）：标签本身是链接，链去各自的页签 ---------- */
 
 function judgmentText(judgment) {
@@ -119,6 +141,41 @@ function resumeControl() {
     " ", el("span", { id: "resume-note" }, ""));
 }
 
+/* ---------- 审批门（WP52，BLUEPRINT 20.11）：待你确认，接受或拒绝（决策 59） ---------- */
+
+async function sendApproval(decision) {
+  /* 把决定交给本地服务（POST /api/runs/<id>/approval），202 后重新接上这次运行的事件流。
+     静态回放页根本不画按钮，这里只在实时页面被调用。 */
+  const runId = state.runId;
+  const note = $("approval-note");
+  if (note) note.textContent = "正在提交你的决定……";
+  let answer;
+  try {
+    answer = await getJSON("/api/runs/" + encodeURIComponent(runId) + "/approval", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: decision, note: "" }),
+    });
+  } catch (_) {
+    if (note) note.textContent = "决定发不出去：与本地服务的连接不可用。";
+    return;
+  }
+  if (answer.status === 202) { openRun(runId, false); return; }   // 重新接上这次运行的事件流
+  if (note) note.textContent = answer.status === 404
+    ? "本地服务没有确认接口。"
+    : "不能确认：" + ((answer.data && (answer.data.error || answer.data.detail)) || "本地服务拒绝，原因未知") + "。";
+}
+
+function approvalControls() {
+  if (!state.live)
+    return el("p", { class: "note" }, "静态回放页不能确认；这次运行当时的决定已记录在日志里。");
+  return el("p", { class: "note" },
+    el("button", { class: "ctl", type: "button", on: { click: () => { void sendApproval("approved"); } } }, "接受这次方案"),
+    " ",
+    el("button", { class: "ctl danger", type: "button", on: { click: () => { void sendApproval("rejected"); } } }, "拒绝这次方案"),
+    " ", el("span", { id: "approval-note" }, ""));
+}
+
 /* ---------- 结果卡 ---------- */
 
 function renderResult(model) {
@@ -127,6 +184,23 @@ function renderResult(model) {
   const { outcome, thesis, proposal, currency } = verdictData(model);
   const progress = verdictProgress(model.events);
 
+  if (waitingApproval(model)) {                      // 审批门（20.11）：待你确认，接受或拒绝
+    const the = thesis || {}, prop = proposal || {};
+    const withCur = (label) => currency ? label + "（" + currency + "）" : label;
+    fill(box, el("h2", null, "结果"),
+      el("div", { class: "verdict forming" }, "待你确认"),
+      el("p", { class: "muted" }, "审计与评审都已通过；等你确认后才交付。"),
+      el("div", { class: "levels" },
+        level(withCur("入场价"), num(prop.entry), "lv-entry"),
+        level(withCur("止损价"), num(prop.stop), "lv-stop"),
+        level(withCur("目标价"), num(prop.target), "lv-target"),
+        level("仓位（占权益）", num(prop.size_pct) + "%"),
+        level("评级", the.rating || "—"),
+        level("持有（交易日）", prop.horizon_days === undefined || prop.horizon_days === null ? "—" : prop.horizon_days)),
+      el("p", { class: "note" }, "只能接受或拒绝：方案本身不能在此修改，改过的方案必须重新通过审计。"),
+      approvalControls());
+    return;
+  }
   if (status === "interrupted") {                    // 中断：到了哪一步；续跑按钮（静态页说明）
     fill(box, el("h2", null, "结果"),
       el("div", { class: "verdict review" }, "运行中断，未形成结论"),
@@ -147,7 +221,10 @@ function renderResult(model) {
   if (outcome.status !== "delivered") {              // REVIEW：这一块不出现任何评级与价位
     const kids = [el("h2", null, "结果"),
       el("div", { class: "verdict review" }, "REVIEW：未给出评级"),
-      el("p", null, "原因：" + reasonText(outcome.reason) + "。")];
+      el("p", null, "原因：" + approvalReasonText(outcome.reason) + "。")];
+    const decision = model.board["approval/decision"];
+    if (decision && decision.decision === "rejected" && decision.note)
+      kids.push(el("p", { class: "muted" }, "你的备注：" + decision.note));
     const advice = verdictAdvice(outcome.reason);
     if (advice) kids.push(el("p", { class: "note advice" }, "下一步：" + advice.text + " ",
       advice.tab ? tabLink(advice.tab, "查看", "这条建议所指的内容在这一页签") : null));
@@ -161,7 +238,6 @@ function renderResult(model) {
     return;
   }
   const the = thesis || {}, prop = proposal || {};   // 交付：结论在上，证据与失效条件在下
-  const level = (label, value, cls) => el("div", { class: "level" + (cls ? " " + cls : "") }, el("b", null, value), el("span", null, label));
   const withCur = (label) => currency ? label + "（" + currency + "）" : label;
   const points = the.points || [], invalidation = the.invalidation || [];
   const side = /buy|overweight/i.test(the.rating || "") ? " long" : /sell|underweight/i.test(the.rating || "") ? " short" : "";
@@ -196,7 +272,8 @@ function renderChart(model) {
     return;
   }
   const board = model.board, outcome = board["run/outcome"];
-  const proposal = outcome && outcome.status === "delivered" ? board["trader/proposal"] || {} : {};
+  const proposal = (outcome && outcome.status === "delivered") || waitingApproval(model)
+    ? board["trader/proposal"] || {} : {};
   const levels = [["入场", proposal.entry, "var(--info)"], ["止损", proposal.stop, "var(--bad)"], ["目标", proposal.target, "var(--good)"]]
     .filter(([, value]) => value !== null && value !== undefined);
   const closes = bars.map((bar) => bar.close);

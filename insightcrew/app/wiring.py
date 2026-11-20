@@ -19,7 +19,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -48,9 +48,9 @@ from ..domain import symbols
 from ..domain.market import InvalidTicker, MarketData, NoData, SourceUnavailable, UnknownTicker
 from ..domain.portfolio import Portfolio
 from ..domain.portfolio import fingerprint as portfolio_fingerprint
-from ..domain.types import Outcome, Scope
+from ..domain.types import Approval, Outcome, Scope
 from ..evals.scenarios import Scenario, load_one
-from ..flows.analyze import FlowConfig
+from ..flows.analyze import FlowConfig, preset_approval
 from ..flows.analyze import drive as drive_flow
 from ..flows.deps import Deps
 from ..kernel.board import Board
@@ -224,7 +224,8 @@ def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: 
             judges: bool | None = None, debate_rounds: int | None = None,
             channels: tuple[str, ...] | None = None, parallel: bool | None = None,
             portfolio: str = "", risk_rounds: int | None = None,
-            tools: bool | None = None, memory: bool | None = None) -> Job:
+            tools: bool | None = None, memory: bool | None = None,
+            approve: bool | None = None) -> Job:
     """命令行与网页的共同入口。空字符串与 None 表示"没有给"。
 
     请求：场景自带的请求打底，用户给的代码与日期覆盖它。
@@ -232,6 +233,7 @@ def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: 
     流程配置：有场景用场景自己的（场景是一次完整的脚本化运行，--channels 与设置里的
     channels 都被忽略，BLUEPRINT 18.8），否则用设置里的；judges、debate_rounds 与
     channels 是用户在这一次运行上的显式覆盖；未知的通道名在这里拒绝。
+    approve（20.11）只在明确给出（True）时覆盖：审批门默认关着。
     """
     chosen = _load_scenario(scenario) if scenario else None
     request = dict(chosen.request) if chosen else {}
@@ -253,7 +255,8 @@ def prepare(settings: Settings, *, ticker: str = "", as_of: str = "", scenario: 
     names = None if chosen is not None or channels is None else tuple(_channel_names(channels))
     overrides = {key: value for key, value in
                  (("judges", judges), ("debate_rounds", debate_rounds), ("channels", names),
-                  ("parallel", parallel), ("risk_rounds", risk_rounds), ("tools", tools))
+                  ("parallel", parallel), ("risk_rounds", risk_rounds), ("tools", tools),
+                  ("approve", approve))
                  if value is not None}
     if memory is not None:
         overrides["memory"] = memory
@@ -352,9 +355,27 @@ def open_run(settings: Settings, request: dict[str, Any], *, scenario: Scenario 
                    "request_timeout_s": limits.request_timeout_s},
         "thread": run_signature(request, deps, cfg, names),   # 运行签名（19.5 第 6 条）：resume 核对用
     })
+    if cfg.approve:
+        _preset_approval(run, scenario, replay)     # 20.11：场景/重放自带决定时预置，图到门口入账、不暂停
     return run, dataclasses.replace(
         deps, out_dir=run_dir,
         render=lambda snapshot: report.render(snapshot, journal.events, run_id=run.id))
+
+
+def _preset_approval(run: Run, scenario: Scenario | None, replay: tuple[Event, ...] | None) -> None:
+    """预置审批门的自带决定（BLUEPRINT 20.11，决策 44 对外部输入的做法）：场景写在自己的
+    replies["user"] 里（第一条）；重放从被重放日志的黑板投影取回。决定经 flows 的注册表
+    预置、由 approval 节点在门口入账——不提前写日志，运行的事件次序与序号和一次真实运行
+    完全相同（重放才能逐序号一致）。没有预置时真实运行在门口暂停等人：命令行 --approve
+    问终端，页面 POST /api/runs/<id>/approval。"""
+    supplied: Any = None
+    if scenario is not None:
+        replies = scenario.replies.get("user")
+        supplied = replies[0] if replies else None
+    elif replay is not None:
+        supplied = Board.fold(replay).snapshot().get("approval/decision")
+    if supplied is not None:
+        preset_approval(run, Approval.model_validate(supplied))
 
 
 def _dir_labels(request: dict[str, Any], deps: Deps) -> tuple[str, str]:
@@ -396,19 +417,23 @@ async def checkpoint(run_dir: Path) -> AsyncIterator[AsyncSqliteSaver]:
 
 
 async def run_flow(run: Run, request: dict[str, Any], deps: Deps,
-                   flow: FlowConfig | None = None) -> Outcome:
+                   flow: FlowConfig | None = None, *,
+                   decision: Approval | None = None,
+                   ask: Callable[[Run], Approval] | None = None) -> Outcome:
     """命令行与网页的真实运行入口：带 SQLite 检查点、运行签名与 trace，供 resume 续跑。
 
     场景、测试与 replay 直接调 flows.analyze.analyze（无检查点、无 trace）。
     trace（BLUEPRINT 20.6）在这里挂成 run.observe：调用方已挂的观察者（命令行 --show
     的逐行播报）不被顶掉，先记测量、再转交。测量不影响日志（不变量 22）。
+    decision/ask（20.11）是审批门的两个入口：decision 给出已拿到的决定（从暂停的
+    检查点续起，页面的确认按钮走它）；ask 给出暂停后的问询（命令行 --approve 走它）。
     """
     cfg = flow or FlowConfig()
     started = next((e for e in run.journal.events if e.type == "run.started"), None)
     names = (started.data.get("models") if started is not None else None) or {}
     thread = run_signature(request, deps, cfg, dict(names))
     if deps.out_dir is None:
-        return await drive_flow(run, request, deps, cfg)
+        return await drive_flow(run, request, deps, cfg, decision=decision, ask=ask)
     tracer = Tracer(deps.out_dir / "trace.jsonl")
     prior = run.observe
 
@@ -419,7 +444,8 @@ async def run_flow(run: Run, request: dict[str, Any], deps: Deps,
 
     run.observe = _observing
     async with checkpoint(deps.out_dir) as saver:
-        return await drive_flow(run, request, deps, cfg, checkpointer=saver, thread_id=thread)
+        return await drive_flow(run, request, deps, cfg, checkpointer=saver, thread_id=thread,
+                                decision=decision, ask=ask)
 
 
 # ---- 运行结束之后：运行页面 ----

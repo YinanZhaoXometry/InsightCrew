@@ -8,6 +8,10 @@
 运行保持未结束、可续跑（决策 55）；续跑把 resume_run 作为活动任务跑（第 3 条），
 它的拒绝都是中文、报 409。计划预览（第 8 条）不调模型、不建运行目录。
 
+审批门（20.11，WP52）：approve 开着的运行在图的 interrupt 处暂停，活对象留在
+session.pending，事件流不带 error 收尾；POST /api/runs/{id}/approval 给出决定
+（接受或拒绝），从暂停的检查点续起跑完。等待期间不发生模型调用。
+
 安全边界（BLUEPRINT 10.6）：只绑 127.0.0.1；Host 必须是本机；带 Origin 的 POST 必须来自本页面；
 run_id 必须符合目录名的形状并且就在运行根目录下；一次只跑一个运行；
 任何回复都不含密钥、端点或文件路径。
@@ -26,7 +30,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -42,9 +46,10 @@ from ..domain import symbols
 from ..domain.ledger import build_ledger
 from ..domain.market import InvalidTicker, NoData, SourceUnavailable, UnknownTicker
 from ..domain.portfolio import state_for
-from ..domain.types import Contract, Scope
+from ..domain.types import Approval, Contract, Scope
 from ..evals.scenarios import load_all
 from ..flows import stages as flow_stages
+from ..flows.analyze import ApprovalPending
 from ..flows.deps import Deps
 from ..kernel.board import Board
 from ..kernel.budget import Budget
@@ -98,6 +103,14 @@ class RunRequest(Contract):
     tools: bool | None = None
     memory: bool | None = None
     channels: tuple[str, ...] | None = None
+    approve: bool | None = None                             # 审批门（20.11）：True 才覆盖设置
+
+
+class ApprovalRequest(Contract):
+    """审批门的答复（BLUEPRINT 20.11）：只能接受或拒绝，可附一句备注（决策 59：不能改方案）。"""
+
+    decision: Literal["approved", "rejected"]
+    note: str = Field(default="", max_length=500)
 
 
 @dataclass
@@ -108,6 +121,7 @@ class Session:
     runs_dir: Path
     active: str | None = None                                   # 正在进行的运行；同一时间只有一个
     task: asyncio.Task[None] | None = None                      # 那次运行（或续跑）的任务，取消要用
+    pending: tuple[str, Run, Deps, Job] | None = None           # 在审批门等待确认的运行（20.11）：活对象留在这里
     errors: dict[str, str] = field(default_factory=dict)        # 以意外异常结束的运行 -> 说明
     tasks: set[asyncio.Task[None]] = field(default_factory=set)
     markets: dict[str, CsvMarket] = field(default_factory=dict)
@@ -158,7 +172,8 @@ def create_app(settings: Settings, runs_dir: Path | None = None) -> FastAPI:
             job = prepare(settings, ticker=body.ticker, as_of=body.as_of, scenario=body.scenario,
                           judges=body.judges, debate_rounds=body.debate_rounds,
                           channels=body.channels, portfolio=_portfolio_path(body.portfolio),
-                          risk_rounds=body.risk_rounds, tools=body.tools, memory=body.memory)
+                          risk_rounds=body.risk_rounds, tools=body.tools, memory=body.memory,
+                          approve=True if body.approve else None)
             run, deps = open_run(settings, job.request, scenario=job.scenario, flow=job.flow,
                                  runs_dir=session.runs_dir, portfolio=job.portfolio_path)
         except BadRequest as e:
@@ -181,7 +196,8 @@ def create_app(settings: Settings, runs_dir: Path | None = None) -> FastAPI:
             job = prepare(settings, ticker=body.ticker, as_of=body.as_of, scenario=body.scenario,
                           judges=body.judges, debate_rounds=body.debate_rounds,
                           channels=body.channels, portfolio=_portfolio_path(body.portfolio),
-                          risk_rounds=body.risk_rounds, tools=body.tools, memory=body.memory)
+                          risk_rounds=body.risk_rounds, tools=body.tools, memory=body.memory,
+                          approve=True if body.approve else None)
             return _plan(session, job)
         except BadRequest as e:
             return JSONResponse({"error": str(e)}, status_code=422)
@@ -255,6 +271,34 @@ def create_app(settings: Settings, runs_dir: Path | None = None) -> FastAPI:
         if task.done() and not task.cancelled() and isinstance(task.exception(), BadRequest):
             return JSONResponse({"error": str(task.exception())}, status_code=409)
         print(f"· 续跑开始：{run_id}")
+        return {"run_id": run_id}
+
+    @app.post("/api/runs/{run_id}/approval", status_code=202)
+    async def approval(run_id: str, body: ApprovalRequest) -> Any:
+        """给出审批门的决定（20.11）：接受或拒绝，不能改方案（决策 59）。
+
+        只对正在等待确认的运行有效：那次运行在审批门以 interrupt 暂停，活对象留在
+        session.pending；决定经 run_flow(decision=…) 从暂停的检查点续起，作为活动任务跑完。
+        等待中的运行不占活动位；服务重启会丢等待位（日志与检查点仍在，拒绝并说明）。
+        """
+        if _journal(session, run_id) is None:
+            return JSONResponse({"error": "没有这个运行"}, status_code=404)
+        if session.active is not None:
+            return JSONResponse({"error": "已有一次运行正在进行，等它结束再开始下一次",
+                                 "active_run": session.active}, status_code=409)
+        pending = session.pending
+        if pending is None or pending[0] != run_id:
+            return JSONResponse({"error": "这个运行不在等待确认。", "active_run": session.active},
+                                status_code=409)
+        _, run, deps, job = pending
+        decision = Approval(decision=body.decision, note=body.note)
+        session.pending = None
+        session.active = run_id
+        task = asyncio.create_task(_execute(session, run, deps, job, decision=decision))
+        session.task = task
+        session.tasks.add(task)
+        task.add_done_callback(session.tasks.discard)
+        print(f"· 已收到确认：{run_id}（{decision.decision}）")
         return {"run_id": run_id}
 
     @app.api_route("/api/runs/{run_id}/report", methods=["GET", "HEAD"])
@@ -377,6 +421,8 @@ def _plan(session: Session, job: Job) -> dict[str, Any]:
     if flow.judges:
         stages.append({"key": "judges", "roles": [f"judge.{lens}" for lens in LENSES],
                        "parallel": False})
+    if flow.approve:
+        stages.append({"key": "approval", "roles": [], "parallel": False})   # 20.11：等人，零模型调用
     stages.append({"key": "report", "roles": [], "parallel": False})
 
     typical = len(due) + 2 * flow.debate_rounds + 1 + 1 + 4 * flow.risk_rounds
@@ -395,14 +441,24 @@ def _plan(session: Session, job: Job) -> dict[str, Any]:
 
 # ---- 跑一次运行 ----
 
-async def _execute(session: Session, run: Run, deps: Deps, job: Job) -> None:
+async def _execute(session: Session, run: Run, deps: Deps, job: Job, *,
+                   decision: Approval | None = None) -> None:
     """在服务器的事件循环上跑一次运行（wiring.run_flow：带检查点与轨迹，20.8 第 1 条），
     随后写运行页面。取消是中断、不是错误（第 2 条）：日志不写事件，运行未结束、可续跑。
+    decision 是审批门的决定（20.11）：从暂停的检查点续起并跑完。
     无论怎样结束，都清掉"进行中"。"""
     try:
-        outcome = await run_flow(run, job.request, deps, job.flow)
+        outcome = await run_flow(run, job.request, deps, job.flow, decision=decision)
         write_page(run, deps)
+        if session.pending is not None and session.pending[0] == run.id:
+            session.pending = None          # 等确认的运行已给出决定并跑完
         print(f"· 运行结束：{run.id}（{outcome.status}，{outcome.reason}）")
+    except ApprovalPending:
+        # 审批门暂停（20.11）：不是错误，事件流不带 error 收尾；活对象留在等待位，
+        # 决定从 POST /approval 来。日志没有 run.finished：运行未结束，等待期间不发生模型调用。
+        session.pending = (run.id, run, deps, job)
+        write_page(run, deps)               # 为已写下的部分照写页面：结论卡据此显示「待你确认」
+        print(f"· 运行暂停，等待确认：{run.id}")
     except asyncio.CancelledError:
         write_page(run, deps)          # 为已写下的部分照写页面（D6 命令行一半的先例）
         print(f"· 运行被取消：{run.id}（未结束，可续跑）")
@@ -426,6 +482,9 @@ async def _execute_resume(session: Session, path: Path) -> None:
     except BadRequest as e:
         print(f"· 续跑被拒绝：{run_id}（{e}）")
         raise
+    except ApprovalPending:
+        # 在审批门暂停的运行被普通续跑叫醒（20.11）：没有带来决定，仍在门口等着，不算错误。
+        print(f"· 续跑仍在等待确认：{run_id}")
     except asyncio.CancelledError:
         print(f"· 续跑被取消：{run_id}（未结束，仍可续跑）")
         raise
@@ -600,6 +659,9 @@ async def _stream(session: Session, path: Path, run_id: str, after: int) -> Asyn
             yield _end(session.errors[run_id], "interrupted")
             return
         if not active:
+            if session.pending is not None and session.pending[0] == run_id:
+                yield _end(None, "interrupted")     # 审批门暂停（20.11）：不是错误，页面据此保持「待你确认」
+                return
             yield _end("日志里没有 run.finished：这次运行没有正常结束", "interrupted")
             return
         if time.monotonic() - last_sent >= _KEEPALIVE_S:

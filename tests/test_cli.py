@@ -193,7 +193,8 @@ def test_analyze_reports_an_unexpected_stop_and_points_at_resume(runs: Path,
                                                                  monkeypatch: pytest.MonkeyPatch) -> None:
     """D6 的命令行一半：运行抛出意外异常时，页面照写（写当时已有的），一行说明、退出码 1。"""
 
-    async def _boom(run: object, request: object, deps: object, flow: object = None) -> None:
+    async def _boom(run: object, request: object, deps: object, flow: object = None,
+                    **_kwargs: object) -> None:
         raise RuntimeError("模拟缺陷")
 
     monkeypatch.setattr(cli_module, "run_flow_with_checkpoints", _boom)

@@ -14,6 +14,10 @@ state["route"]（路由事件也由节点就地记日志），条件边的 route
 版本 2.3（BLUEPRINT 20.7）：risk 节点 await 异步的 stage_risk.risk（第 1 条）；
 join 对本轮该跑而 holder 里没有的分析师就地补算（第 2 条）；角色调用 call 从
 analyze 引入（第 6 条）；每分析师墙钟不再记录（第 5 条，改由侧车 trace 承担）。
+
+版本 2.3（BLUEPRINT 20.11，WP52）：approve 开着时在 judges/audit 与 outcome 之间加
+approval 节点——LangGraph 的 interrupt 在此暂停等人，决定以 Command(resume=…) 续起
+（approval_resume），只有本文件认识 langgraph.types。
 """
 from __future__ import annotations
 
@@ -25,8 +29,9 @@ from typing import Any, TypedDict
 # 参数，langgraph 才会把 config（连同 configurable）注入进来。除此之外不用 langchain_core。
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command, interrupt
 
-from ..domain.types import Verdict
+from ..domain.types import Approval, Proposal, Thesis, Verdict
 from ..kernel.runtime import Halt, Malformed, Role, Run, commit, run_role, run_role_deferred
 from ..roles import (
     BEAR,
@@ -76,17 +81,44 @@ _ANALYSTS = ANALYST_ORDER   # 打回时可能作为起点的分析师（19.5 第
 
 
 def audit_map(cfg: Any, owners: tuple[str, ...], *, parallel: bool = False) -> Any:
-    """audit 条件边的 path_map：在场责任人 + judges/outcome。
+    """audit 条件边的 path_map：在场责任人 + judges/approval/outcome（20.11）。
 
     串行模式责任人映射到同名节点；并行模式分析师责任人映射到扇出节点 analysts，
     路由值形如 "analysts:<owner>"（扇出从该分析师起，即 run_from 的语义）。
+    审批通过后的去向：评审开着去 judges；关着而审批门开着去 approval；否则直达 outcome。
     """
-    later = "judges" if cfg.judges else "outcome"
+    later = _after_gate(cfg)
     analyst_owners = tuple(o for o in owners if o in _ANALYSTS)
     if not parallel:
         return [*owners, later]
     return {**{f"analysts:{owner}": "analysts" for owner in analyst_owners},
             "manager": "manager", "trader": "trader", later: later}
+
+
+def _after_gate(cfg: Any) -> str:
+    """审计（或评审）通过之后去哪：judges > approval（20.11）> outcome。"""
+    if cfg.judges:
+        return "judges"
+    return "approval" if cfg.approve else "outcome"
+
+
+def approval_resume(decision: Approval) -> Any:
+    """把用户的决定变成图的重入输入：Command(resume=<JSON 值>)，从暂停的检查点续起。
+
+    只有本文件认识 langgraph（19.5 第 7 条），analyze.py 因此经它取重入输入；
+    值用 JSON 字典（检查点要序列化它），interrupt 的 response_schema 会校验回 Approval。
+    """
+    return Command(resume=decision.model_dump(mode="json"))
+
+
+def _approval_brief(run: Run) -> dict[str, Any]:
+    """interrupt 暂停时交给客户端的一份小结（20.11）：等确认的是哪个方案。
+    页面与终端自己再从黑板取全文，这里只给最小事实，且全部是可序列化的 JSON 值。"""
+    proposal = run.board.get("trader/proposal", Proposal) if run.board.has("trader/proposal") else None
+    thesis = run.board.get("manager/thesis", Thesis) if run.board.has("manager/thesis") else None
+    return {"key": "approval/decision",
+            "rating": thesis.rating if thesis is not None else None,
+            "proposal": proposal.model_dump(mode="json") if proposal is not None else None}
 
 
 def _after_audit(state: GraphState) -> str:
@@ -223,12 +255,12 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
         ctx = _ctx(config)
         findings = stages.audit(ctx["run"], ctx.get("deps", deps))
         if not findings:
-            return {"route": "judges" if cfg.judges else "outcome"}
+            return {"route": _after_gate(cfg)}
         if cfg.audit == "shadow":
             # 照常记录但不打回。评审返工后的再审计仍不通过，按原 scrutinise 的规则停机。
             if state["judge_round"] > 0:
                 raise Halt("audit_failed", "评审返工后的方案未通过审计")
-            return {"route": "judges" if cfg.judges else "outcome"}
+            return {"route": _after_gate(cfg)}
         signature = sorted(f"{f.check}|{f.subject}" for f in findings)
         if signature == state["last_findings"]:
             raise Halt("stagnation", "同样的问题连续两次未被修正")
@@ -264,7 +296,7 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
         if accepts >= cfg.quorum:
             label = f"accepted {accepts}/{len(JUDGES)}"
             run.board.put("judges/status", label, by="flow")
-            return {"judge_round": round_no, "route": "outcome"}
+            return {"judge_round": round_no, "route": "approval" if cfg.approve else "outcome"}
         run.board.put("judges/status", "contested", by="flow")
         if round_no == cfg.judge_rounds:
             raise Halt("contested", "评审多数反对，返工次数已用尽")
@@ -275,6 +307,31 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
                            data={"to": target, "why": "评审否决论点" if to_thesis else "评审否决价位或仓位"})
         # 返工后是一轮新的审计循环：计数与签名清零（原 scrutinise 里重新调用 pass_audit 的语义）。
         return {"judge_round": round_no, "audit_round": 0, "last_findings": [], "route": target}
+
+    async def approval(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
+        """审批门（BLUEPRINT 20.11）：评审接受（或评审关闭而审计通过）之后、outcome 之前暂停等人。
+
+        机制是 LangGraph 的 interrupt：第一次执行在这里抛 GraphInterrupt，检查点把暂停留档，
+        等待期间不再发生模型调用；决定以 Command(resume=...) 从暂停处续起，本节点从头重跑，
+        interrupt 返回经 response_schema 校验的 Approval。板上已有 approval/decision 时
+        （门口之后被中断、续跑重跑本节点）不再入账，直接用 logged 的决定；ctx 里带着预置
+        决定（场景的 replies["user"]、重放按决策 44 取自日志）时在门口入账——与一次真实
+        运行同位，日志的次序与序号不变。只能接受或拒绝（决策 59）：拒绝以
+        Halt(rejected_by_user) 走 analyze 的降级，REVIEW 收尾。
+        """
+        ctx = _ctx(config)
+        run: Run = ctx["run"]
+        if run.board.has("approval/decision"):
+            decision = run.board.get("approval/decision", Approval)
+        elif ctx.get("decision") is not None:
+            decision = Approval.model_validate(ctx["decision"])
+            run.board.put("approval/decision", decision, by="user")
+        else:
+            decision = interrupt(_approval_brief(run), response_schema=Approval)
+            run.board.put("approval/decision", decision, by="user")
+        if decision.decision == "rejected":
+            raise Halt("rejected_by_user", decision.note or "用户否决了这次方案")
+        return {}
 
     async def outcome(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
         """把结果交给 analyze 的收尾：verified 与 judgment 从黑板读（等价于原 pass_audit 的返回值）。"""
@@ -355,7 +412,12 @@ def build_graph(stages: Any, cfg: Any, deps: Any = None, *,
     graph.add_conditional_edges("audit", _after_audit, audit_targets)
     if cfg.judges:
         graph.add_node("judges", judges)
-        graph.add_conditional_edges("judges", _after_judges, list(JUDGE_MAP))
+        # 评审接受后的去向随审批门变化（20.11）：approval 开着去 approval，否则直达 outcome。
+        graph.add_conditional_edges("judges", _after_judges,
+                                    ["manager", "trader", "approval" if cfg.approve else "outcome"])
+    if cfg.approve:
+        graph.add_node("approval", approval)
+        graph.add_edge("approval", "outcome")
     graph.add_node("outcome", outcome)
     graph.add_edge("outcome", END)
     return graph.compile(checkpointer=checkpointer)

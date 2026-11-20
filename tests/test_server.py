@@ -192,7 +192,7 @@ def test_second_start_gets_409(app: FastAPI, client: TestClient, tmp_path: Path)
 
 def test_an_unexpected_exception_ends_the_stream_with_an_error(client: TestClient, app: FastAPI,
                                                               monkeypatch: pytest.MonkeyPatch) -> None:
-    async def broken(*_args: object) -> None:
+    async def broken(*_args: object, **_kwargs: object) -> None:
         raise RuntimeError("boom")
 
     monkeypatch.setattr(server, "run_flow", broken)

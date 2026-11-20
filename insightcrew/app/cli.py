@@ -23,12 +23,12 @@ from ..adapters.scripted import Script
 from ..domain import symbols
 from ..domain.ledger import build_ledger, disagreements, recompute_ledger
 from ..domain.market import Instrument, InvalidTicker, NoData, SourceUnavailable, UnknownTicker
-from ..domain.types import DataCard, Fact, Item, Outcome, Scope
+from ..domain.types import Approval, DataCard, Fact, Item, Outcome, Proposal, Scope, Thesis
 from ..evals import run as eval_cmd
 from ..evals.scenarios import names as scenario_names
 from ..evals.scenarios import run_all, summary_line
 from ..flows import stages as flow_stages
-from ..flows.analyze import FlowConfig
+from ..flows.analyze import ApprovalPending, FlowConfig
 from ..flows.analyze import analyze as run_flow
 from ..flows.deps import Deps
 from ..kernel.board import Board
@@ -94,6 +94,8 @@ def analyze(
     no_judges: Annotated[bool, typer.Option("--no-judges", help="跳过模型评审")] = False,
     debate_rounds: Annotated[int | None, typer.Option("--debate-rounds", min=0, help="辩论轮数")] = None,
     serial: Annotated[bool, typer.Option("--serial", help="分析师按顺序跑，不并行（日志与并行相同）")] = False,
+    approve: Annotated[bool, typer.Option(
+        "--approve", help="审批门（20.11）：评审通过后暂停，在终端等你确认（接受或拒绝）后交付")] = False,
     quiet: Annotated[bool, typer.Option("--quiet", help="只打印结果，不打印过程")] = False,
     no_open: Annotated[bool, typer.Option("--no-open", help="不打开运行页面")] = False,
 ) -> None:
@@ -105,7 +107,8 @@ def analyze(
                       judges=False if no_judges else None, debate_rounds=debate_rounds,
                       channels=names, parallel=False if serial else None,
                       portfolio=portfolio, risk_rounds=risk_rounds,
-                      tools=True if tools else None, memory=True if memory else None)
+                      tools=True if tools else None, memory=True if memory else None,
+                      approve=True if approve else None)
         run, deps = open_run(settings, job.request, scenario=job.scenario, flow=job.flow,
                              portfolio=job.portfolio_path)
     except BadRequest as e:
@@ -123,6 +126,13 @@ def analyze(
 
     try:
         outcome = asyncio.run(_run(run, deps, job, show=not quiet))   # _run 经 wiring 的检查点入口
+    except ApprovalPending:
+        # 审批门暂停而没人能在这里给决定（设置里开了 approve 而 --approve 没给）：
+        # 运行未结束、可续跑；页面或带 --approve 重新发起的终端问询都能给出决定。
+        write_page(run, deps)
+        print("运行已在审批门暂停，等待你的确认（未经确认不会交付）：带 --approve 在终端确认，"
+              "或在运行页面上确认这次运行。")
+        raise typer.Exit(1) from None
     except Exception as e:            # 意外中断（D6 的命令行一半，20.7 第 11 条）：留可续跑的现场
         write_page(run, deps)         # 页面为当时已有的部分照写
         print(f"运行意外中断（{type(e).__name__}）：可用 insightcrew resume {deps.out_dir} 续跑")
@@ -149,10 +159,12 @@ async def _run(run: Run, deps: Deps, job: Job, *, show: bool) -> Outcome:
 
     经 wiring 的 run_flow 进入：带 SQLite 检查点、运行签名与 trace，被中断的运行可以用
     resume 续跑。show 时把逐行播报挂成观察者：run_flow 会把 trace 与它串起来（先测量、
-    后播报），两边的次序与内容互不干扰。"""
+    后播报），两边的次序与内容互不干扰。审批门开着时把终端问询交给流程（20.11）：
+    图在门口暂停，问询在这里拿到决定后从暂停的检查点续起。"""
     if show:
         run.observe = _say_role_lines
-    task = asyncio.create_task(run_flow_with_checkpoints(run, job.request, deps, job.flow))
+    ask = _ask_approval if job.flow.approve else None
+    task = asyncio.create_task(run_flow_with_checkpoints(run, job.request, deps, job.flow, ask=ask))
     shown = 0
     while True:
         finished = task.done()
@@ -165,6 +177,35 @@ async def _run(run: Run, deps: Deps, job: Job, *, show: bool) -> Outcome:
         if finished:
             return task.result()
         await asyncio.wait({task}, timeout=0.2)
+
+
+_YES = ("a", "y", "接受", "是", "yes", "ok")
+_NO = ("r", "n", "拒绝", "否", "no")
+
+
+def _ask_approval(run: Run) -> Approval:
+    """审批门的终端问询（BLUEPRINT 20.11）：打印方案要点，接受或拒绝，可附一句备注。
+
+    问询发生在图暂停之后：此时方案与论点都已通过审计（与评审）。只能接受或拒绝——
+    方案不能在这里改，改过的方案必须重新通过审计（决策 59）。
+    """
+    proposal = run.board.get("trader/proposal", Proposal) if run.board.has("trader/proposal") else None
+    thesis = run.board.get("manager/thesis", Thesis) if run.board.has("manager/thesis") else None
+    print()
+    if proposal is not None:
+        print("方案待你确认："
+              + (f"评级 {thesis.rating}，" if thesis is not None else "")
+              + f"操作 {proposal.action}，入场 {proposal.entry}，止损 {proposal.stop}，"
+                f"目标 {proposal.target}，仓位 {proposal.size_pct}%，持有 {proposal.horizon_days} 个交易日。")
+    print("审计与评审都已通过；接受后交付，拒绝则以 REVIEW（rejected_by_user）结束。")
+    print("只能接受或拒绝：方案本身不能在这里修改。")
+    while True:
+        answer = input("接受这次方案吗？（接受=a / 拒绝=r）：").strip().lower()
+        if answer in _YES:
+            return Approval(decision="approved", note=input("备注（可直接回车留空）：").strip())
+        if answer in _NO:
+            return Approval(decision="rejected", note=input("备注（可直接回车留空）：").strip())
+        print("请回答 a（接受）或 r（拒绝）。")
 
 
 def _progress(event: Event) -> str | None:
@@ -327,7 +368,15 @@ def resume(
     run_dir: Annotated[str, typer.Argument(help="被中断的运行目录，如 runs/20260101-120000-ACME-…-abcd")],
 ) -> None:
     """把一次被中断的运行从检查点接着跑完（日志尚未 run.finished 才可以）。"""
-    raise typer.Exit(resume_cmd.run(_settings(), run_dir))
+    try:
+        code = resume_cmd.run(_settings(), run_dir)
+    except ApprovalPending:
+        # 在审批门暂停的运行（20.11）：续跑没有带来决定，它仍在门口等着。
+        # 决定的入口是运行页面的确认按钮或带 --approve 的终端问询，不是 resume。
+        print("这次运行在审批门暂停，等待你的确认：在运行页面上确认这次运行，"
+              "或带 --approve 重新发起后在终端确认。")
+        raise typer.Exit(1) from None
+    raise typer.Exit(code)
 
 
 @app.command()

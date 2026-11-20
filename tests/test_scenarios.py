@@ -33,7 +33,7 @@ def test_scenario_matches_its_expectation(name: str, tmp_path: Path) -> None:
 def test_the_channel_scenarios_expect_what_blueprint_1813_states() -> None:
     """18.13 的表：五个新场景的调用数与预期（channels_clean 9、uncovered 8、quiet 7）。"""
     by_name = {s.name: s for s in SCENARIOS}
-    assert len(by_name) == 34      # 21 个 2.0/2.1 场景 + v2.2 的 13 个（WP32–WP35）
+    assert len(by_name) == 36      # 21 个 2.0/2.1 + v2.2 的 13 个（WP32–WP35）+ WP52 的 2 个审批门场景
     assert len(by_name["channels_clean"].expect.calls) == 9
     assert len(by_name["uncovered"].expect.calls) == 8
     assert len(by_name["quiet"].expect.calls) == 7

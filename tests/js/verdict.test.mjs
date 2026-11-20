@@ -13,7 +13,7 @@ const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../in
 function loadVerdict() {
   const files = ["00-core.js", "05-labels.js", "10-model.js", "30-verdict.js"];
   const source = files.map((name) => readFileSync(path.join(SRC, name), "utf8")).join("\n");
-  const wrapper = `(function () {\n"use strict";\n${source}\nreturn { fold, verdictStatusOf, verdictProgress, verdictAdvice, verdictData, verdictStageOf };\n})()`;
+  const wrapper = `(function () {\n"use strict";\n${source}\nreturn { fold, verdictStatusOf, verdictProgress, verdictAdvice, verdictData, verdictStageOf, waitingApprovalOf, approvalReasonText };\n})()`;
   return vm.runInNewContext(wrapper, {});
 }
 
@@ -110,4 +110,37 @@ test("verdictStageOf：产物按键前缀与首段归段，评审按执行者归
   assert.equal(verdictStageOf(ev(2, "artifact.written", "portfolio",
     { key: "portfolio/state", version: 1, value: {} })), null);   // 不属于任何流水线段
   assert.equal(verdictStageOf(ev(2, "model.failed", "risk.aggressive", {}, "risk#1")), "risk");
+});
+
+test("waitingApprovalOf：审批门暂停的判定（WP52，20.11）——到了门口才算等待", () => {
+  const { fold, waitingApprovalOf } = loadVerdict();
+  const start = (flow) => [ev(1, "run.started", "app",
+    { mode: "scripted", request: { ticker: "ACME", as_of: "2026-09-30" }, flow: flow })];
+  const gate = (flow) => [...start(flow),
+    ev(2, "artifact.written", "trader", { key: "trader/proposal", version: 1, value: {} }, "trader#1"),
+    ev(3, "artifact.written", "auditor", { key: "audit/status", version: 1,
+      value: { verdict: "pass", proposal_seq: 2, thesis_seq: 1, analysis_seq: 0 } }),
+    ev(4, "artifact.written", "flow", { key: "judges/status", version: 1, value: "accepted 2/3" })];
+  /* 到了门口、没人给过决定：等待（直播流已收尾的暂停，与静态页上的暂停同样判等待） */
+  assert.equal(waitingApprovalOf(fold(gate({ approve: true }), null, false), true, true), true);
+  assert.equal(waitingApprovalOf(fold(gate({ approve: true }), null, false), false, true), true);
+  /* 门没开（默认）、决定已在板上、approve 开着但还没到门口（评审没给结论）：都不是等待 */
+  assert.equal(waitingApprovalOf(fold(gate({}), null, false), true, true), false);
+  assert.equal(waitingApprovalOf(fold([...gate({ approve: true }),
+    ev(5, "artifact.written", "user", { key: "approval/decision", version: 1,
+      value: { decision: "approved", note: "" } })], null, false), true, true), false);
+  assert.equal(waitingApprovalOf(fold([...start({ approve: true }),
+    ev(2, "artifact.written", "trader", { key: "trader/proposal", version: 1, value: {} })],
+    null, false), true, true), false);
+  /* 评审关闭时以审计通过为准：门口成立即等待 */
+  assert.equal(waitingApprovalOf(fold(gate({ approve: true, judges: false }), null, false), true, true), true);
+  /* 没到门口的普通中断（比如辩论中取消）不因 approve 开着就算等待 */
+  assert.equal(waitingApprovalOf(fold([...start({ approve: true }),
+    ev(2, "model.called", "bull", { output: {} }, "debate#1")], null, false), true, true), false);
+});
+
+test("approvalReasonText：rejected_by_user 用本视图的私有标签，其余照旧落生键名", () => {
+  const { approvalReasonText } = loadVerdict();
+  assert.equal(approvalReasonText("rejected_by_user"), "你否决了这次方案");
+  assert.equal(approvalReasonText("contested"), "评审多数反对，未达成共识");
 });
