@@ -245,6 +245,8 @@ def _models(settings: Settings, started: Event) -> Any:
     from ..adapters.models import Tiers, build  # 局部引入避免加载顺序问题
     from ..adapters.scripted import Script
 
+    if settings.force_offline:
+        return Script({})
     key = settings.api_key.get_secret_value() if settings.api_key else None
     try:
         return Tiers(build(settings.tiers.quick, base_url=settings.base_url, api_key=key),

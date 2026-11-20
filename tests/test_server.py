@@ -5,7 +5,7 @@
 版本 2.3（BLUEPRINT 20.8）：网页运行带检查点（D5）；取消与续跑；事件流带 trace 行与
 keep-alive、end 报 finished/interrupted；报告与静态页导出；meta 扩展；组合按名字选；
 计划预览。凡走续跑路径的测试都设 IC_FORCE_OFFLINE=1 并给 resume._models 换剧本
-（问题 38：它不看 force_offline，不换会想对真实端点发请求）。"""
+（离线时 _models 只给空剧本，问题 38；续跑要走到交付就得有回复）。"""
 from __future__ import annotations
 
 import asyncio
@@ -466,8 +466,8 @@ def test_a_cancelled_scripted_run_is_interrupted_and_resumes_to_delivered(
     listed = client.get("/api/runs").json()["runs"]
     assert listed[0]["status"] == "incomplete" and listed[0]["resumable"] is True
 
-    monkeypatch.setattr(resume_cmd, "_models",                     # 问题 38：_models 不看 force_offline，
-                        lambda s, e: Script(load_one("demo").replies))   # 测试里换成剧本，另以环境变量兜底
+    monkeypatch.setattr(resume_cmd, "_models",                     # 离线的 _models 是空剧本（问题 38），
+                        lambda s, e: Script(load_one("demo").replies))   # 续跑到交付需要 demo 的回复
     reply = client.post(f"/api/runs/{run_id}/resume")
     assert reply.status_code == 202 and reply.json() == {"run_id": run_id}
     messages = _watch(client, run_id)                              # 看着续跑跑完

@@ -275,8 +275,7 @@ def test_resume_carries_the_requests_already_spent(runs: Path,
 def test_resume_truncates_a_torn_last_line(runs: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """D8：最后一行写了一半（没有换行、也解析不过）先截到完整行，说一行，然后照常续跑。
 
-    续跑用的模型来源换成空剧本（问题 37：resume 的 _models 不看 IC_FORCE_OFFLINE，
-    不换会在离线测试里对着 .env 的密钥发真请求）。"""
+    续跑用的模型来源换成 demo 的剧本，好让续跑照常走完（离线的 _models 只给空剧本，问题 38）。"""
     settings = load(wiring.ROOT, force_offline=True)
     run_dir = _crashed_run(settings, runs)
     monkeypatch.setattr(resume_cmd, "_models",
@@ -288,6 +287,14 @@ def test_resume_truncates_a_torn_last_line(runs: Path, monkeypatch: pytest.Monke
     assert code == 0 and "已截" in output                        # 一行说明 + 照常续跑
     lines = journal.read_text(encoding="utf-8").splitlines()
     assert all(json.loads(line) for line in lines)              # 剩下的每一行都完整
+
+
+def test_resume_models_respect_force_offline() -> None:
+    """问题 38：设置能构造出真实模型时，IC_FORCE_OFFLINE 仍让续跑只得到空剧本，不发请求。"""
+    settings = load(wiring.ROOT, tiers={"quick": "some-model", "deep": "some-model"},
+                    base_url="http://127.0.0.1:9/v1", api_key="sk-test", force_offline=True)
+    started = resume_cmd.Event(seq=1, ts="2026-11-21T00:00:00", type="run.started")
+    assert isinstance(resume_cmd._models(settings, started), Script)
 
 
 def test_resume_still_refuses_a_bad_line_in_the_middle(runs: Path) -> None:
