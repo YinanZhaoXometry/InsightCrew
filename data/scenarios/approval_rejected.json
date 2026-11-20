@@ -170,7 +170,7 @@
     "status": "review",
     "reason": "rejected_by_user",
     "facts_and_rules": "verified",
-    "judgment": "not reviewed",
+    "judgment": "accepted 2/3",
     "calls": [
       "technical",
       "bull",

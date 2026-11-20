@@ -187,6 +187,11 @@ def _degrade(run: Run, halt: Halt) -> Outcome:
     if halt.reason in _RESOURCE and audited and not run.board.has("judges/status"):
         return Outcome(status="delivered", reason=halt.reason, facts_and_rules="verified",
                        judgment=f"not reviewed: {halt.reason}")
+    if halt.reason == "contested":
+        judgment = "contested"
+    elif halt.reason == "rejected_by_user" and run.board.has("judges/status"):
+        judgment = run.board.get("judges/status", str)   # 问题 45：用户否决的是评审已给结论的方案
+    else:
+        judgment = "not reviewed"
     return Outcome(status="review", reason=halt.reason,
-                   facts_and_rules="verified" if audited else "unverified",
-                   judgment="contested" if halt.reason == "contested" else "not reviewed")
+                   facts_and_rules="verified" if audited else "unverified", judgment=judgment)

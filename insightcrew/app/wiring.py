@@ -354,6 +354,8 @@ def open_run(settings: Settings, request: dict[str, Any], *, scenario: Scenario 
         "limits": {"max_requests": limits.max_requests, "max_seconds": limits.max_seconds,
                    "request_timeout_s": limits.request_timeout_s},
         "thread": run_signature(request, deps, cfg, names),   # 运行签名（19.5 第 6 条）：resume 核对用
+        # 组合原件：resume 据此重算签名并接着用它（问题 43），组合阶段之前中断的运行也复原得了
+        "portfolio": deps.portfolio.model_dump(mode="json") if deps.portfolio is not None else None,
     })
     if cfg.approve:
         _preset_approval(run, scenario, replay)     # 20.11：场景/重放自带决定时预置，图到门口入账、不暂停

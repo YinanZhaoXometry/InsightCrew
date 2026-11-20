@@ -31,6 +31,7 @@ _REASON = {
     "time_exhausted": "时间预算已用尽",
     "calls_exhausted": "模型请求次数已用尽",
     "model_unavailable": "模型不可用",
+    "rejected_by_user": "你否决了这次方案",
 }
 _JUDGES = {"evidence": "证据评审", "conservative": "保守评审", "aggressive": "进取评审"}
 _STAGES = {"technical": "技术分析", "fundamentals": "基本面分析", "disclosures": "公告分析",

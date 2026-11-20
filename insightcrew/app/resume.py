@@ -19,12 +19,14 @@ resume_run 是续跑本身（异步，供网页的运行控制调用，BLUEPRINT
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
 
+from ..domain.portfolio import Portfolio
 from ..domain.types import Outcome
 from ..flows.analyze import FlowConfig
 from ..flows.analyze import drive as drive_flow
@@ -137,6 +139,10 @@ async def resume_run(settings: Settings, path: Path) -> Outcome:
         deps = build_deps(restored)
     except OSError as e:
         raise BadRequest(f"数据集 {restored.run.universe!r} 读不出来：{e}") from e
+    # 问题 43：组合按原运行复原——run.started 记录的原件优先，更早的运行取黑板上的 portfolio/input
+    portfolio = started.data.get("portfolio") or board.snapshot().get("portfolio/input")
+    if portfolio is not None:
+        deps = dataclasses.replace(deps, portfolio=Portfolio.model_validate(portfolio))
 
     recorded_thread = started.data.get("thread")
     recomputed = run_signature(request, deps, flow,
@@ -159,8 +165,10 @@ async def resume_run(settings: Settings, path: Path) -> Outcome:
     mark(trace, "run.resumed", after_seq=events[-1].seq)
 
     async with checkpoint(path.parent) as saver:
+        # 问题 44：第一个超步落盘之前被中断的运行没有检查点可接，从图的起点跑
+        started_graph = await saver.aget_tuple({"configurable": {"thread_id": recomputed}})
         outcome = await drive_flow(run_ctx, request, deps, flow, checkpointer=saver,
-                                   thread_id=recomputed, resume=True)
+                                   thread_id=recomputed, resume=started_graph is not None)
 
     write_page(run_ctx, deps)
     return outcome

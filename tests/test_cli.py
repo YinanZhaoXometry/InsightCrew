@@ -289,6 +289,58 @@ def test_resume_truncates_a_torn_last_line(runs: Path, monkeypatch: pytest.Monke
     assert all(json.loads(line) for line in lines)              # 剩下的每一行都完整
 
 
+def _opened_run(settings: Settings, runs: Path, portfolio: str = "") -> Path:
+    """只写了 run.started 的运行：取消落在第一个检查点之前（问题 44）。"""
+    job = wiring.prepare(settings, scenario="demo")
+    _, deps = wiring.open_run(settings, job.request, scenario=load_one("demo"), flow=job.flow,
+                              runs_dir=runs, portfolio=portfolio)
+    assert deps.out_dir is not None
+    return deps.out_dir
+
+
+def _finished(run_dir: Path) -> list[dict]:
+    lines = (run_dir / "journal.jsonl").read_text(encoding="utf-8").splitlines()
+    return [e for e in map(json.loads, lines) if e["type"] == "run.finished"]
+
+
+def test_resume_before_the_first_checkpoint_starts_the_graph_over(
+        runs: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """问题 44：没有检查点可接时，续跑从图的起点跑，而不是以 EmptyInputError 死掉。"""
+    settings = load(wiring.ROOT, force_offline=True)
+    run_dir = _opened_run(settings, runs)
+    monkeypatch.setattr(resume_cmd, "_models", lambda s, e: Script(load_one("demo").replies))
+    outcome = asyncio.run(resume_cmd.resume_run(settings, run_dir / "journal.jsonl"))
+    assert (outcome.status, outcome.reason) == ("delivered", "ok")
+    assert len(_finished(run_dir)) == 1
+
+
+@pytest.mark.parametrize("crash", [True, False], ids=["after_ledger", "before_first_checkpoint"])
+def test_resume_restores_the_portfolio(runs: Path, monkeypatch: pytest.MonkeyPatch,
+                                       crash: bool) -> None:
+    """问题 43：带组合的运行能续跑——签名按原运行的组合重算，续跑用的也是那份组合。"""
+    settings = load(wiring.ROOT, force_offline=True)
+    portfolio = "data/portfolios/flat_usd.json"
+    if crash:
+        scenario = load_one("demo")
+        job = wiring.prepare(settings, scenario="demo")
+        run, deps = wiring.open_run(settings, job.request, scenario=scenario, flow=job.flow,
+                                    runs_dir=runs, portfolio=portfolio)
+        run.models = _CrashOn(scenario.replies, "trader")
+        with pytest.raises(RuntimeError):
+            asyncio.run(wiring.run_flow(run, job.request, deps, job.flow))
+        assert deps.out_dir is not None
+        run_dir = deps.out_dir
+    else:
+        run_dir = _opened_run(settings, runs, portfolio)
+    monkeypatch.setattr(resume_cmd, "_models", lambda s, e: Script(load_one("demo").replies))
+    asyncio.run(resume_cmd.resume_run(settings, run_dir / "journal.jsonl"))
+    assert len(_finished(run_dir)) == 1
+    lines = (run_dir / "journal.jsonl").read_text(encoding="utf-8").splitlines()
+    written = [e["data"]["value"] for e in map(json.loads, lines)
+               if e["type"] == "artifact.written" and e["data"]["key"] == "portfolio/input"]
+    assert written and written[-1]["currency"] == "USD"
+
+
 def test_resume_models_respect_force_offline() -> None:
     """问题 38：设置能构造出真实模型时，IC_FORCE_OFFLINE 仍让续跑只得到空剧本，不发请求。"""
     settings = load(wiring.ROOT, tiers={"quick": "some-model", "deep": "some-model"},

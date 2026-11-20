@@ -541,8 +541,8 @@ def test_resume_refuses_what_it_cannot_continue(settings: Settings, client: Test
                                                 tmp_path: Path,
                                                 monkeypatch: pytest.MonkeyPatch) -> None:
     """20.8 第 3 条的拒绝：已结束、签名不一致、版本 2.2 之前、没有检查点、另有运行在进行、
-    没有这个运行；理由是中文，落在 409 的回复里。签名不一致以带组合的运行触发：续跑重算
-    签名时不复原组合（resume 的既有读法，见会话记录），指纹必不相同。"""
+    没有这个运行；理由是中文，落在 409 的回复里。签名不一致：把带组合的运行在 run.started
+    里记录的组合换成另一份，重算的组合指纹与记录的签名对不上。"""
     monkeypatch.setenv("IC_FORCE_OFFLINE", "1")                   # 本测试走 resume_run 的拒绝前缀
     finished = _start(client, scenario="demo")
     _watch(client, finished)
@@ -551,6 +551,13 @@ def test_resume_refuses_what_it_cannot_continue(settings: Settings, client: Test
     assert reply.status_code == 409 and "已经结束" in reply.json()["error"]
 
     crashed = _crashed_run(settings, tmp_path, portfolio="data/portfolios/flat_usd.json")
+    journal = crashed / "journal.jsonl"
+    lines = journal.read_text(encoding="utf-8").splitlines()
+    first = json.loads(lines[0])
+    first["data"]["portfolio"] = json.loads(
+        (ROOT / "data" / "portfolios" / "held_acme.json").read_text(encoding="utf-8"))
+    journal.write_text("\n".join([json.dumps(first, ensure_ascii=False), *lines[1:]]) + "\n",
+                       encoding="utf-8")                         # 记录的组合换成另一份：指纹对不上
     reply = client.post(f"/api/runs/{crashed.name}/resume")
     assert reply.status_code == 409 and "运行签名不一致" in reply.json()["error"]
 

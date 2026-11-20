@@ -111,7 +111,8 @@ async def test_a_paused_run_resumes_with_an_approved_decision():
 
 
 async def test_a_rejected_decision_ends_review_with_rejected_by_user():
-    """拒绝：运行以 REVIEW、原因 rejected_by_user 结束；方案已过审计，核验仍是 verified。"""
+    """拒绝：运行以 REVIEW、原因 rejected_by_user 结束；方案已过审计，核验仍是 verified；
+    判断照录评审已给的结论（问题 45）。"""
     run, cfg = _run(), FlowConfig(approve=True)
     saver = InMemorySaver()
     with pytest.raises(ApprovalPending):
@@ -119,7 +120,7 @@ async def test_a_rejected_decision_ends_review_with_rejected_by_user():
     outcome = await drive(run, REQUEST, None, cfg, checkpointer=saver, thread_id="gate",
                           decision=REJECTED)
     assert outcome.status == "review" and outcome.reason == "rejected_by_user"
-    assert outcome.facts_and_rules == "verified" and outcome.judgment == "not reviewed"
+    assert outcome.facts_and_rules == "verified" and outcome.judgment == "accepted 2/3"
     assert run.board.get("approval/decision", Approval) == REJECTED
     assert [e.type for e in run.journal.events][-1] == "run.finished"
 
