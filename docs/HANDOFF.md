@@ -2478,6 +2478,7 @@ Commands run, with the last lines of their output:
   修后：tests/test_cli.py test_server.py test_approval.py test_graph.py test_wiring.py 连跑三次 → 128 passed ×3
   ./scripts/check.sh → 910 passed；ruff/pyright 0；36 场景 ✓；53/53 重放一致；eval all 6/6；「check.sh：全部阶段通过。」退出 0
   IC_FORCE_OFFLINE=1 uv run insightcrew analyze --scenario approval_rejected --no-open → 「结果：REVIEW（原因：rejected_by_user）；核验：verified；判断：accepted 2/3」；report.md「原因：你否决了这次方案。」「模型判断：评审接受（2/3）」
+  提交 `32fd8e9` 后 git archive 重建 `../InsightCrew.zip`（484 个文件，无 .env、runs/、data/market/real/、.venv）；空目录 /tmp/q4x-fresh 解包 → uv sync 成功 → 910 passed → IC_FORCE_OFFLINE=1 analyze --no-open「结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified」。本段入库后 zip 从最终 HEAD 再建一次（与已验证的树只差本段文字）。
 
 Not run, and why: 浏览器里的"首检查点前取消→续跑"未重做（取消须落在约 46ms 内，WP51 也只能经 API 背靠背做到；路径已由 resume_run 的测试覆盖，网页续跑调的是同一个函数）。无网络请求、无真实模型、未读未打印 `.env`。
 
