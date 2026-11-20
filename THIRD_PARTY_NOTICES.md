@@ -16,7 +16,7 @@ recorded as HANDOFF question 15 for the owner to confirm.
 
 ## Files adapted
 
-Found by `grep -rl "Adapted from TradingAgents"` over `insightcrew/` and `data/` (WP39, 2026-11-20), one per line:
+Found by `grep -rl "Adapted from TradingAgents"` over `insightcrew/` and `data/` (WP39, 2026-11-20), one per line. Re-verified by WP39 for version 2.3 (2026-11-20): version 2.3 adapted nothing from either reference codebase (BLUEPRINT 20.2), and the same grep returns the same twenty files, so the list is unchanged from version 2.2:
 
 ```
 data/macro.toml

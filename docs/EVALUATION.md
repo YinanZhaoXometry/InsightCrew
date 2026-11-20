@@ -1,12 +1,13 @@
 # Evaluation
 
-What InsightCrew version 2.2 was tested on, what happened, and what the results do and do not support. Every number here comes from a command you can re-run or a journal archived in `insightcrew/evals/archive/`. Commands are run from the repository root. The real-model journals are all from versions 2.0 and 2.1; the nine version 2.2 real-model cells are defined and **not run** (section 3c).
+What InsightCrew version 2.3 was tested on, what happened, and what the results do and do not support. Every number here comes from a command you can re-run or a journal archived in `insightcrew/evals/archive/`. Commands are run from the repository root. The real-model journals are 43 from versions 2.0 to 2.2 and 10 from version 2.3 (one pilot and the nine cells of section 3c, each archived with its `trace.jsonl`); every one of the 53 replays `一致` and passes `verify`.
 
 ## Contents
 
 1. [What is being evaluated](#1-what-is-being-evaluated)
 2. [Offline evaluations](#2-offline-evaluations)
 3. [Real-model runs](#3-real-model-runs)
+3c. [The version 2.2 cells on a real model](#3c-the-version-22-cells-on-a-real-model)
 4. [What the real runs changed](#4-what-the-real-runs-changed)
 5. [Ablation](#5-ablation)
 6. [Failure cases and observations](#6-failure-cases-and-observations)
@@ -17,23 +18,24 @@ What InsightCrew version 2.2 was tested on, what happened, and what the results 
 
 The system defends one claim: **no number reaches the user unchecked, and no proposal that breaks a stated limit is delivered.** The evaluation is built around that claim, in two parts:
 
-- **The mechanism, offline.** Does each gate catch what it should, and nothing it should not? Do the two computation paths agree, for every pair including the new macro and settlement pairs? Does anything dated after the analysis date ever get through, in any of the eight point-in-time sweeps? These run with no model and no network, so the results are exact and anyone can reproduce them.
-- **Behaviour with a real model.** Does the flow complete with a real model, what does it cost, how often is work sent back, and what does each part of the verification change? These results come from DeepSeek models, archived as journals.
+- **The mechanism, offline.** Does each gate catch what it should, and nothing it should not? Do the two computation paths agree, for every pair including the macro and settlement pairs? Does anything dated after the analysis date ever get through, in any of the eight point-in-time sweeps? Does a journal's structure hold up under an offline check? These run with no model and no network, so the results are exact and anyone can reproduce them.
+- **Behaviour with a real model.** Does the flow complete with a real model, what does it cost, how often is work sent back, and what does each part of the verification change? These results come from DeepSeek models, archived as journals — and, since version 2.3, with timing traces beside them.
 
 It does not evaluate whether the ratings are good trades. Section 7 explains why it cannot.
 
 ## 2. Offline evaluations
 
-`uv run insightcrew eval all` runs the first three blocks and exits 0; `uv run insightcrew scenarios` runs the fourth.
+`uv run insightcrew eval all` runs the first three blocks and exits 0; `uv run insightcrew scenarios` runs the fourth; `scripts/check.sh` runs all of it plus the three checks in one command.
 
 | Evaluation | Result |
 |---|---|
 | Fault injection (`eval inject`) | 19 of 19 injected faults caught, 0 of 6 valid variants flagged; with both v2.1 channels 6 of 6 caught, 0 of 2 flagged; version 2.2 faults 6 of 6 caught, 0 of 2 flagged |
 | Two-path consistency (`eval consistency`) | Indicators 277 data points × 29 declared facts, all equal; fundamentals 46 dates × 12 facts, all equal; tools 63 calls × two paths (7 families × 3 analysis dates × 3 windows), all equal; macro 96 points × two paths, all equal |
 | Point in time (`eval pit`) | 18 data points, 864 ledger facts: later bars change no fact; channels 16 data points; then six version 2.2 sweeps — news 9, social 9, macro 91, prediction markets 6, lessons 5, tools 63 — all clean |
-| Scenarios (`scenarios`) | 34 of 34 scripted runs end as specified (21 from versions 2.0/2.1, 13 for the version 2.2 capabilities) |
-| Replay of the archive | 43 of 43 archived journals replay `一致` (`IC_FORCE_OFFLINE=1`, exit 0 each) |
-| Tests (`pytest`) | 825 passed |
+| Scenarios (`scenarios`) | 36 of 36 scripted runs end as specified (21 from versions 2.0/2.1, 13 for the version 2.2 capabilities, 2 for the approval gate) |
+| Replay of the archive | 53 of 53 archived journals replay `一致` (`IC_FORCE_OFFLINE=1`, exit 0 each) |
+| Structure of the archive (`verify`) | 53 of 53 pass the offline structural check (exit 0 each); a journal with a deleted middle line fails it |
+| Tests (`pytest`) | 906 passed with Node present; without Node the 2 page-Node tests skip (904 passed, 2 skipped) |
 
 **Fault injection.** Starts from the passing board of the `clean` scenario and changes one thing at a time. Each fault must produce a finding with a specific check:
 
@@ -75,7 +77,7 @@ The version 2.2 block runs through the real portfolio and analysis chain (the po
 
 Its two valid variants — a Buy with headroom under a held small position, and a score exactly on a band's upper edge — were not flagged.
 
-**Scenarios.** Each file in `data/scenarios/` is a scripted run on the real stages, with its expected outcome stated in the file. The 21 from versions 2.0 and 2.1 cover every route through the flow (`clean`, `demo`, `misquote`, `stubborn`, `flailing`, `revise_levels`, `revise_thesis`, `contested`, `malformed_judge`, `malformed_manager`, `budget_early`, `budget_late`, `hold`, `thin`, `stale`, `unknown`, `channels_clean`, `misquote_fundamentals`, `ghost_item`, `uncovered`, `quiet`). The 13 new ones cover the capabilities:
+**Scenarios.** Each file in `data/scenarios/` is a scripted run on the real stages, with its expected outcome stated in the file. The 21 from versions 2.0 and 2.1 cover every route through the flow (`clean`, `demo`, `misquote`, `stubborn`, `flailing`, `revise_levels`, `revise_thesis`, `contested`, `malformed_judge`, `malformed_manager`, `budget_early`, `budget_late`, `hold`, `thin`, `stale`, `unknown`, `channels_clean`, `misquote_fundamentals`, `ghost_item`, `uncovered`, `quiet`). The 13 of version 2.2 cover the capabilities:
 
 | Scenario | Shows | Ends |
 |---|---|---|
@@ -93,15 +95,17 @@ Its two valid variants — a Buy with headroom under a held small position, and 
 | `memory_lessons` | One lesson known before the date, one after: only the first reaches the board | delivered |
 | `memory_record` | A delivered run appends one decision; a review run appends none | delivered / review |
 
+The two of version 2.3 cover the approval gate: `approval_approved` (the call sequence of `clean` with the decision recorded and delivered) and `approval_rejected` (the run ends `review`, `rejected_by_user`).
+
 The faults in the scenarios are planted by the script, so the catch rate is true by construction. What the scenarios show is the routing: which gate catches which fault, who is sent back, and what is delivered.
 
-**Point in time, six new sweeps.** News and social (9 points each): an item dated after the analysis date never passes a port, and later items do not change an earlier window. Macro (91 points): a vintage dated after the analysis date is never used; two CPI restatements read day by day — 329.4 becomes 329.5 only from the day the revision takes effect, 337.0 becomes 337.2 likewise. Prediction markets (6 points): a snapshot is read only when `fetched_on` equals the analysis date. Lessons (5 points): an outcome known after the analysis date is never selected, the boundary day included. Tools (63 points): tools use only bars up to the analysis date — a deliberately leaky port that ignores `as_of` gives the same answers as the honest one on every family, date and window.
+**Point in time, six sweeps.** News and social (9 points each): an item dated after the analysis date never passes a port, and later items do not change an earlier window. Macro (91 points): a vintage dated after the analysis date is never used; two CPI restatements read day by day — 329.4 becomes 329.5 only from the day the revision takes effect, 337.0 becomes 337.2 likewise. Prediction markets (6 points): a snapshot is read only when `fetched_on` equals the analysis date. Lessons (5 points): an outcome known after the analysis date is never selected, the boundary day included. Tools (63 points): tools use only bars up to the analysis date — a deliberately leaky port that ignores `as_of` gives the same answers as the honest one on every family, date and window.
 
 ## 3. Real-model runs
 
 **Setup.** Quick tier `deepseek:deepseek-flash` (five roles and the three judges, at low reasoning effort), deep tier `deepseek:deepseek-v4-pro` (the Research Manager, at high effort). Tool output (`run.output_mode = "auto"`). Prices from Pydantic AI's table. The synthetic tickers are `ACME` (US) and `0000.HK` and `GAPPY` (Hong Kong); `AAPL` and `0700.HK` are real bars from Eastmoney.
 
-Every row below is a directory in `insightcrew/evals/archive/` holding the run's `journal.jsonl`. Revisions are `route` events. Retries are corrective retries (requests minus calls). Cost is in USD.
+Every row below is a directory in `insightcrew/evals/archive/` holding the run's `journal.jsonl` — and, for the ten runs of section 3c, its `trace.jsonl`. Revisions are `route` events. Retries are corrective retries (requests minus calls). Cost is in USD.
 
 **Final v2.0 configuration, synthetic bars:**
 
@@ -142,23 +146,37 @@ What this shows, and what it does not:
 - **The real-universe cells ran with both channels unavailable** — the live evidence downloads were blocked by the network during the build (ROADMAP), so no evidence files exist for real tickers and the channels report unavailable there. Those cells therefore differ from `none` only by the two status lines.
 - **Cost and rework rise with the channels** (about 2.4× cost in `both`); the citation share stays low; the REVIEW rate is unchanged. Four cells per configuration cannot separate any of that from chance (section 7), which is why `[flow] channels` is left unset in `insightcrew.toml`.
 
-## 3c. The version 2.2 cells: defined, not run
+## 3c. The version 2.2 cells on a real model
 
-Version 2.2's five capabilities and the LangGraph orchestration have run only under the scripted model (the 13 scenarios above, 825 tests). `uv run insightcrew eval v22` lists the nine real-model cells and exits 2 — **they are not run**: each spends real money, and the owner's spending cap (HANDOFF question 14) has not been given.
+The five capabilities and the LangGraph orchestration ran on the real model on 2026-11-20, on version 2.3 after the hardening: one pilot, then the nine cells of `eval v22` (serially, cost accumulating). Every run is archived with its journal and its `trace.jsonl`; every archive replays `一致` and passes `verify`. The summary is `insightcrew/evals/archive/v22.json`.
 
-| Cell | Request | Measures |
-|---|---|---|
-| `acme_all_on` | ACME 2026-09-30, every capability on, parallel | One run through all five capabilities and the parallel analysts |
-| `acme_all_off` | ACME 2026-09-30, everything off | The baseline: behaviour identical to 2.1 |
-| `acme_risk_on` | ACME, `risk_rounds = 1` | The risk debate alone |
-| `acme_tools_on` | ACME, tools on | Analyst tool calls alone |
-| `acme_portfolio` | ACME, `data/portfolios/flat_usd.json` | The portfolio rules and report section |
-| `aapl_risk_on` | AAPL 2026-09-30, real bars, risk on | The debate on a real instrument |
-| `aapl_tools_on` | AAPL, real bars, tools on | Tools on a real instrument |
-| `hk_all_on` | 0700.HK 2026-09-30, real bars, everything on | The whole system on a Hong Kong instrument |
-| `wall_serial` | ACME, `parallel = false` | Serial wall time, against the parallel cells |
+**Pilot** (`20261120-202059-ACME-2026-09-30-a7c3`): ACME 2026-09-30 with every capability on (five channels, risk debate, tools, memory, parallel analysts), started from the command line. Delivered, `accepted 2/3`, verified; zero audit findings; cost 0.0383 USD. The manager's thesis cited channel evidence on its own. No prompt was changed anywhere in this evaluation: no journal showed a fault.
 
-The ablation this version was designed to inform — whether the risk debate and the three judges both earn their cost (BLUEPRINT decision 45) — is likewise **pending**: it waits on these cells. Nothing about the capabilities' effect on decisions, cost or wall time is claimed until then.
+| Cell | Run | Outcome | Rating | Revisions | Calls | Retries | Tokens | Cost USD | Wall (trace) |
+|---|---|---|---|---|---|---|---|---|---|
+| `acme_all_on` | `20261120-203125-ACME-2026-09-30-2794` | delivered ok | Hold | 0 | 15 | 0 | 113,906 | 0.045239 | 265 s |
+| `acme_all_off` | `20261120-203551-ACME-2026-09-30-84eb` | review contested | (withheld) | 1 | 12 | 1 | 107,299 | 0.048487 | 327 s |
+| `acme_risk_on` | `20261120-204118-ACME-2026-09-30-fa62` | delivered ok | Hold | 0 | 12 | 0 | 84,220 | 0.028055 | — |
+| `acme_tools_on` | `20261120-204440-ACME-2026-09-30-34af` | delivered ok | Hold | 0 | 7 | 0 | 41,946 | 0.017182 | — |
+| `acme_portfolio` | `20261120-204632-ACME-2026-09-30-7bbf` | delivered ok | Hold | 0 | 8 | 0 | 56,956 | 0.027410 | — |
+| `aapl_risk_on` | `20261120-204953-AAPL-2026-09-30-023a` | delivered ok | Hold | 0 | 12 | 0 | 86,248 | 0.032170 | — |
+| `aapl_tools_on` | `20261120-205319-AAPL-2026-09-30-e0d1` | delivered ok | Hold | 0 | 8 | 0 | 47,417 | 0.016503 | — |
+| `hk_all_on` | `20261120-205454-0700.HK-2026-09-30-a6d5` | delivered ok | Underweight | 0 | 12 | 0 | 83,446 | 0.027859 | — |
+| `wall_serial` | `20261120-205745-ACME-2026-09-30-a933` | delivered ok | Hold | 1 | 11 | 1 | 96,528 | 0.036200 | 261 s |
+
+Total spend: 0.3174 USD of the 2 USD cap (pilot 0.0383 + cells 0.2791). One earlier attempt at the first cell was stopped when its run directory showed no trace (the evaluation was entering the flow without checkpoints); its 0.0249 USD is journaled in `runs/` but not archived, and one in-flight call it interrupted (estimated ≤ 0.014 USD) is in no file — the same loss every interruption has.
+
+**Parallel against serial, from the traces.** In `acme_all_on` the five analysts (technical plus four channels) ran concurrently: their call durations sum to 48.0 s and the group spans 13.7 s — the overlap saved about 34 s on that group. The same-shaped minimal pair (`acme_all_off` parallel at 327 s against `wall_serial` serial at 261 s) says nothing about the mechanism: with everything off the group is one analyst, and the parallel cell went `contested` (an extra judge round and revision, one more call, one retry), so the difference is model latency variance and a different path, not the cost of parallelism. What that pair does show is the compatibility rule: all-off parallel behaves exactly as 2.1 did.
+
+**Real-bar cells.** AAPL and 0700.HK have no news, sentiment or macro archive (no live source has ever been fetched) and no fundamentals or disclosures files, so all five channels report `unavailable`, with the reason, in the results table — and the runs deliver, the channel analysts skipped by the gate. This is the explicit-absence rule working, not a failure.
+
+**What the cells measured and what they did not:**
+
+- **Every capability ran on a real model and delivered** (8 of 9 cells; the ninth is a `contested` refusal, which is the system refusing rather than guessing). Costs sit between 0.017 and 0.048 USD a cell against the 220,000-token run ceiling (largest run 113,906 tokens).
+- **The tool mechanism was never exercised by the model's own choice:** in every run with tools on, DeepSeek made zero tool calls — the ledger already held the facts the prompt asks for. The mechanism itself is proven offline (the two scripted scenarios and the kernel tests). Making a real run call a tool would need a prompt change, which is the owner's to order.
+- **The risk debate and the judges both ran** in the cells that switch them on; the revision counts are zero except where noted. Whether they earn their cost is a question these nine cells cannot answer (section 7).
+- **Retries:** two of 102 calls had `requests > 1` (one in `acme_all_off`, one in `wall_serial`), absorbed by the OpenAI SDK's built-in retry (default two, confirmed by reading the installed source; Pydantic AI adds none). The kernel has no retry of its own.
+- **Memory wrote idempotently:** the pilot appended one ACME decision; `acme_all_on` the same day and ticker was ignored; `hk_all_on` appended one 0700.HK decision, pending settlement.
 
 ## 4. What the real runs changed
 
@@ -183,6 +201,8 @@ Round 1, the same cells with the judges at high effort:
 | `…092432-GAPPY-2026-09-29-ee52` | delivered | 0 | 8 | 0 | 0 | 48,459 | 0.0394 | 129 |
 
 Compared with the final configuration, refusals fell from 3 in 6 to 0 in 5, truncated replies from 4 to 0, and the typical cost roughly halved. The prompt line and the lower effort were changed in the same step, so their effects cannot be separated. Whether lower effort makes the judges' critiques worse was not measured. After the change their critiques still cite specific facts, but nobody scored them.
+
+The version 2.3 runs changed no prompt and no setting: no journal showed a fault (the `manager.md` sentence about `memory/status` that the strictest prompt-integrity reading would flag is recorded as an open question for the owner, and no run misbehaved because of it).
 
 ## 5. Ablation
 
@@ -218,11 +238,11 @@ What this supports:
 - **The audit found nothing to send back.** See section 6.
 - **Run-to-run noise is about the size of the effects.** With an audit that never fires, `no_judges` and `shadow` are the same flow, yet they disagree on one cell in four (Underweight against Sell). Removing the debate changed two cells, both to Buy. That is barely above the noise, so it is evidence neither for nor against the debate.
 
-The version 2.2 ablation — the risk debate against the judges, both lenses now arguing risk — is pending the cells of section 3c.
+The risk-debate-against-judges ablation (both lenses arguing risk) remains unrun: it needs cells deliberately configured for it, and more of them than nine.
 
 ## 6. Failure cases and observations
 
-**The audit never fired.** In every one of the 29 real-model runs that reached the audit (13 in sections 3 and 4, 16 in the ablation), the first proposal passed. That includes the `shadow` runs, where a failing proposal would have been delivered and counted. With this model, on these cells, the audit's measured effect is zero. Its value is shown by the fault injection and the scenarios, which prove that a faulty number or proposal cannot get through. A model that happens to be careful does not make the guarantee less necessary.
+**The audit never fired.** In every one of the 39 real-model runs that reached the audit (13 in sections 3 and 4, 16 in the ablation, the pilot and 9 cells of section 3c), the first proposal passed. That includes the `shadow` runs, where a failing proposal would have been delivered and counted, and the risk-debate cells, whose revised proposals also passed. With this model, on these cells, the audit's measured effect is zero. Its value is shown by the fault injection and the scenarios, which prove that a faulty number or proposal cannot get through. A model that happens to be careful does not make the guarantee less necessary.
 
 **A thesis pushed between two judges.** The AAPL run (`20261119-093532-AAPL-2026-11-18-a161`) shows the judges working, and also their limit:
 
@@ -233,46 +253,56 @@ The version 2.2 ablation — the risk debate against the judges, both lenses now
 
 Judges with opposed lenses can push a thesis back and forth; the round cap ends that in a refusal rather than letting the last push win. The evidence judge's second critique is a correct, specific piece of arithmetic that no code check makes: the audit checks each rule, not whether the thesis's argument agrees with the levels the trader chose.
 
+**A refusal by model variance.** `acme_all_off` (section 3c) is the same request as the version-2.1 baseline and ended `contested`: the judges did not reach a quorum within the round cap on a run with every capability off. Re-running it would cost money and draw another sample from the same variance; nothing about the refusal points at a defect, and the journal reads as a clean disagreement between the lenses.
+
 **Reasoning that runs out of room.** The first run's failure (section 4) was invisible offline: a scripted model does not reason. A model that reasons by default needs output ceilings set from its real usage, and the ceiling is a setting in `roles/__init__.py`, not a guess.
 
 **Replies that imitate the input.** The roles see their inputs as `<artifact>` blocks. Two judges answered with an imitation of that format rather than through the output tool. The corrective retry recovered both, which is what it is for, but each cost a call. A one-line prompt fix removed the problem in the later runs.
 
 **The data source can disappear.** Yahoo answered HTTP 429 to every request from the development machine, and Stooq now serves a JavaScript check. The Eastmoney fallback was added for this. Either endpoint is unofficial and can change. The five version 2.2 sources have not been tried live at all.
 
-**A crash loses only the interrupted call.** The checkpointed graph commits every node at its end, so the journal after a crash holds exactly the finished nodes and `resume` continues from there; the spend of a call interrupted mid-way is in no journal (a scripted interruption-and-resume test checks that the final board equals an uninterrupted run's). This is verified offline; no real-model interruption has been tried.
+**A crash loses only the interrupted call.** The checkpointed graph commits every node at its end, so the journal after a crash holds exactly the finished nodes and `resume` continues from there; the spend of a call interrupted mid-way is in no journal (a scripted interruption-and-resume test checks that the final board equals an uninterrupted run's). An interruption inside a node that makes several calls repeats that node's calls — a valid run, not an identical journal. This is verified offline (and once for real, by the aborted first cell of section 3c); no deliberate real-model interruption has been tried.
+
+**A model that does not call the tools it is given.** Section 3c: with the ledger already holding the facts, DeepSeek never called `indicator` in any tools-on run. The mechanism is proven offline; the observation is recorded so the cost table is not read as "tools exercised".
 
 ## 7. What these results do not show
 
 - **Profitability or decision quality.** Tens of runs cannot separate skill from chance, and no rating was compared with what happened next.
-- **Anything about the version 2.2 capabilities on a real model.** The nine cells are defined and not run (section 3c). Nothing is claimed about what the portfolio, the risk debate, tools, news, macro, sentiment or memory do to decisions, cost or wall time.
+- **That any capability improves decisions.** The nine cells measure that the capabilities run, what they cost, and that their outputs pass the audit and the judges. Nothing more.
 - **Anything about decisions from synthetic bars.** Most runs use generated prices, which carry no information. They test the mechanism.
-- **Freedom from hindsight.** The point-in-time rule controls what the tools return. It does not control what a model remembers from training. The models state their own training cutoffs as 2024-06 (`deepseek-flash`) and 2023-10 (`deepseek-v4-pro`); these statements are unverified. The real-bar runs are dated 2026-11-18, after both.
-- **Prompt quality from offline runs.** A scripted model ignores the prompt; the offline results say nothing about the prompts, including the six new ones of version 2.2.
+- **Freedom from hindsight.** The point-in-time rule controls what the tools return. It does not control what a model remembers from training. The models state their own training cutoffs as 2024-06 (`deepseek-flash`) and 2023-10 (`deepseek-v4-pro`); these statements are unverified. The real-bar runs are dated 2026-11-18 and 2026-09-30, after both.
+- **Prompt quality from offline runs.** A scripted model ignores the prompt; the offline results say nothing about the prompts.
 - **That the judges verify.** L4 is scrutiny, not proof. The three judges share a model and can share a blind spot.
 - **Anything about other models.** Every real-model result is from one DeepSeek pair.
-- **The value of the debate.** The v2.0 ablation's effect is within the noise (section 5); the risk debate has not been ablated at all (section 3c).
-- **That parallel analysts save a given amount.** Wall time is measured in memory and the `wall_serial` cell is not run; no number exists.
+- **The value of the debate.** The v2.0 ablation's effect is within the noise (section 5); the risk debate has not been ablated.
+- **That parallel analysts save a given amount.** One trace shows the five-analyst group overlapping (48.0 s of calls in a 13.7 s span) on one machine and one network; that is the whole of the measurement, and it is not a benchmark.
+- **That the page streams the model's output.** It shows that a role is working and for how long; the output appears when the call returns.
+- **That resume loses nothing.** The usage of the interrupted call is in no file, and an interruption inside a node with several calls repeats them.
+- **That the approval gate is a control of any regulatory kind.** It is a pause for a yes or a no.
+- **That the CI workflow passes.** The file has never been pushed and never run; `scripts/check.sh` is the proof that was executed.
+- **That the page matches any named product.** It is this project's own page; say what it does.
 - **That headlines, posts or market probabilities are verified.** Code checks that an item exists and when it was published or fetched. What it says is judgment; market probabilities are quoted as the source's wording, unverified.
-- **That sentiment from StockTwits or Reddit represents the market,** or that an archive started today covers anything earlier.
+- **That sentiment from StockTwits or Reddit represents the market,** or that an archive started on one day covers anything earlier.
 - **That a backtest on a handful of dates says anything about returns.** The backtest command is a mechanism (settle before analysing, no future lessons), demonstrated on a three-date scripted grid.
-- **That more evidence gives better decisions.** Twelve v2.1 runs cannot show it (section 3b).
-- **The channels on real evidence.** The live downloads were blocked by the network; the real-ticker cells ran with the channels unavailable (section 3b).
+- **That more evidence gives better decisions.** Twelve v2.1 runs and nine v2.3 cells cannot show it.
+- **The channels on real evidence.** The live downloads were blocked by the network; every real-ticker cell ran with the channels unavailable (sections 3b and 3c).
 
 ## 8. Reproducing
 
 | What | Command | Needs |
 |---|---|---|
 | Offline evaluations | `uv run insightcrew eval all` | Nothing; exits 0 |
-| Scenarios | `uv run insightcrew scenarios` | Nothing; 34 lines ✓ 相符 |
-| The version 2.2 cells | `uv run insightcrew eval v22` | Nothing; lists the 9 cells and exits 2 until the owner caps spending |
-| Tests and checks | `uv run pytest -q`, `uv run ruff check .`, `uv run pyright` | Nothing; 825 passed |
-| Replay every archived journal | `for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew replay "$d"; done` | Nothing for synthetic tickers; the two real-bar runs need `uv run insightcrew fetch AAPL 0700.HK --years 3` first, because downloaded bars are not committed |
-| Interrupt and resume | Stop a scripted `analyze --scenario …` mid-run, then `uv run insightcrew resume runs/<id>` | Nothing (scripted); done in `tests/test_graph.py` |
+| Scenarios | `uv run insightcrew scenarios` | Nothing; 36 lines ✓ 相符 |
+| Everything offline, one command | `./scripts/check.sh` | Nothing; the three checks, 36 scenarios, 53 replays, `eval all`. The CI file has never run |
+| Tests and checks | `uv run pytest -q`, `uv run ruff check .`, `uv run pyright` | Nothing; 906 passed with Node present (904 passed, 2 skipped without it) |
+| Replay every archived journal | `for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew replay "$d"; done` | Nothing for synthetic tickers; the real-bar runs need `uv run insightcrew fetch AAPL 0700.HK --years 3` first, because downloaded bars are not committed |
+| Verify every archived journal | `for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew verify "$d"; done` | Nothing; 53 × 通过 |
+| Interrupt and resume | Cancel a scripted run from the page, or stop an `analyze --scenario …` mid-run, then resume it (`uv run insightcrew resume runs/<id>` or the page's button) | Nothing (scripted); done in `tests/test_graph.py` and `tests/test_server.py` |
 | A scripted backtest | `tests/test_backtest.py` (three-date grid, resume with the same `--run-id`) | Nothing |
-| One real-model run | `uv run insightcrew analyze ACME --date 2026-09-30`, or `uv run insightcrew analyze AAPL --universe real` after `fetch` | `DEEPSEEK_API_KEY` in `.env`; about 0.03 USD in the v2.0 configuration; the v2.2 capabilities cost more and are unmeasured |
+| One real-model run | `uv run insightcrew analyze ACME --date 2026-09-30`, or `uv run insightcrew analyze AAPL --universe real` after `fetch` | `DEEPSEEK_API_KEY` in `.env`; about 0.03 USD in the v2.0 configuration, 0.017–0.048 USD with capabilities on (section 3c) |
 | The ablation | `uv run insightcrew eval ablation` | The key; about 0.5 USD and several minutes |
 | The channels evaluation | `uv run insightcrew eval channels` | The key; about 0.5 USD and several minutes |
-| One run with channels | `uv run insightcrew analyze ACME --channels fundamentals,disclosures` | The key; about 0.05 USD |
-| One run with a capability | `uv run insightcrew analyze ACME --risk-rounds 1` (or `--tools`, `--memory`, `--portfolio data/portfolios/held_acme.json`) | The key; unmeasured |
+| The v2.2 cells again | `uv run insightcrew eval v22` | The key; spends (the archived run of 2026-11-20 cost 0.2791 USD for the nine cells). Without a key it lists the cells and exits 2 |
+| One run with a capability | `uv run insightcrew analyze ACME --risk-rounds 1` (or `--tools`, `--memory`, `--portfolio data/portfolios/held_acme.json`, `--approve`) | The key; see section 3c for measured costs |
 
 A re-run with a real model will not reproduce the same ratings: the model is not deterministic, which is the noise section 5 describes. Replaying an archived journal reproduces the recorded run exactly.

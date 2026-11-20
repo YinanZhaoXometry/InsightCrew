@@ -4,7 +4,7 @@ The status board for the rewrite described in [BLUEPRINT.md](BLUEPRINT.md). The 
 
 **Every session reads this file first, and before it ends updates [section 2](#2-status) and appends to [section 8](#8-session-log).**
 
-Last updated: 2026-11-20 morning, by the review and planning session that wrote version 2.3. Submission is 2026-11-23 23:59.
+Last updated: 2026-11-20 late evening, by WP39 (documents, notices, packaging), which closed version 2.3. Submission is 2026-11-23 23:59.
 
 > **Version 2.3 is planned and authorised: work packages 40 to 52, in [BLUEPRINT.md section 20](BLUEPRINT.md#20-version-23-hardening-run-control-and-the-workbench-page). Nothing of it is built.** It fixes the defects a review of version 2.2 found (five of them before WP38 spends money), adds a timing trace beside the journal, cancel and resume from the page, and rebuilds the run page around the user's questions. Start with WP40 (alone). [Section 5.6](#56-version-23-work-packages-40-to-52) says which packages run at the same time and which files each owns; [section 4](#4-what-the-owner-has-authorised) the version 2.3 authorisations. **WP38 now runs on `v2.3`, after WP41 and WP42, with a cap of 2 USD. WP39 comes last.** Version 2.2 as built stays at the tag `v2.2`, which WP40 creates.
 
@@ -81,7 +81,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 36 | Version 2.2: report, page, `serve` | done | Overnight session. 六个新节全部按键驱动（组合状态/风险三方意见（只立场与批评）/工具事实进事实表并标注/新闻与宏观（预测市场单列"来源原话，未经核验"）/社交情感/用到的课程；run/wall_ms 在板上才画墙钟——问题 20 的 C 案下从不出现，分支已备）；页面：news/sentiment/risk 流水线段与泳道、ACTOR_STAGE/KEY_STAGE 映射、并行分析师组（≥2 位时并列成框、无箭头）、墙钟标签、镜像报告的证据区块、表单五字段（组合文件/风险轮数/工具/记忆/通道多选）经 prepare/open_run 透传，坏组合文件 422 且回复不带路径；replay_html.py 无需改动。本包文件 pytest 71 项绿、ruff/pyright 干净、页面 JS 过 node --check；demo 与 uncovered 的报告新旧模块逐字节相同；21 个既有场景逐一 ✓ 相符；43/43 归档重放一致；新增 13 场景中 12 个的报表已实跑核对（portfolio×3、risk×2、sentiment_clean、news_uncovered、memory×2、tools_out_of_range、news_clean、tools_clean——守卫修复落地后最后两个转绿）；仅 macro_clean 仍被挡：刚刚落地的 stages.audit 守卫把 `board.get("macro/facts", [])` 的第二参（应为类型）写成了列表，macro 键在板即 `TypeAdapter([])` 崩（该行的修正属 stages.py 的 owner）；宏观区块的报表在单元测试里以手造板键验证。续跑标记未做：日志没有续跑标记事件（按指示跳过）。全仓 pytest 的失败全在他人文件（见日志）。 |
 | 37 | Version 2.2: evaluations | done | Overnight session (问题 29 授权)。`eval all` 打印全部新行并退出 0：inject 加版本 2.2 块（组合状态翻转 ×2、新闻 claim 引未知宏观事实、情绪信号引未知帖、情绪分出带、教训带数字——6/6 发现、0/2 误报）；consistency 加工具块（7 家族 × 3 分析日 × 3 窗口 = 63 次调用，flows/tools 内部两路 + evals 独立复算 recompute 比对）与宏观块（4 序列 × 3 变换 × 8 分析日 = 96 点，macro vs macro_sql）；pit 加六块（新闻 9、社交 9、宏观 91 含 cpi 两次重述逐日 329.4→329.5/337.0→337.2、预测市场 6（fetched_on==as_of，评测自建临时档案、就地实现 19.8 规则，与 WP34 的 stage_news._markets 同一条规则各持一份）、教训 5（含边界日成员断言）、工具 63（漏 bar 检查，诚实端口 vs 无视 as_of 的坏端口同答案））。新测试 16 项（tests/test_inject.py、test_consistency.py、test_pit.py，各含伪造分歧/泄漏的检出用例）。run.py 仅 docstring（`all` 三项未变，新行随各评测打印）。 |
 | 38 | Real-model runs and ablation, as amended by BLUEPRINT 20.14 | done | One pilot + all nine cells run on the real model (2026-11-20 evening), archived with `trace.jsonl`; every archive replays 一致 and passes `verify` (53/53 incl. the 43 old). 8 delivered + 1 review (`acme_all_off`, contested). Spent **0.3174 USD of the 2 USD cap** (pilot 0.0383 + cells 0.2791), plus 0.0249 journaled + one aborted in-flight call (≤0.014) wasted on a first attempt routed without the trace (see log). No prompt was changed: no journal showed a fault; question 36's sentence stays (manager outputs never mention `memory/status`). Model client retries confirmed from installed source (20.2). Real-bar cells: news/sentiment/macro (and fundamentals/disclosures) channels all `unavailable`, as the amendment says. Timing from the traces: the five-analyst group in `acme_all_on` overlapped (sum 48.0s vs span 13.7s). |
-| 39 | Documents, notices, packaging, as amended by BLUEPRINT 20.14 | in progress | The version 2.2 documents and the notices list are done (02:05 session). **Runs last, after version 2.3 is done or cut:** describe 2.3 as built, move BLUEPRINT 20.16's list to ROADMAP, rebuild and verify the zip. |
+| 39 | Documents, notices, packaging, as amended by BLUEPRINT 20.14 | done | The packaging half, 2026-11-20 late evening (the version 2.2 documents half was done at 02:05): README/AGENTS/ARCHITECTURE/EVALUATION/ROADMAP rewritten from the code and the session logs (ARCHITECTURE gains the trace and run control §16; ROADMAP takes 20.16's list; EVALUATION gains the run cells of 3c; counts 906 tests with Node, 904+2 skipped without it, 36 scenarios, 53 archives replay 一致 and verify 通过; the CI file's never-run status stated everywhere it is mentioned). THIRD_PARTY_NOTICES re-verified by grep: version 2.3 adapted nothing, the twenty-file list is unchanged. start.sh/start.bat re-checked against the unchanged command surface. `../InsightCrew.zip` rebuilt from the head and verified from a fresh unzip (uv sync, 906 tests, keyless `analyze --no-open`). Link check 0 bad. Details in the session log. |
 
 | 40 | Version 2.3: tag `v2.2`, branch `v2.3`, the plan committed, the kernel observer hook | done | Tag `v2.2` on `549c40f`; branch `v2.3`; plan commit `45b5b06`. Kernel change exactly 20.5 (`Run.observe`, `_notify` in `contextlib.suppress`, three guarded calls in `run_role_deferred`; only `contextlib` imported); `test_kernel.py`/`test_kernel_v22.py` untouched and green; 5 new tests in `tests/test_kernel_v23.py` (no-observer identity incl. the clock count, observer order and fields, tool role's `tool_calls`, raising observer journal-equal, `role.failed` before the Halt). 830 tests, ruff/pyright clean; 34/34 scenarios ✓; 43/43 replays 一致. |
 | 41 | Version 2.3: flow hardening (risk debate awaited, resume across the analyst fan-out and with tools, siblings' spend) | done | 20.7 第 1–6 条全部落地，四项先红后绿：D1 `stage_risk.risk` 异步直跑（线程桥/asyncio.run/ThreadPoolExecutor 全删，图的 risk 节点 await；测试：慢速剧本辩论期间同循环心跳持续推进——修前 0 次）；D2 join 按 `analysts_group[_rerun_start:]` 逐位入账、缺位且该跑的就地 `run_role_deferred` 补算（蓝图点名的窗口在 langgraph 1.2.22 下本就全超步重跑、测试不红——见问题 37；缺陷在相邻窗口复现：join 入账中途被中断、续跑直接落回 join 时缺 `fundamentals/analysis`）；D3 流程一半 `drive(resume=True)` 重建 `run.tools` 并 `ToolBox.seed` 装回板上 `tools/facts`（修前按 app/resume 重建 Run 续跑即 `KeyError: 'indicator'`）；兄弟花费：`drive` 的 Halt 处理先按固定顺序入账 holder 里已算完的分支（忽略 Malformed）再降级（修前第一位分析师的 `model.called` 不在日志）。第 5 条 `wall_on_board`/`_record_wall`/`run/wall_ms` 全删（无任何调用方与测试读它们）；第 6 条 `call` 只在 analyze 定义一份，graph 与 stage_risk 引入（drive 函数体内才引入 graph，模块加载无环）。`tests/test_flow_hardening.py` 新增 3 项、`tests/test_graph.py` 新增 2 项（既有全绿）、`test_stage_portfolio_risk.py` 两处直调改 await（问题 34）。本包文件 ruff/pyright 干净；全仓 pytest 845 过、9 挂全在 WP42/WP44 进行中的文件（见日志）；34/34 场景 ✓；43/43 重放一致。 |
@@ -2406,6 +2406,45 @@ Unverified: 服务重启后 pending 丢失的 409 分支只经代码路径（重
 Files created or changed: `data/scenarios/approval_approved.json`、`data/scenarios/approval_rejected.json`（新）、`tests/test_approval.py`（新，14 项）、`insightcrew/domain/types.py`（Approval）、`insightcrew/flows/analyze.py`（approve/ApprovalPending/drive 两入口/预置注册表）、`insightcrew/flows/graph.py`（approval 节点、路由、approval_resume）、`insightcrew/app/cli.py`（--approve、问询、两处接住）、`insightcrew/app/server.py`（确认路由、pending、流与预览）、`insightcrew/app/wiring.py`（prepare.approve、预置、run_flow 透传）、`insightcrew/app/assets/js/30-verdict.js`（等待态、按钮、私有标签）、`tests/js/verdict.test.mjs`（+2）、`tests/test_scenarios.py`（钉 36，问题 46）、`tests/test_cli.py`/`tests/test_server.py`（替身收 **_kwargs，问题 46）、`docs/HANDOFF.md`（状态行、问题 45/46、本条目）。`insightcrew/kernel/` 零改动；`tests/test_architecture.py` 未动（无角色读新键）。
 
 Committed: 本包文件与本文件按路径一次提交，消息 `WP52: ...`。未推送。
+
+### 2026-11-20 late evening · WP39 (documents, notices, packaging) · delegated session (GLM-5.3, via ZCode)
+
+Result: done — 版本 2.3 收尾。文档按代码与会话日志（WP40–WP52、WP38）重写并逐数对树核对；THIRD_PARTY_NOTICES 经 grep 复核（2.3 零改编、二十文件表不变）；start 脚本对照命令面复查（无变化，未改）；`../InsightCrew.zip` 从 head 重建并在全新空目录验证（uv sync、906 项测试、无密钥 `analyze --no-open`）。第 7 节共享文件请求表复查：唯一一行（WP48 的 renderCite 挂点）已由 WP51 落实并署名，无遗留。
+
+做了什么（源真相 = 第 8 节各条目 + 对树核实，数字逐一复核过）：
+  `README.md`：改写为 2.3——审批门与 `verify`/`--approve` 进命令示例、运行目录加 trace.jsonl、流程图加 approval 分支（拒绝走 REVIEW）、新增「The page」一节（五页签、引用链接、瀑布、计划预览、取消/续跑/导出、暗色、键盘、WCAG AA、无 token 流式与不匹配任何具名产品的声明）、结果表更新（36 场景、53/53 重放、53/53 verify、v2.3 九格+试点 0.3174 USD、并行 48.0s/13.7s、906 项含 Node 说明）、限制区加 20.16 四条（resume 非无损、轨迹非基准、审批门非监管、无 token 流式）、`scripts/check.sh` 与 CI 文件「从未推送、从未运行」写明。
+  `AGENTS.md`：改写为 2.3——命令面加 `--approve`/`verify`/`check.sh`；不变量表补 22/23/24、19 改「计时在轨迹」、15 扩到轨迹；「意外之事」更新（内核两次变更 WP23/WP40、计时只在 trace、页面拼装与禁用清单、Node 只跑测试、resume 三处已知缝隙（问题 38/43/44）、问题 36 的更严读法、check.sh 为本地证明而 CI 从未运行）。
+  `docs/ARCHITECTURE.md`：标题改 2.3；§3 内核约 550 行（含观察者钩子）、2.3 零改编声明；§4 加审批人一行（只能接受或拒绝）；§5 管线加 [approval]、join 就地补算、风控辩论异步、兄弟花费先入账、resume 修复残行/重建工具箱/写 run.resumed、墙钟段改为「计时在轨迹」；§6 更名「the journal, the board and the trace」并加轨迹五类行与不变量 22/23 的说明；§7 验证表加审批一行；§8 加 rejected_by_user 与「中断即未结束」两态；§9 引实测九格（113,906 token / 327 秒）与 SDK 重试；§10 接口表重写（verify、check.sh、CI 从未运行、serve 的运行控制、导出与计划预览）+ 页面架构一段（13 JS + 7 CSS、fold、五页签、质量层）；新增 §16「Run control」；§11 决策表加轨迹/取消/审批三条；§12 限制区按 20.16 与问题 38/43/44/45 更新。
+  `docs/EVALUATION.md`：开头改为 53 份归档（43 旧 + 10 新带 trace）；离线表加 verify 53/53 行、测试 906（无 Node 904 过 2 跳）；3c 从「定义未跑」改写为实跑结果（试点 + 九格全表、0.3174/2 USD、并行的组重叠 48.0s→13.7s、acme_all_off 对 wall_serial 不可作机制结论、实股五通道 unavailable 照交付、工具零调用是模型的选择（机制由脚本化场景证明）、SDK 重试 2/102、记忆幂等写入）；§6 加「模型方差导致的拒绝」与「审计 39 次实跑零触发（含九格与试点）」；§7 加 20.16 全部六条与既有各条；§8 加 verify 循环与 check.sh 行。
+  `docs/ROADMAP.md`：改写为 2.3——§1 待决（九格已跑移出、live 端点、开关决定、问题 36–46、20.7 三条行为问题）；§2 脚手架表以九格实测更新（风险辩论跑了四格+试点、工具真实模型零调用、并行一组实测、审批门两场景+浏览器）；§3 Next 重排（端点批准、开关、更多格子、问题裁决、第二模型族、native、散文数字、推送并运行 CI 是 owner 的决定）；§4「Not built in this version」整节为 20.16 清单（token 流式、工具调用实时播报需 owner 授权的进一步钩子调用、三条行为问题、发言顺序偏差（条件未触发，九格无一显示）、内部人交易通道、Retry-After、宽容数值、追问、从某阶段分叉、并排比较、日志脱敏、逐条落盘 flush）；§5 粗糙边更新（`_one_line` 已合一移除；加问题 38/43/44 的 resume 三缝与问题 45 的两处文案归属）。
+  `THIRD_PARTY_NOTICES.md`：仅加一句——WP39 于 2.3 复核：`grep -rl "Adapted from TradingAgents" insightcrew data` 返回同样二十个文件，2.3 零改编，清单照 2.2。
+  start.sh / start.bat：复查（uv 探测、`uv sync`、`uv run insightcrew serve`，端口 8765 默认不变）——命令面未变，一字未改。
+
+Commands run, with the last lines of their output:
+  uv run pytest -q → 906 passed in 28.58s
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  ./scripts/check.sh → 结果：1/6 pytest 通过（906）；2/6 ruff 通过；3/6 pyright 通过；4/6 scenarios 通过（36 ✓ 相符）；
+    5/6 replay 通过，53 份归档全部一致；6/6 eval all 通过；「check.sh：全部阶段通过。」退出 0
+  链接检查（自写小脚本，文件与锚点）→ all links resolve（首查抓到 README 一处旧锚点，已改）
+  无 Node 复核 → PATH 去掉 node 跑 tests/test_page_js.py → 2 skipped（文档所写 904+2 的依据）
+
+Packaging（提交后从 HEAD 重建，见下）：
+  git archive --format=zip -o ../InsightCrew.zip HEAD → 成功
+  全新空目录解包 → unzip 列出顶层即仓库内容；确认无 .env、无 runs/、无 data/market/real/、无 .venv（git 忽略，git archive 自然排除；逐项验证）
+  该目录内 uv sync → 成功（本地包缓存，未发网络请求）
+  该目录内 uv run pytest -q → 906 passed
+  该目录内 IC_FORCE_OFFLINE=1 uv run insightcrew analyze --no-open → 结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified（演示场景，脚本化模型，未读任何密钥；.zip 里本就没有 .env）
+
+Not run, and why: 未发任何网络请求（uv sync 走本地缓存即成，未触碰远端）、未调真实模型、未读未打印 `.env`、未推送；`serve` 未启动（本包不需要看页面）。
+
+Unverified: CI 工作流在真实 runner 上的行为（从未运行，文档照实写明）；start.bat 未在 Windows 上实跑（沿旧记录）。
+
+Files created or changed: `README.md`、`AGENTS.md`、`docs/ARCHITECTURE.md`、`docs/EVALUATION.md`、`docs/ROADMAP.md`、`THIRD_PARTY_NOTICES.md`（一句）、`docs/HANDOFF.md`（状态行、Last updated、本条目）。start.sh/start.bat 复查后未改；仓库外 `../InsightCrew.zip` 重建。`insightcrew/`、`tests/`、`scripts/`、`.github/`、`pyproject.toml`、`uv.lock` 零改动。
+
+Committed: 本包文件与本文件按路径一次提交，消息 `WP39: ...`。未推送。
+
+For the next session: 版本 2.3 全部工作包收口（40–52、38、39 皆 done）。剩余是 owner 的验收与第 7 节问题 36–46 的裁决；提交截止 2026-11-23 23:59。
 
 ## 9. Prompts for starting a session
 
