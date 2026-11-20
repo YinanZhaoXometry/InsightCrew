@@ -2202,7 +2202,7 @@ Commands run, with the last lines of their output:
 Not run, and why: `scripts/check.sh` 未代跑（WP46/47/48/50 同刻收尾，5.6 规则 6；证明按 19.3 两条手跑如上）；直播的瀑布要等 WP45 的 20.8 第 4 条（事件流带 trace）才有数据，当下的直播无轨迹态正是本视图要正确处理的形态，已核对；无网络请求、无真实模型、未读未打印 `.env`。
 Unverified: 直播运行中边跑边长的瀑布（数据源 WP45 之后才存在；跨度逐条到达时 render 重画，Node 测试覆盖同路径）。"全能力"截图受场景规则所限：`--channels` 与场景互斥（D4）、`--memory` 挂在无内联记录的场景上会写真实决策日志（问题 32 的缝），故取 risk_shrinks_size＋--tools（风险辩论＋工具＋评审＋辩论＋并行全开）为场景规则下一次能开到的全部能力；WP46 的 22a9 运行另证明 `--memory --portfolio flat_usd` 也能与场景同开。
 Files created or changed: `insightcrew/app/assets/js/50-usage.js`（重写）、`insightcrew/app/assets/css/50-usage.css`（重写）、`tests/js/usage.test.mjs`（新）、`docs/HANDOFF.md`（状态行与本条目）。仅动本包文件；`tests/test_run_page.py` 未动、全绿。
-Committed: 本包三个文件与本文件按路径一次提交，消息 `WP49: ...`。未推送。
+Committed: 视图三文件按路径一次提交（`e25aad3`，消息 `WP49: ...`）；本文件的状态行与本条目因并行会话的提交竞争（WP46 提交时本文件已在工作区改好）随 `785d1a7` 先行入库——内容一字未失，仅在他人提交里。未推送。
 For the next session: WP45 落地事件流带 trace 后，直播运行的瀑布与秒条即有真实数据，无需改本视图；WP51 过页时可留意瀑布在 480px 下的横滚与记号悬停、以及"未收尾"横杠不只靠颜色区分（已有虚线边框与悬停文案）。截图所用的 4 个测试运行与中断夹具留在 runs/（git 忽略）；其 replay.html 经一次性脚本（/tmp，未进仓库）用 replay_html.write(events, bars, trace) 重写为带轨迹版——write_page 带 trace 是 WP45 的 20.8 第 10 条。
 
 ## 9. Prompts for starting a session

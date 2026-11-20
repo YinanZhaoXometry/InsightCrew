@@ -1,4 +1,34 @@
-/* 50-usage.css —— 用量与耗时。 */
-.meter { height:8px; border-radius:999px; background:var(--lane); border:1px solid var(--line); overflow:hidden; margin-top:6px; }
+/* 50-usage.css —— 用量与耗时：上限进度条与轨迹瀑布（WP49）。 */
+.meter { height:8px; border-radius:999px; background:var(--lane); border:1px solid var(--line); overflow:hidden; }
 .meter i { display:block; height:100%; background:var(--accent); }
 .meter.over i { background:var(--bad); }
+
+/* 与上限的比较：标签 · 进度条 · 数值 */
+.limits { margin-top:4px; }
+.limit-row { display:grid; grid-template-columns:96px 1fr max-content; gap:10px; align-items:center; margin:7px 0; }
+.limit-row .lab { font-size:12.5px; color:var(--soft); }
+.limit-row .val { font-size:12.5px; color:var(--soft); font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+/* 调用瀑布：一个角色一行，一次调用一条横杠；竖线是续跑与取消的记号 */
+.wf { --wf-name:132px; --wf-gap:10px; margin-top:6px; }
+.wf-axis { display:grid; grid-template-columns:var(--wf-name) 1fr; gap:var(--wf-gap); margin-bottom:4px; }
+.wf-axis .ticks { position:relative; height:15px; font-size:10.5px; color:var(--muted);
+                  font-variant-numeric:tabular-nums; }
+.wf-axis .ticks span { position:absolute; transform:translateX(-50%); white-space:nowrap; }
+.wf-axis .ticks span:first-child { transform:none; }
+.wf-axis .ticks span:last-child { transform:translateX(-100%); }
+.wf-rows { position:relative; display:grid; gap:4px; }
+.wf-row { display:grid; grid-template-columns:var(--wf-name) 1fr; gap:var(--wf-gap); align-items:center; }
+.wf-name { font-size:12px; color:var(--soft); text-align:right; white-space:nowrap;
+           overflow:hidden; text-overflow:ellipsis; }
+.wf-track { position:relative; height:20px; background:var(--lane); border:1px solid var(--line); border-radius:5px; }
+.wf-bar { position:absolute; top:2px; bottom:2px; min-width:3px; border-radius:3px; background:var(--accent); }
+.wf-bar.bad { background:var(--bad); }
+.wf-bar.open { background:var(--warn-bg); border:1px dashed var(--warn); }
+.wf-marks { position:absolute; left:calc(var(--wf-name) + var(--wf-gap)); right:0; top:0; bottom:0; }
+.wf-mark { position:absolute; top:0; bottom:0; width:0; border-left:2px dashed var(--code); }
+.wf-mark.cancelled { border-left-color:var(--bad); }
+.wf-mark b { position:absolute; top:-2px; left:4px; font-size:10px; font-weight:600;
+             color:var(--code); background:var(--card); padding:0 3px; border-radius:4px;
+             border:1px solid var(--line); white-space:nowrap; }
+.wf-mark.cancelled b { color:var(--bad); }
