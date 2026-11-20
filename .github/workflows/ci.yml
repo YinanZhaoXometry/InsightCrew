@@ -1,0 +1,19 @@
+# 这个工作流文件从未被推送，也从未运行过（BLUEPRINT 20.12、20.16）。
+# 它是版本 2.3 的一个交付物：装 uv、按 uv.lock 同步环境、跑三项检查。
+# 在本地，同样的证明用 scripts/check.sh 一条命令跑完（还包括场景、重放与 eval all）。
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - run: uv run pytest -q
+      - run: uv run ruff check .
+      - run: uv run pyright

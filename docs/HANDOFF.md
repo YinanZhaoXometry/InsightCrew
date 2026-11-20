@@ -84,10 +84,10 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 39 | Documents, notices, packaging, as amended by BLUEPRINT 20.14 | in progress | The version 2.2 documents and the notices list are done (02:05 session). **Runs last, after version 2.3 is done or cut:** describe 2.3 as built, move BLUEPRINT 20.16's list to ROADMAP, rebuild and verify the zip. |
 
 | 40 | Version 2.3: tag `v2.2`, branch `v2.3`, the plan committed, the kernel observer hook | done | Tag `v2.2` on `549c40f`; branch `v2.3`; plan commit `45b5b06`. Kernel change exactly 20.5 (`Run.observe`, `_notify` in `contextlib.suppress`, three guarded calls in `run_role_deferred`; only `contextlib` imported); `test_kernel.py`/`test_kernel_v22.py` untouched and green; 5 new tests in `tests/test_kernel_v23.py` (no-observer identity incl. the clock count, observer order and fields, tool role's `tool_calls`, raising observer journal-equal, `role.failed` before the Halt). 830 tests, ruff/pyright clean; 34/34 scenarios ✓; 43/43 replays 一致. |
-| 41 | Version 2.3: flow hardening (risk debate awaited, resume across the analyst fan-out and with tools, siblings' spend) | not started | Needs WP40. On WP38's path. |
+| 41 | Version 2.3: flow hardening (risk debate awaited, resume across the analyst fan-out and with tools, siblings' spend) | in progress | Needs WP40. On WP38's path. |
 | 42 | Version 2.3: app hardening (`[flow] channels`, resume, torn journal line), the trace, the `verify` command | not started | Needs WP40. On WP38's path. |
-| 43 | Version 2.3: test harness, prompt-integrity tests, `scripts/check.sh`, the CI file | not started | Needs WP40. |
-| 44 | Version 2.3: page foundation (the split into modules, the assembler, the model, the labels, the shell) | not started | Needs WP40. Critical path of the page; give it the strongest agent. |
+| 43 | Version 2.3: test harness, prompt-integrity tests, `scripts/check.sh`, the CI file | done | `tests/conftest.py` 网络夹具加拦 `connect_ex`，新增 autouse 夹具移除所有 `*_API_KEY` 环境变量；830 项既有测试无一因此失败。`tests/test_prompts.py` 四项检查今天全过（发现见问题 36）。`scripts/check.sh` 六阶段（三项检查、34 场景、43 重放、eval all）全过退出 0。`.github/workflows/ci.yml` 仅是文件：从未推送、从未运行。 |
+| 44 | Version 2.3: page foundation (the split into modules, the assembler, the model, the labels, the shell) | in progress | Needs WP40. Critical path of the page; give it the strongest agent. |
 | 45 | Version 2.3: server API and run control (checkpointed web runs, cancel, resume, trace in the stream, exports, plan preview) | not started | Needs WP41 and WP42. |
 | 46 | Version 2.3: page, verdict and chart | not started | Needs WP44. |
 | 47 | Version 2.3: page, process (debate, revisions with the audit's findings, risk, judges) | not started | Needs WP44. |
@@ -635,6 +635,7 @@ Questions for the owner, and gaps found while building. Questions 33 to 35 were 
 | 33 | 2026-11-20 | 42 | **`tests/test_cli.py` asserts the exact set of files in a run directory.** The trace adds `trace.jsonl`, so the expected set in `test_analyze_with_nothing_runs_the_demo_and_writes_four_files` gains that one name (cases are neither removed nor weakened), as question 28 did for `checkpoints.sqlite`. | Applied as the consequence of the owner's choice of the trace (2026-11-20). If overruled: the trace is written only for runs started from the page. |
 | 34 | 2026-11-20 | 41 | **`stage_risk.risk` becomes `async`.** BLUEPRINT 19 called its synchronous signature final (WP31). The fix for defect D1 changes it; tests that call it change only how they call it. | Applied as part of the hardening the owner chose. If overruled: D1 stays, and the risk cells of WP38 are run from the command line only. |
 | 35 | 2026-11-20 | 45 | **What cancel means.** The plan: a cancelled run is unfinished and resumable; nothing is written to the journal; the trace records `run.cancelled` (BLUEPRINT decision 55). The alternative: cancel finishes the run as `review` with a new reason `cancelled`, writes the report, and the run cannot be resumed; that needs a special case in `replay`. | The plan's reading, recommended. The owner may choose the alternative before WP45 starts. |
+| 36 | 2026-11-20 | 43 | **A finding of the prompt-integrity tests, for WP38.** The four checks of BLUEPRINT 20.12 all pass on today's prompts and are committed (`tests/test_prompts.py`). The backtick check bites on nothing today: no prompt names a key in backticks. A stricter reading — any board-key-shaped name in the prompt text must be one the role reads or writes — would fail in one place: `manager.md` names `memory/status`, a key `flows/stage_memory.py` does write, but MANAGER does not read it; the prompt explains a key the role never receives. Only WP38 changes a prompt: it decides whether the sentence goes or the manager gains the read. | — |
 
 ### Version 2.3: shared-file requests
 
@@ -1999,6 +2000,32 @@ Files created or changed: `insightcrew/kernel/runtime.py`（仅 20.5）、`tests
 Committed: 计划 `45b5b06`（Plan: version 2.3）；随后本包文件按路径一次提交（runtime、新测试与本文件），消息 `WP40: tag v2.2, branch v2.3, plan committed; kernel observer hook (BLUEPRINT 20.5)`。未推送。
 
 For the next session: WP41 · WP42 · WP43 · WP44 可同时开始（5.6 第 2 步）；内核自本包后冻结，谁需要改内核就停下问。
+
+### 2026-11-20 (WP43) · test harness, prompt integrity, `scripts/check.sh`, the CI file · delegated session (GLM-5.3, via ZCode)
+
+Result: done — BLUEPRINT 20.12 的三样全部落地：测试夹具、提示词完整性测试、一条命令的证明脚本与 CI 文件（后者仅是文件）。
+
+做了什么：
+  `tests/conftest.py`：原有网络夹具把 `socket.socket.connect_ex` 一并拦下（同一句报错、同一 integration 豁免）；新增第二个 autouse 夹具 `_no_api_keys`，每条测试期间用 monkeypatch 删掉所有以 `_API_KEY` 结尾的环境变量、测试后原样恢复。830 项既有测试在两个夹具下全部通过——没有测试依赖这台机器（无需按 20.12 停下记录）。
+  `tests/test_prompts.py`（新，4 项）：① `roles/prompts/` 每个文件（含 `_common.md`）的每一可核对行都出现在某一个角色的提示词里（judge.md 的 `{lens}` 占位行跳过，`<!--` 行照抄 `_prompt` 的丢弃规则）；② 任何角色的提示词里没有 `<!--`、没有改编声明的可见文字；③ 反引号里点名的黑板键形状的名字必须在 reads ∪ writes 里；④ 读 `*/status` 键的角色（news、sentiment、bull、bear、manager、三位 judge）提示词都解释了 `unavailable`。四项今天全过，全部提交；更严的读法（不限反引号）会在一处失败——记为问题 36，留 WP38（只有它改提示词）。
+  `scripts/check.sh`（新，可执行）：六个阶段——pytest、ruff、pyright、`insightcrew scenarios`、每份归档 `IC_FORCE_OFFLINE=1 insightcrew replay`、`insightcrew eval all`——每阶段打印一行结果，任一失败以 1 退出。uv 不在 PATH 时回落到 `~/.local/bin/uv`。
+  `.github/workflows/ci.yml`（新）：装 uv（astral-sh/setup-uv）、`uv sync --frozen`、三项检查。**该工作流从未被推送、从未运行过**，文件头注释与此处都写明；本地同等的证明用 `scripts/check.sh`。
+
+Commands run, with the last lines of their output:
+  uv run pytest -q → 834 passed in 23.44s（830 既有 + 4 项新提示词测试）
+  uv run ruff check . → All checks passed!
+  uv run pyright → 0 errors, 0 warnings, 0 informations
+  ./scripts/check.sh → 六行"结果：…通过"（834 项测试、34 场景全部 ✓ 相符、43 份归档全部一致、eval all 各块全过），末行"check.sh：全部阶段通过。"，退出码 0
+
+Not run, and why: 未启动 `serve`、未发任何网络请求、未调真实模型、未读未打印 `.env`（本包一样都不需要）；CI 工作流按约定从未运行。
+
+Unverified: CI 工作流在真实 runner 上的行为（它从未运行，也永不代跑——要验证的是它装 uv、同步环境、跑三项检查的写法本身）。
+
+Files created or changed: `tests/conftest.py`（编辑）、`tests/test_prompts.py`（新）、`scripts/check.sh`（新）、`.github/workflows/ci.yml`（新）、`docs/HANDOFF.md`（状态行、问题 36、本条目）。
+
+Committed: 本包四个文件与本文件按路径一次提交，消息 `WP43: test harness (connect_ex + *_API_KEY fixtures), 4 prompt-integrity tests, scripts/check.sh (six stages green), ci.yml (never pushed, never run)`。未推送。
+
+For the next session: WP38 与 WP51 起跑前、WP39 起跑前，按 5.6 规则 6 在无他人工作时跑 `scripts/check.sh` 做结合检查。WP38 改提示词时先读问题 36。
 
 ## 9. Prompts for starting a session
 
