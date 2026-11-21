@@ -1,6 +1,10 @@
-/* 55-launch.js —— 发起运行的表单、计划预览与运行历史（WP50 接手，BLUEPRINT 20.10「发起」）。
-   表单分四组：标的与日期 / 流程 / 证据通道 / 组合；改动后刷新计划预览（POST /api/plan，
-   服务端没有这个接口时整个预览收起）；上次填的值记在 localStorage；历史里可续跑的运行有续跑键。
+/* 55-launch.js —— 新建分析屏：表单、两步花费预估与运行历史（WP54，照主人的 OpenDesign 原型重排；
+   纯函数与字段自 WP50 一字未改）。
+   表单分三组：标的与日期 / 证据通道 / 分析配置（可展开，流程与组合在里面）；
+   交互是两步：主按钮「查看花费预估」把 POST /api/plan 的结果画进右侧面板，
+   改动任何字段后旧预估标记「配置已变更，请重新预估」，确认键才启动运行；
+   服务端没有 /api/plan 时预估键收起，直接开始（WP50 的降级不变）。
+   上次填的值记在 localStorage；历史是屏外常驻一节（行卡），可续跑的运行带续跑键。
    元素 ID 保持不变：f-scenario、f-ticker、f-date、f-judges、f-rounds、f-risk-rounds、
    f-tools、f-memory、f-portfolio、f-channels（通道由一个多选框改成五个复选框，容器仍用这个 ID）。 */
 
@@ -73,12 +77,13 @@ function writeSaved(store, values) {
   try { store.setItem(STORE_KEY, JSON.stringify(values)); } catch (_) { /* 隐私模式等存不进就算了 */ }
 }
 
-/* ---------- 实时表单（加载时把 20.9 留下的平铺表单重排成四组；静态页不进来） ---------- */
+/* ---------- 实时表单（加载时把 20.9 留下的平铺表单重排成 setup 屏的三组；静态页不进来） ---------- */
 
-let planAvailable = true, planTimer = 0, planSeq = 0, startPending = false;
-let metaApplied = false, savedApplied = false, foldedFor = "?";
+let planAvailable = true, planSeq = 0, startPending = false;
+let estimateReady = false, estimateDirty = false;
+let metaApplied = false, savedApplied = false;
 
-function buildLaunch() {
+function buildSetup() {
   const host = $("launch");
   if (!host) return;
   const group = (title, ...kids) => el("fieldset", { class: "fgroup" }, el("legend", null, title), ...kids);
@@ -93,37 +98,37 @@ function buildLaunch() {
       el("datalist", { id: "tickers" }),
       lab("分析日", el("input", { id: "f-date", type: "date" }),
           el("span", { class: "field-error", id: "err-date" }))),
-    group("流程",
-      el("label", { class: "inline" }, el("input", { id: "f-judges", type: "checkbox" }), " 模型评审"),
-      lab("辩论轮数", el("input", { id: "f-rounds", type: "number", min: "0", max: "10" })),
-      lab("风险辩论轮数", el("input", { id: "f-risk-rounds", type: "number", min: "0", max: "10" })),
-      el("label", { class: "inline" }, el("input", { id: "f-tools", type: "checkbox" }), " 分析工具"),
-      el("label", { class: "inline" }, el("input", { id: "f-memory", type: "checkbox" }), " 记忆")),
     group("证据通道",
       el("div", { id: "f-channels", class: "chan" },
         CHANNELS.map(([name, line]) => el("label", { class: "chan-line" },
           el("input", { type: "checkbox", id: "fc-" + name, value: name }),
           el("b", null, name), el("span", { class: "muted" }, line))),
         el("span", { class: "field-error", id: "err-channels" }))),
-    group("组合",
-      lab("组合文件", el("select", { id: "f-portfolio" }),
-          el("span", { class: "field-error", id: "err-portfolio" }))),
-    el("button", { class: "primary", type: "submit", id: "btn-start" }, "开始"));
-  fill(host, el("details", { id: "launch-fold", open: true },
-    el("summary", null, el("span", { class: "fold-title" }, "发起一次运行"),
-      el("span", { class: "muted", id: "fold-hint" })),
-    el("div", { class: "launch-grid" }, form, el("div", { class: "plan", id: "plan", hidden: true })),
-    el("p", { class: "note", id: "mode-note" }),
+    el("details", { id: "adv", class: "fgroup adv" },
+      el("summary", null, el("span", { class: "fold-title" }, "分析配置"),
+        el("span", { class: "muted", id: "adv-hint" }, "流程、工具与组合")),
+      el("div", { class: "adv-body" },
+        el("label", { class: "inline" }, el("input", { id: "f-judges", type: "checkbox" }), " 模型评审"),
+        lab("辩论轮数", el("input", { id: "f-rounds", type: "number", min: "0", max: "10" })),
+        lab("风险辩论轮数", el("input", { id: "f-risk-rounds", type: "number", min: "0", max: "10" })),
+        el("label", { class: "inline" }, el("input", { id: "f-tools", type: "checkbox" }), " 分析工具"),
+        el("label", { class: "inline" }, el("input", { id: "f-memory", type: "checkbox" }), " 记忆"),
+        lab("组合文件", el("select", { id: "f-portfolio" }),
+            el("span", { class: "field-error", id: "err-portfolio" })))),
+    el("div", { class: "form-foot" },
+      el("span", { class: "muted", id: "mode-note" }, ""),
+      el("span", { class: "form-foot-btns" },
+        el("button", { class: "ctl", type: "button", id: "btn-estimate" }, "查看花费预估"),
+        el("button", { class: "primary", type: "submit", id: "btn-start" }, "开始"))));
+  fill(host, form,
     el("p", { class: "note", id: "scenario-note", hidden: true }),
-    el("p", { class: "error", id: "form-error", hidden: true }),
-    el("details", { id: "history" },
-      el("summary", null, "过去的运行"),
-      el("div", { id: "history-body", class: "muted" }, "（加载中）"))));
-  form.addEventListener("input", () => { remember(); schedulePlan(); clearFieldErrors(); });
+    el("p", { class: "error", id: "form-error", hidden: true }));
+  form.addEventListener("input", () => { remember(); markEstimateStale(); clearFieldErrors(); });
   form.addEventListener("change", () => {
-    remember(); updateMacroGate(); updateTickerHint(); schedulePlan(); clearFieldErrors();
+    remember(); updateMacroGate(); updateTickerHint(); markEstimateStale(); clearFieldErrors();
   });
   $("fc-news").addEventListener("change", updateMacroGate);
+  $("btn-estimate").addEventListener("click", refreshPlan);
 }
 
 function snapshot() {
@@ -206,7 +211,7 @@ function applyScenario() {
   if (state.meta && !metaApplied) { metaApplied = true; applyMetaDefaults(); }
   if (!savedApplied) {
     savedApplied = true;
-    applySaved(); updateMacroGate(); updateTickerHint(); schedulePlan();
+    applySaved(); updateMacroGate(); updateTickerHint();
   }
   const name = $("f-scenario").value;
   const scenario = state.meta && state.meta.scenarios.find((s) => s.name === name);
@@ -221,35 +226,55 @@ function applyScenario() {
   updateTickerHint();
 }
 
-/* ---------- 计划预览 ---------- */
+/* ---------- 两步的花费预估（WP54：先预估、改动即作废、确认才开始） ---------- */
 
-function schedulePlan() {
-  if (!planAvailable) return;
-  clearTimeout(planTimer);
-  planTimer = setTimeout(refreshPlan, 250);            /* 改动停顿一下再问，别每敲一个字问一次 */
+function markEstimateStale() {
+  if (!estimateReady) return;                    /* 还没有预估可作废 */
+  estimateDirty = true;
+  const box = $("estimate");
+  if (!box || box.hidden) return;
+  box.classList.add("stale");
+  const stale = box.querySelector(".stale-note");
+  if (stale) stale.hidden = false;
+  updateStartButton();
 }
 
 async function refreshPlan() {
   if (!planAvailable || !state.meta) return;
+  const button = $("btn-estimate");
+  if (button) { button.disabled = true; button.textContent = "预估中……"; }
   const seq = planSeq += 1;
   const { status, data } = await getJSON("/api/plan",
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formBody(snapshot())) });
+  if (button) { button.disabled = false; button.textContent = "查看花费预估"; }
   if (seq !== planSeq || !state.meta) return;          /* 过期的回复：表单又改过了 */
-  if (status === 404) { planAvailable = false; $("plan").hidden = true; return; }   /* 服务端没有这个接口：整个预览收起 */
-  const box = $("plan");
-  box.hidden = false;
+  if (status === 404) {                                /* 服务端没有这个接口：预估一步收起，直接开始 */
+    planAvailable = false; estimateReady = false;
+    if (button) button.hidden = true;
+    $("estimate").hidden = true;
+    const note = $("mode-note");
+    if (note && !note.textContent) note.textContent = "这个服务没有计划预览接口：确认配置后直接开始。";
+    updateStartButton();
+    return;
+  }
+  const box = $("estimate");
   if (status === 422) {
-    fill(box, el("h3", null, "计划预览"), el("p", { class: "error" },
-      "这次请求会被拒绝：" + ((data && data.error) || "请求不合格式") + "。"));
+    estimateReady = false;
+    box.hidden = false; box.classList.remove("stale");
+    fill(box, el("h3", null, "花费预估"),
+      el("p", { class: "error" }, "这次请求会被拒绝：" + ((data && data.error) || "请求不合格式") + "。"));
+    updateStartButton();
     return;
   }
   if (status !== 200) return;
-  renderPlan(planRows(data));
+  renderEstimate(planRows(data));
 }
 
-function renderPlan(rows) {
-  const box = $("plan");
-  if (!rows) { box.hidden = true; return; }
+function renderEstimate(rows) {
+  const box = $("estimate");
+  if (!rows) { box.hidden = true; estimateReady = false; updateStartButton(); return; }
+  estimateReady = true; estimateDirty = false;
+  box.hidden = false; box.classList.remove("stale");
   const stageChip = (stage) => el("span", { class: "stage idle", title: stage.roles.join("、") || undefined },
     STAGE_NAME[stage.key] || stage.key);
   const chips = [];
@@ -262,30 +287,36 @@ function renderPlan(rows) {
       el("span", { class: "par-tag" }, "并行"), group.map(stageChip)));
     i += 1;
   }
-  const kids = [el("h3", null, "计划预览"),
-    el("p", { class: "note" }, "这次请求会走的阶段与开销的估计；不调用模型，不产生运行。"),
+  const kids = [
+    el("h3", null, "花费预估"),
+    el("p", { class: "note" }, "这次请求会走的阶段与开销的估计；预估不调用模型，不产生费用。"),
     el("div", { class: "plan-line" },
       "标的 " + (rows.ticker || "—") + " · 分析日 " + (rows.asOf || "最近交易日")
       + " · " + (MODE_TEXT[rows.mode] || rows.mode || "")),
-    el("div", { class: "plan-strip" }, chips),
-    el("div", { class: "plan-line" },
-      "调用：典型 " + (rows.calls.typical !== null ? count(rows.calls.typical) : "—") + " 次 · 上限 "
-      + (rows.calls.ceiling !== null && rows.calls.ceiling !== undefined ? count(rows.calls.ceiling) : "不设上限")),
-    el("div", { class: "plan-line" },
-      "token 上限 " + (rows.runTokens ? count(rows.runTokens) : "不设上限")
-      + " · 成本上限 " + (rows.runCost !== null && rows.runCost !== undefined ? num(rows.runCost, 6) : "不设上限"))];
+    el("div", { class: "est-cards" },
+      el("div", { class: "est-card" }, el("span", null, "典型调用"),
+        el("b", { class: "mono" }, rows.calls.typical !== null ? count(rows.calls.typical) : "—"),
+        el("small", null, "上限 " + (rows.calls.ceiling !== null && rows.calls.ceiling !== undefined ? count(rows.calls.ceiling) : "不设"))),
+      el("div", { class: "est-card" }, el("span", null, "token 上限"),
+        el("b", { class: "mono" }, rows.runTokens ? count(rows.runTokens) : "不设"),
+        el("small", null, "整个运行")),
+      el("div", { class: "est-card" }, el("span", null, "成本上限"),
+        el("b", { class: "mono" }, rows.runCost !== null && rows.runCost !== undefined ? num(rows.runCost, 6) : "不设"),
+        el("small", null, "USD"))),
+    el("div", { class: "plan-strip" }, chips)];
   if (rows.channels.length) {
-    kids.push(el("div", { class: "plan-channels" }, rows.channels.map((channel) =>
-      el("span", { class: "plan-chan st-" + (channel.state || "off"),
-                   title: channel.reason || undefined },
-        channel.name + " " + (PLAN_CHANNEL_WORD[channel.state] || channel.state || "—")
-        + (channel.state === "unavailable" && channel.reason ? "（" + channel.reason + "）" : "")))));
+    kids.push(el("h4", null, "数据覆盖"), el("div", { class: "est-cover" }, rows.channels.map((channel) =>
+      el("div", { class: "est-cover-row st-" + (channel.state || "off"), title: channel.reason || undefined },
+        el("b", null, channel.name),
+        el("span", null, (PLAN_CHANNEL_WORD[channel.state] || channel.state || "—")
+          + (channel.state === "unavailable" && channel.reason ? " · " + channel.reason : ""))))));
   }
   if (rows.portfolio !== null && rows.portfolio !== "") {
-    kids.push(el("div", { class: "plan-line" },
-      "组合：" + (PSTATE_TEXT[rows.portfolio] || rows.portfolio)));
+    kids.push(el("div", { class: "plan-line" }, "组合：" + (PSTATE_TEXT[rows.portfolio] || rows.portfolio)));
   }
+  kids.push(el("p", { class: "stale-note note", hidden: true }, "配置已变更，请重新预估。"));
   fill(box, kids);
+  updateStartButton();
 }
 
 /* ---------- 提交与启动键 ---------- */
@@ -325,7 +356,7 @@ async function submitForm(ev) {
   } finally {
     startPending = false;
   }
-  if (reply.status === 202) { followLive(reply.data.run_id); return; }
+  if (reply.status === 202) { estimateReady = false; estimateDirty = false; followLive(reply.data.run_id); return; }
   const message = (reply.data && reply.data.error) || ("请求不合格式（HTTP " + reply.status + "）");
   const which = errorField(message);
   if (which) fieldError(which, message);
@@ -333,7 +364,7 @@ async function submitForm(ev) {
     error.hidden = false;
     fill(error, "没有开始：" + message + "。",
       reply.data && reply.data.active_run ? el("button", { class: "linkish", type: "button",
-        on: { click: () => { openRun(reply.data.active_run, false); window.scrollTo(0, 0); } } },
+        on: { click: () => openRun(reply.data.active_run, false) } },
         "查看正在进行的运行") : null);
   }
   updateLaunchState();
@@ -345,21 +376,29 @@ function followLive(runId) {
   state.follow = true;
 }
 
-function updateLaunchState() {
+function updateStartButton() {
   const button = $("btn-start");
   if (!button) return;
   const active = Boolean(state.runId) && !state.ended;   /* 有一个未收尾的运行（就是活动运行） */
   button.disabled = startPending || active;              /* 请求在途或运行进行中：不能开始下一次 */
-  button.textContent = startPending ? "开始……" : "开始";
-  const fold = $("launch-fold"), hint = $("fold-hint");
-  if (fold && state.runId !== foldedFor) {               /* 打开一个运行时把发起区折成一行；回到列表再展开 */
-    foldedFor = state.runId;
-    fold.open = !state.runId;
-  }
-  if (hint) hint.textContent = active ? "（有一次运行正在进行）" : "";
+  button.textContent = startPending ? "开始……"
+    : estimateReady && !estimateDirty ? "确认预估并开始" : "开始";
 }
 
-/* ---------- 历史 ---------- */
+function updateLaunchState() {
+  updateStartButton();
+  /* setup 屏的活跃运行提示：单运行互斥，给它一条回工作台的路 */
+  const note = $("active-note");
+  if (!note) return;
+  const active = Boolean(state.runId) && !state.ended;
+  note.hidden = !active;
+  if (active) fill(note, "有一次运行正在进行（" + state.runId + "）。",
+    el("button", { class: "linkish", type: "button",
+      on: { click: () => openRun(state.runId, false) } }, "查看当前运行"));
+  else fill(note);
+}
+
+/* ---------- 历史（屏外常驻一节：一行一次运行） ---------- */
 
 async function loadHistory() {
   const { status, data } = await getJSON("/api/runs");
@@ -369,22 +408,24 @@ async function loadHistory() {
       el("button", { class: "linkish", type: "button", on: { click: loadHistory } }, "重试"));
     return;
   }
-  if (!data.runs.length) { body.textContent = "还没有运行。"; return; }
+  if (!data.runs.length) { body.textContent = "还没有运行。从「新建分析」开始第一次分析。"; return; }
   const when = (id) => id.slice(0, 4) + "-" + id.slice(4, 6) + "-" + id.slice(6, 8) + " "
     + id.slice(9, 11) + ":" + id.slice(11, 13) + ":" + id.slice(13, 15);
-  fill(body, table(["开始时间", "代码", "分析日", "模型", "结果", "原因", ""], data.runs.map((run) => [
-    when(run.run_id), run.ticker, run.as_of, MODE_TEXT[run.mode] || run.mode,
-    el("span", { class: run.status === "delivered" ? "pass" : run.status === "review" ? "fail" : "na" },
-       STATUS_TEXT[run.status] || run.status),
-    run.reason === "ok" ? "" : reasonText(run.reason),
-    el("span", { class: "rowctl" },
-      run.resumable ? el("button", { class: "linkish", type: "button",
-        on: { click: () => resumeRun(run.run_id) } }, "续跑") : null,
-      el("button", { class: "linkish", type: "button",
-        on: { click: () => { openRun(run.run_id, false); window.scrollTo(0, 0); } } }, "查看"))])));
+  fill(body, data.runs.map((run) => el("div", { class: "hist-row" + (run.status === "review" ? " is-review" : "") },
+    el("button", { class: "hist-main", type: "button",
+      on: { click: () => { openRun(run.run_id, false); window.scrollTo(0, 0); } } },
+      el("span", { class: "hist-tick" }, el("b", null, run.ticker || "—"),
+        el("small", { class: "muted mono" }, when(run.run_id))),
+      el("span", { class: "hist-date muted" }, run.as_of || "—"),
+      el("span", { class: "hist-mode muted" }, MODE_TEXT[run.mode] || run.mode),
+      el("span", { class: "pill st-" + (run.status === "delivered" ? "delivered" : run.status === "review" ? "review" : "interrupted") },
+        STATUS_TEXT[run.status] || run.status),
+      el("span", { class: "hist-why muted" }, run.reason && run.reason !== "ok" ? reasonText(run.reason) : "")),
+    run.resumable ? el("button", { class: "ctl hist-resume", type: "button",
+      on: { click: () => resumeRun(run.run_id) } }, "续跑") : null)));
 }
 
-/* 实时模式才重排表单：静态 replay.html 的发起区整个隐藏，不进来 */
+/* 实时模式才重排表单：静态 replay.html 的 setup 屏整个隐藏，不进来 */
 if (typeof document !== "undefined" && document.getElementById("launch")
     && document.getElementById("embedded")
-    && !JSON.parse(document.getElementById("embedded").textContent)) buildLaunch();
+    && !JSON.parse(document.getElementById("embedded").textContent)) buildSetup();

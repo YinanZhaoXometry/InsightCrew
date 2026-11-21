@@ -39,32 +39,15 @@
 .runctl .ctl.warn:hover { background:var(--bad-bg); }
 .runctl-note { max-width:340px; font-size:11.5px; color:var(--muted); }
 
-/* 发起运行（实时模式）：折成一行、四组字段、计划预览在旁 */
-#launch.card { padding:10px 16px; }
-#launch summary { cursor:pointer; list-style:none; display:flex; align-items:baseline; gap:8px; }
-#launch summary::-webkit-details-marker { display:none; }
-#launch details > summary { align-items:center; }
-#launch details > summary::before { content:""; flex:none; width:6px; height:6px; margin:0 4px 0 2px;
-                                     border-right:1.5px solid var(--accent); border-bottom:1.5px solid var(--accent);
-                                     transform:rotate(-45deg); transition:transform .15s ease; }
-#launch details[open] > summary::before { transform:rotate(45deg); }
-#launch details { margin-top:0; }
-#launch #history { margin-top:14px; }
-#launch summary .fold-title { color:var(--ink); font-weight:600; font-size:13.5px; letter-spacing:.2px; }
-#launch summary .fold-title::after { content:" · 选择场景或标的，配置流程后开始"; color:var(--muted); font-weight:400; font-size:12px; }
-#launch-fold[open] summary { margin-bottom:12px; }
-.launch-grid { display:grid; grid-template-columns:minmax(380px, 1fr) minmax(280px, 1fr); gap:0 22px; align-items:start; }
-.launch-grid:has(> #plan[hidden]) { grid-template-columns:1fr; }   /* 计划预览收起（服务端没有 /api/plan）时不留空列 */
-@media (max-width: 900px) { .launch-grid { grid-template-columns:1fr; } }
+/* 新建分析屏的表单（WP54：三组 + 可展开的分析配置；两步预估面板的样式在 15-screens.css） */
 #form { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px 14px; align-content:start; }
 @media (max-width:640px) { #form { grid-template-columns:minmax(0, 1fr); } }
 .fgroup { border:1px solid var(--line); border-radius:var(--radius); padding:8px 12px 12px; margin:0; min-width:0; background:var(--lane);
           display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; align-content:flex-start; }
-.fgroup:nth-of-type(3), .fgroup:nth-of-type(4) { align-items:flex-start; }
 .fgroup > label:not(.inline):not(.chan-line) { min-width:0; }
 #form label.inline { white-space:nowrap; }
-#form label:has(#f-scenario), #form label:has(#f-portfolio) { flex:1 1 100%; }
-#form .primary { grid-column:1 / -1; justify-self:end; min-width:160px; }
+#form label:has(#f-scenario) { flex:1 1 100%; }
+#form .primary { justify-self:end; min-width:160px; }
 .fgroup legend { font-size:10.5px; color:var(--muted); padding:0 6px; letter-spacing:.9px; text-transform:uppercase; font-weight:600; }
 #form label { display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:var(--muted); }
 #form label .lab { color:var(--muted); }
@@ -97,19 +80,9 @@
 .linkish:hover { text-decoration:underline; }
 .error { margin:10px 0 0; font-size:12.5px; color:var(--bad); }
 .rowctl { display:inline-flex; gap:10px; }
-details { margin-top:12px; } summary { cursor:pointer; color:var(--soft); font-size:12.5px; }
+summary { cursor:pointer; color:var(--soft); font-size:12.5px; }
 summary:hover { color:var(--ink); }
-#history-body { max-height:340px; overflow:auto; border:1px solid var(--line); border-radius:var(--radius-s); margin-top:8px; }
-#history-body:empty, #history-body.muted:not(:has(table)) { border:0; }
-
-/* 计划预览（POST /api/plan；服务端没有这个接口时整个不出现） */
-.plan { border:1px dashed var(--line); border-radius:var(--radius); padding:10px 14px; font-size:12.5px; }
-.plan h3 { margin:0 0 4px; }
+.fold-title { color:var(--ink); font-weight:600; font-size:13.5px; letter-spacing:.2px; }
+/* 计划预览的阶段条（两步预估面板里复用流水线的段样式） */
 .plan-strip { display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin:8px 0; }
 .plan-line { color:var(--soft); margin:4px 0; font-variant-numeric:tabular-nums; }
-.plan-channels { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.plan-chan { font-size:11.5px; padding:2px 8px; border-radius:var(--radius-s); border:1px solid var(--line); }
-.plan-chan.st-available { background:var(--good-bg); border-color:var(--good-line); color:var(--good); }
-.plan-chan.st-unavailable { background:var(--bad-bg); border-color:var(--bad-line); color:var(--bad); }
-.plan-chan.st-off { background:var(--lane); color:var(--muted); }
-.plan-chan.st-empty { background:var(--warn-bg); border-color:var(--warn-line); color:var(--warn); }

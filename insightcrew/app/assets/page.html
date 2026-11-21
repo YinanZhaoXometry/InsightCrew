@@ -10,27 +10,64 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div>
-      <div class="brand">InsightCrew</div>
-      <h1 id="title">多智能体交易辅助系统</h1>
-      <div id="subtitle">数字由代码计算并复算，方案由代码按规则审计，模型只负责判断。</div>
-    </div>
-    <div class="head-side">
-      <span class="pill" id="run-state" hidden></span>
-      <span class="badge" id="badge" hidden></span>
-    </div>
-  </header>
-  <p class="disclaimer">本页面由课程项目自动生成，不构成投资建议；系统不执行、不路由、也不模拟任何订单。</p>
-  <div class="banner" id="banner" role="alert" hidden></div>
-  <div class="sr-only" id="sr-status" role="status" aria-live="polite"></div>
-  <div class="sr-only" id="sr-activity" role="status" aria-live="polite"></div>
-  <p class="note" id="stream-note" role="status" hidden></p>
+<header class="top">
+  <div>
+    <div class="brand">InsightCrew</div>
+    <h1 id="title">分析工作台</h1>
+    <div id="subtitle">数字由代码计算并复算，方案由代码按规则审计，模型只负责判断。</div>
+  </div>
+  <div class="head-side">
+    <span class="pill" id="run-state" hidden></span>
+    <span class="badge" id="badge" hidden></span>
+    <button class="ctl" id="btn-new" type="button" hidden>新建分析</button>
+  </div>
+</header>
+<p class="disclaimer">本页面由课程项目自动生成，不构成投资建议；系统不执行、不路由、也不模拟任何订单。</p>
+<div class="banner" id="banner" role="alert" hidden></div>
+<div class="sr-only" id="sr-status" role="status" aria-live="polite"></div>
+<div class="sr-only" id="sr-activity" role="status" aria-live="polite"></div>
+<p class="note" id="stream-note" role="status" hidden></p>
 
-  <section class="card" id="launch" hidden>
-    <h2>发起一次运行</h2>
-    <form id="form">
+<main id="app">
+  <!-- 三屏（WP54，照主人的 OpenDesign 原型）：空状态 / 新建分析 / 工作台。 -->
+  <section class="screen" id="screen-empty" hidden>
+    <div class="card hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Evidence before decision</p>
+        <h2 class="hero-title">每一个交易结论，都能回到证据。</h2>
+        <p class="hero-lead">选择标的与分析日期，先确认成本，再观察多智能体协作。结论、规则、版本和费用，始终在同一条可追溯链路里。</p>
+        <div class="hero-actions">
+          <button class="primary" id="btn-hero-new" type="button">开始一次分析</button>
+          <button class="ctl" id="btn-hero-demo" type="button">使用演示配置</button>
+        </div>
+        <p class="hero-note">仅提供研究建议，不连接真实行情、模型或交易服务。</p>
+      </div>
+      <div class="hero-flow" aria-label="分析流程示意">
+        <p class="eyebrow">One traceable run</p>
+        <h3>从配置到复核</h3>
+        <div class="flow-steps">
+          <div class="flow-step"><span class="flow-no">01</span><div><b>确认边界</b><small>数据覆盖与费用上限</small></div><span class="pill">预估</span></div>
+          <div class="flow-step"><span class="flow-no">02</span><div><b>形成方案</b><small>分析师、辩论与经理定论</small></div><span class="pill st-running">协作</span></div>
+          <div class="flow-step"><span class="flow-no">03</span><div><b>独立审计</b><small>打回、修订与版本留痕</small></div><span class="pill st-interrupted">核查</span></div>
+          <div class="flow-step"><span class="flow-no">04</span><div><b>交付结论</b><small>证据反查与历史回放</small></div><span class="pill st-delivered">可追溯</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap-grid">
+      <article class="card cap"><h3>结论优先</h3><p>评级、动作、价格与仓位在首屏对齐，失效条件同时可见。</p></article>
+      <article class="card cap"><h3>双向核查</h3><p>从结论定位证据原文，再从引用者返回具体角色与轮次。</p></article>
+      <article class="card cap"><h3>过程可还原</h3><p>拖动历史时间轴，恢复当时的方案版本、规则判定与费用。</p></article>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-setup" hidden>
+    <div class="setup-head">
+      <div><p class="eyebrow">New analysis</p><h2>新建分析</h2><p class="muted">先明确数据与成本边界，再启动研究流程。</p></div>
+      <button class="ctl" id="btn-back-work" type="button">返回工作台</button>
+    </div>
+    <p class="note" id="active-note" hidden></p>
+    <div id="launch" class="card">
+      <form id="form">
       <label>离线场景 <select id="f-scenario"></select></label>
       <label>代码 <input id="f-ticker" maxlength="32" placeholder="ACME / 0700.HK" list="tickers" autocomplete="off"></label>
       <datalist id="tickers"></datalist>
@@ -49,14 +86,29 @@
         <option value="macro">macro 宏观（需同时选 news）</option>
       </select></label>
       <button class="primary" type="submit">开始</button>
-    </form>
-    <p class="note" id="mode-note"></p>
-    <p class="note" id="scenario-note" hidden></p>
-    <p class="error" id="form-error" hidden></p>
-    <details id="history"><summary>过去的运行</summary><div id="history-body" class="muted">（加载中）</div></details>
+      </form>
+      <p class="note" id="mode-note"></p>
+      <p class="note" id="scenario-note" hidden></p>
+      <p class="error" id="form-error" hidden></p>
+    </div>
+    <aside class="card" id="estimate" aria-label="花费预估" hidden></aside>
   </section>
 
-  <main id="run" hidden>
+  <section class="screen" id="run">
+    <section class="card" id="playbar" aria-label="回放控制" hidden>
+      <button class="ctl" id="btn-play" type="button">播放</button>
+      <button class="ctl" id="btn-step" type="button">单步</button>
+      <span class="speed" id="speeds"><span class="muted">速度</span>
+        <button class="ctl" type="button" data-speed="slow">慢</button>
+        <button class="ctl" type="button" data-speed="normal">正常</button>
+        <button class="ctl" type="button" data-speed="fast">快</button>
+        <button class="ctl" type="button" data-speed="instant">瞬间</button>
+      </span>
+      <input id="slider" type="range" min="0" max="0" value="0" aria-label="回放位置">
+      <span class="muted" id="progress"></span>
+      <div class="replay-marks" id="replay-marks"></div>
+    </section>
+
     <section id="pipeline" aria-label="流水线"></section>
 
     <section class="two">
@@ -78,27 +130,19 @@
     <section class="card view" id="view-usage" role="tabpanel" aria-labelledby="tab-usage" tabindex="0" hidden></section>
 
     <section class="view" id="view-events" role="tabpanel" aria-labelledby="tab-events" tabindex="0" hidden>
-      <section class="card" id="playbar" aria-label="回放控制">
-        <button class="ctl" id="btn-play" type="button">播放</button>
-        <button class="ctl" id="btn-step" type="button">单步</button>
-        <span class="speed" id="speeds"><span class="muted">速度</span>
-          <button class="ctl" type="button" data-speed="slow">慢</button>
-          <button class="ctl" type="button" data-speed="normal">正常</button>
-          <button class="ctl" type="button" data-speed="fast">快</button>
-          <button class="ctl" type="button" data-speed="instant">瞬间</button>
-        </span>
-        <input id="slider" type="range" min="0" max="0" value="0" aria-label="回放位置">
-        <span class="muted" id="progress"></span>
-      </section>
-
       <section>
         <h2>过程记录（被否决的方案不是结论）</h2>
         <div id="lanes"></div>
         <p class="note">每条事件一张卡片，一栏是一个角色的一次出场，从左到右是发生的顺序；点卡片看它的内容。带删除线的是后来被新版本取代的产物。</p>
       </section>
     </section>
-  </main>
-</div>
+  </section>
+</main>
+
+<section class="card" id="history" hidden>
+  <h2>过去的运行</h2>
+  <div id="history-body" class="muted">（加载中）</div>
+</section>
 
 <aside id="detail" hidden role="dialog" aria-label="事件详情"></aside>
 
@@ -107,7 +151,8 @@
 /* 运行页面。它的全部输入是一串事件：静态模式下嵌在 #embedded 里，实时模式下来自本地服务的事件流。
    页面自己折叠黑板，只做展示。它显示的每个价格、价位、比率与规则数值都是事件里现成的值；
    唯一的求和是模型用量（token 与调用成本）的累计。运行数据一律作为文本插入。
-   源文件拆在 assets/css/ 与 assets/js/（BLUEPRINT 20.9），这里由 app/replay_html.py 拼装。 */
+   源文件拆在 assets/css/ 与 assets/js/（BLUEPRINT 20.9），这里由 app/replay_html.py 拼装。
+   WP54 起页面分三屏（空状态 / 新建分析 / 工作台），照主人的 OpenDesign 原型。 */
 (() => {
 "use strict";
 /*@@js*/

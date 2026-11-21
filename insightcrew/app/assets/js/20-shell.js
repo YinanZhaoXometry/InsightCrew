@@ -62,7 +62,6 @@ function requestRender() {
 
 function render() {
   const model = fold(view(), state.trace, state.live);   // 一次渲染只折一次，每个视图从这里画
-  $("run").hidden = !(state.events.length || state.runId);
   const banner = $("banner");
   banner.hidden = !state.error;
   const bannerKey = state.error ? state.error + "|" + state.runId : "";
@@ -78,12 +77,14 @@ function render() {
   for (const v of VIEWS)
     if (v.always || v.id === state.tab) v.render(model, $(v.target || "view-" + v.id));
   renderDetail(model);
+  $("playbar").hidden = !state.events.length;    // 回放条在工作台顶部（WP54）：有事件才出现
   $("btn-play").textContent = state.playing ? "暂停" : complete() ? "重新播放" : "播放";
   $("btn-play").classList.toggle("on", state.playing);
   for (const button of $("speeds").querySelectorAll("button")) button.classList.toggle("on", button.dataset.speed === state.speed);
   $("slider").max = String(state.events.length);
   $("slider").value = String(state.shown);
   $("progress").textContent = state.shown + " / " + state.events.length + (state.ended ? "" : " …");
+  renderReplayMarks();
 }
 
 /* 读屏：运行状态变化时播报一次（胶囊文字），不随每帧重画而重复 */

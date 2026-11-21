@@ -219,10 +219,10 @@ def test_v22_events_are_embedded() -> None:
 def test_the_source_layout_is_the_one_of_20_9() -> None:
     assert sorted(path.name for path in (ASSETS / "js").glob("*.js")) == [
         "00-core.js", "05-labels.js", "10-model.js", "20-shell.js", "25-activity.js",
-        "30-verdict.js", "35-process.js", "40-evidence.js", "45-audit.js", "50-usage.js",
-        "55-launch.js", "60-events.js", "90-boot.js"]
+        "26-screens.js", "30-verdict.js", "35-process.js", "40-evidence.js", "45-audit.js",
+        "50-usage.js", "55-launch.js", "60-events.js", "90-boot.js"]
     assert sorted(path.name for path in (ASSETS / "css").glob("*.css")) == [
-        "00-tokens.css", "10-base.css", "30-verdict.css", "35-process.css",
+        "00-tokens.css", "10-base.css", "15-screens.css", "30-verdict.css", "35-process.css",
         "40-evidence.css", "50-usage.css", "55-launch.css"]
     assert (ASSETS / "page.html").is_file()
 
@@ -280,6 +280,20 @@ def test_the_assembler_refuses_a_script_that_closes_the_tag(tmp_path: Path,
     monkeypatch.setattr(replay_html, "_ASSETS", assets)
     with pytest.raises(RuntimeError):
         live_page()
+
+
+def test_the_page_declares_the_three_screens_of_wp54() -> None:
+    """WP54：空状态 / 新建分析 / 工作台三屏；两步预估；历史行卡；回放条上提。"""
+    for screen in ("screen-empty", "screen-setup", "run"):
+        assert f'id="{screen}"' in ASSET, screen
+    assert "每一个交易结论，都能回到证据。" in ASSET                     # 空屏的大标题（原型文案）
+    assert 'id="btn-new"' in ASSET and 'id="btn-back-work"' in ASSET     # 页头新建键与返回键
+    assert "btn-estimate" in ASSET and "查看花费预估" in ASSET            # 两步预估的第一步
+    assert "确认预估并开始" in ASSET and "配置已变更，请重新预估" in ASSET  # 第二步与作废标记
+    assert 'id="active-note"' in ASSET                                   # setup 屏的活跃运行提示
+    assert 'id="playbar"' in ASSET and 'id="replay-marks"' in ASSET      # 回放条在工作台顶部
+    assert "过去的运行" in ASSET and 'id="history-body"' in ASSET        # 历史是屏外常驻一节
+    assert "marksFor" in ASSET and "showScreen" in ASSET                 # 26-screens 的两个入口
 
 
 def test_the_page_declares_the_quality_layer_of_wp51() -> None:

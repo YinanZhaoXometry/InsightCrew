@@ -3,6 +3,7 @@
 const state = {
   live: false,        // 实时模式（由本地服务提供页面）还是静态模式（事件嵌在页面里）
   meta: null,         // 实时模式下表单需要的信息
+  screen: "work",     // 三屏之一：empty / setup / work（WP54；静态页落在 work）
   runId: "",
   events: [],         // 收到的全部事件，按 seq
   shown: 0,           // 已揭示的条数：回放的位置
@@ -50,8 +51,8 @@ function openRun(runId, watch) {
   resetRun(runId);
   const wanted = runId ? "?run=" + encodeURIComponent(runId) : window.location.pathname;
   if (window.location.search !== (runId ? wanted : "")) window.history.pushState(null, "", wanted);
-  if (!runId) { $("history").open = true; requestRender(); return; }
-  $("history").open = false;                        // 列表可能很长：看一次运行时收起来，别把运行挤到页面外
+  if (!runId) { showScreen("empty"); return; }
+  showScreen("work");
   state.speed = watch ? "normal" : "instant";
   state.follow = watch;                             // 看现场时跟着最新一栏走；翻看旧运行时从头看起
   state.playing = true;
@@ -104,7 +105,6 @@ let liveHooked = false;        // 监听只挂一次：meta 失败后的重试�
 
 async function startLive() {
   state.live = true;
-  $("launch").hidden = false;
   const { status, data } = await getJSON("/api/meta");
   if (status !== 200) {                            // 读不到服务的信息：给重试（质量清单「失败的请求有横幅与重试」）
     fill($("mode-note"), "读不到本地服务的信息。",
@@ -131,7 +131,7 @@ async function startLive() {
   }
   loadHistory();
   const runId = new URLSearchParams(window.location.search).get("run") || "";
-  if (runId) openRun(runId, false); else { $("history").open = true; requestRender(); }
+  if (runId) openRun(runId, false); else showScreen("empty");
 }
 
 function retryMeta() {                             // 清掉带重试键的说明再试一次；成功则照常走下去
