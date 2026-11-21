@@ -39,8 +39,8 @@ uv run insightcrew eval channels                 # 12 real-model runs (v2.1); ab
 uv run insightcrew eval v22                      # the 9 v2.2 cells on the real model (spends); without
                                                  # a key it lists the cells and exits 2
 
-uv run pytest -q                                 # 910 tests with node present; without node the 2 page
-                                                 # tests in tests/test_page_js.py skip (908 passed, 2 skipped)
+uv run pytest -q                                 # 915 tests with node present; without node the 2 page
+                                                 # tests in tests/test_page_js.py skip (913 passed, 2 skipped)
 uv run ruff check .
 uv run pyright
 ./scripts/check.sh                               # the three checks + scenarios + a replay sweep of all

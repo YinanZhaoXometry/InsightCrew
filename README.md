@@ -112,16 +112,16 @@ Memory works outside a single run: a delivered decision is appended to a decisio
 
 ## The page
 
-The run page is assembled from modules at build time into one self-contained file with no build step and no external resource. It opens live from the server or statically from `replay.html`, and is organised by the user's questions:
+The run page is assembled from modules at build time into one self-contained file with no build step and no external resource. The live page has three screens — an empty hero, the 新建分析 setup and the workspace; a static `replay.html` opens the workspace directly. The workspace is organised by the user's questions:
 
 - **结论 (the answer)**: rating, action, levels with currency, thesis with citation badges, invalidation conditions, two trust lines; four states — running, delivered, `REVIEW` with a reason and a next step, interrupted with a resume button (or, with the approval gate on, 待你确认 with accept/reject). A price chart with the analysis date marked.
 - **过程 (why)**: every stage that ran, each role as a card with its model, duration and tokens; the debate rounds; the revision table when the audit or the judges sent work back (one column per version, changed cells marked, the findings under each rejected version); the risk debate's three columns; the judges' rounds.
 - **证据 (can it be trusted)**: one fact table with a search box and kind badges (账本/基本面/工具/宏观); every citation badge anywhere on the page is a link that opens the fact or item and can jump to its row; item lists under headings that keep the words 来源原文，未经核验; a line per channel with its state; the data card; the portfolio state.
 - **规则与审计**: the rule results with limits and computed values (the formula column on delivered runs, as the report does), and the audit's rounds — findings with their layer, where the flow went, which version fixed them.
 - **用量与耗时 (what did it cost)**: a table per role with calls, requests, tokens, cost and duration; three bars against the token, request and time limits; and a waterfall of every model call from the trace, in which parallel analysts are seen to overlap.
-- **发起 (launch)**: the form in groups with a plan preview (typical and ceiling calls, each channel's coverage for the chosen date) before anything is spent; run history with resume buttons; live activity with working-role timers.
+- **发起 (launch)**: the 新建分析 screen — the form in three groups with only real fields, and a two-step cost estimate (查看花费预估 → the panel's typical and ceiling calls, ceilings and each channel's coverage for the chosen date → 确认预估并开始; changing a field marks the estimate stale); run history as a standing section with resume buttons; live activity with working-role timers.
 
-Header controls cancel a running analysis (after a confirmation that says the call in flight is not recorded), resume an interrupted one, and export the report and the static replay. The page is keyboard-operable, has a dark and a light colour scheme (both at WCAG AA contrast), works down to 480 px wide, and says so and retries when a fetch fails. It is this project's own page; it is not a copy of any named product, and it does not stream the model's output — it shows that a role is working and for how long, and the reply appears when the call returns.
+The workspace leads with a large symbol heading and a horizontal conclusion card over a circular stage pipeline, and carries the replay controls at its top — play, step, speeds, a draggable position and clickable key-event marks (开始, the audit findings, each 打回, the delivery) that restore the whole page to that moment. Header controls cancel a running analysis (after a confirmation that says the call in flight is not recorded), resume an interrupted one, and open the 新建分析 screen. The page is keyboard-operable, has a dark and a light colour scheme (both at WCAG AA contrast; the dark one follows the kraken design of the owner's OpenDesign prototype), works down to 480 px wide, and says so and retries when a fetch fails. It is this project's own page; it is not a copy of any named product, and it does not stream the model's output — it shows that a role is working and for how long, and the reply appears when the call returns.
 
 ## Results
 
@@ -142,7 +142,7 @@ From [docs/EVALUATION.md](docs/EVALUATION.md). Every number comes from a command
 | Version 2.2/2.3 cells on a real model (`eval v22`, run 2026-11-20) | Pilot plus 9 cells, all archived with `trace.jsonl`: 8 delivered, 1 `review` (contested, model variance); 0.3174 USD of the 2 USD cap |
 | Parallel against serial, from the traces | The five-analyst group in the all-on run overlapped: call durations sum to 48.0 s, the group spans 13.7 s |
 | Replay of every archived journal | 53 of 53 identical (`一致`); `verify` passes on 53 of 53 |
-| Tests | 910 passed with Node present; without Node the 2 page-Node tests skip (908 passed, 2 skipped) |
+| Tests | 915 passed with Node present; without Node the 2 page-Node tests skip (913 passed, 2 skipped) |
 
 No live endpoint of the new sources (news feeds, StockTwits, Reddit, FRED, Polymarket) has been fetched yet: their adapters are tested offline against hand-built fixtures, and each live request is asked for first.
 
@@ -196,7 +196,7 @@ The main ones. The full list is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#1
 | `uv run insightcrew check` | Settings without the key, and what the configured models accept |
 | `uv run insightcrew fetch AAPL 0700.HK` | Downloads real daily bars and, after them, v2.1 evidence (US from SEC EDGAR when `IC_SEC_CONTACT` is set, HK announcements from Eastmoney). Version 2.2 kinds are separate flags, off by default: `--news`, `--social`, `--macro` (needs `IC_FRED_API_KEY`), `--markets` (Polymarket). Each live request is asked for first |
 | `scripts/check.sh` | One command for the whole proof: the three checks, every scenario, a replay sweep of every archived journal, and `eval all`. This is what was actually run; the CI workflow file (`.github/workflows/ci.yml`) has **never been pushed and never run** |
-| `uv run pytest` | 910 tests with Node present (without Node, the 2 page-Node tests skip). No network, no key |
+| `uv run pytest` | 915 tests with Node present (without Node, the 2 page-Node tests skip). No network, no key |
 
 **Without uv.** `python3 -m venv .venv`, then `.venv/bin/pip install -e .`, then `.venv/bin/insightcrew serve` (on Windows, `.venv\Scripts\`). This needs Python 3.12 or later and ignores `uv.lock`, so the package versions may differ from the ones tested. It was tried on Python 3.15.2, where pip chose newer minor versions, and the offline demo ran. The test tools are not installed this way.
 

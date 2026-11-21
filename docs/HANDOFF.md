@@ -2567,6 +2567,18 @@ Commands run, with the last lines of their output:
   浏览器核验（serve:9999，IAB 1440×960）：?run= 工作台——ws-head 显示 ACME+名称+合成数据标签+导出两键（HEAD 探测通过后显示）、结论大卡评级 Buy 与六指标格、9 个圆节点（交易员 ↺1 琥珀）、并行组虚线框、全宽图；视觉模型逐项核对通过（列四项打磨级小项，三项已修，一项为窄屏徽章换行——已有 flex-wrap 不改）。截图 /tmp/wp55_workspace.png、静态暗色 /tmp/wp55_static_dark.png。
   未做：浅色方案截图——macOS 傍晚起自动深色外观，无头 Chrome 跟随系统（`--blink-settings=preferredColorScheme` 无效）；WP53 已验浅色且本次未动令牌与双方案逻辑，对比度测试仍双方案核算，跳过。
 
+### 2026-11-21 21:20 · 最终打包 · coordinator session (ZCode)
+
+Result: done — owner 确认演示视频已备好（v3，3:36，仓库外的 `../demo-video/`），要求最终打包。文档对齐 + zip 从最终 HEAD 重建 + 空目录解包验证。
+
+文档对齐（WP53–55 之后与代码一致）：
+  计数 910→915（无 Node 908→913+2 跳过）：README ×2、AGENTS ×1、EVALUATION ×2、ROADMAP ×1。ARCHITECTURE §16：13 JS/7 CSS → 14 JS/8 CSS，`tests/js/` 47→50 项，并补一段 WP53–55 的三屏与 kraken 设计（双方案 AA）。README「The page」一节：三屏（空 hero / 新建分析 / 工作台；静态 replay 直开工作台）、发起改为两步预估的读法、工作台的大符号标题区/横向结论卡/圆形节点/回放条与关键事件标记、暗色 kraken 出处。THIRD_PARTY_NOTICES 复核：仍恰好 20 个文件（WP53–55 未改编参考代码）。`.gitignore` 加 `.wrangler/`（wrangler 临时目录，不入库）；`docs/design/` 仍按主人之前的决定保持未跟踪。
+
+Commands run, with the last lines of their output:
+  ./scripts/check.sh → 三项检查 915/0/0、36/36 场景 ✓、53/53 重放一致、eval all 6/6；「check.sh：全部阶段通过。」
+  git archive HEAD → ../InsightCrew.zip 重建（本段入库后的最终 HEAD）；空目录解包 → uv sync → pytest -q → 915 passed → IC_FORCE_OFFLINE=1 analyze --no-open「结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified」exit 0（replay.html 生成）。
+  无网络请求（uv 走本地缓存）、无真实模型、未读未打印 `.env`。
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.

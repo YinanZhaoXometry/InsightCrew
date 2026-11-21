@@ -35,7 +35,7 @@ It does not evaluate whether the ratings are good trades. Section 7 explains why
 | Scenarios (`scenarios`) | 36 of 36 scripted runs end as specified (21 from versions 2.0/2.1, 13 for the version 2.2 capabilities, 2 for the approval gate) |
 | Replay of the archive | 53 of 53 archived journals replay `一致` (`IC_FORCE_OFFLINE=1`, exit 0 each) |
 | Structure of the archive (`verify`) | 53 of 53 pass the offline structural check (exit 0 each); a journal with a deleted middle line fails it |
-| Tests (`pytest`) | 910 passed with Node present; without Node the 2 page-Node tests skip (908 passed, 2 skipped) |
+| Tests (`pytest`) | 915 passed with Node present; without Node the 2 page-Node tests skip (913 passed, 2 skipped) |
 
 **Fault injection.** Starts from the passing board of the `clean` scenario and changes one thing at a time. Each fault must produce a finding with a specific check:
 
@@ -294,7 +294,7 @@ Judges with opposed lenses can push a thesis back and forth; the round cap ends 
 | Offline evaluations | `uv run insightcrew eval all` | Nothing; exits 0 |
 | Scenarios | `uv run insightcrew scenarios` | Nothing; 36 lines ✓ 相符 |
 | Everything offline, one command | `./scripts/check.sh` | Nothing; the three checks, 36 scenarios, 53 replays, `eval all`. The CI file has never run |
-| Tests and checks | `uv run pytest -q`, `uv run ruff check .`, `uv run pyright` | Nothing; 910 passed with Node present (908 passed, 2 skipped without it) |
+| Tests and checks | `uv run pytest -q`, `uv run ruff check .`, `uv run pyright` | Nothing; 915 passed with Node present (913 passed, 2 skipped without it) |
 | Replay every archived journal | `for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew replay "$d"; done` | Nothing for synthetic tickers; the real-bar runs need `uv run insightcrew fetch AAPL 0700.HK --years 3` first, because downloaded bars are not committed |
 | Verify every archived journal | `for d in insightcrew/evals/archive/*/; do IC_FORCE_OFFLINE=1 uv run insightcrew verify "$d"; done` | Nothing; 53 × 通过 |
 | Interrupt and resume | Cancel a scripted run from the page, or stop an `analyze --scenario …` mid-run, then resume it (`uv run insightcrew resume runs/<id>` or the page's button) | Nothing (scripted); done in `tests/test_graph.py` and `tests/test_server.py` |

@@ -24,5 +24,7 @@ runs/
 .pytest_cache/
 .ruff_cache/
 
+.wrangler/
+
 # 真实行情（fetch 命令写入，不进 git）
 data/market/real/

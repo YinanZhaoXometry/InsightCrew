@@ -1,6 +1,6 @@
 # Roadmap
 
-What version 2.3 leaves open, what the evaluation says about the parts that could be removed, and what to build next. Version 1, the data analyst, is preserved at the tag `v1-data-analyst`; version 2.0 at `v2.0`; version 2.1 at `v2.1`; version 2.2 at `v2.2`. Version 2.3 is built and green (910 tests with Node present, 36 scenarios, 53 archived journals replaying `一致` and passing `verify`), and its real-model runs are done (one pilot plus the nine cells, 0.3174 USD of the 2 USD cap). What has deliberately never run: any live endpoint of the five new sources, and the CI workflow file.
+What version 2.3 leaves open, what the evaluation says about the parts that could be removed, and what to build next. Version 1, the data analyst, is preserved at the tag `v1-data-analyst`; version 2.0 at `v2.0`; version 2.1 at `v2.1`; version 2.2 at `v2.2`. Version 2.3 is built and green (915 tests with Node present, 36 scenarios, 53 archived journals replaying `一致` and passing `verify`), and its real-model runs are done (one pilot plus the nine cells, 0.3174 USD of the 2 USD cap). What has deliberately never run: any live endpoint of the five new sources, and the CI workflow file.
 
 ## 1. What is pending
 
