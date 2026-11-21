@@ -2546,6 +2546,12 @@ Commands run, with the last lines of their output:
 
 Not run, and why: 未动后端一行（/api/plan、/api/runs、取消/续跑/审批的接口与测试原样）；无网络请求、无真实模型、未读未打印 `.env`；`docs/design/` 仍未跟踪（同 WP53 记录，主人定去留）。
 
+### 2026-11-21 12:55 · 静态演示页部署到 Cloudflare Pages · coordinator session (ZCode)
+
+Result: done — owner 要求「部署到这个 Cloudflare，部署完给地址看一下」。系统的完整后端（FastAPI + LangGraph + 本地运行目录）不能跑在 Cloudflare 上；部署的是**自包含静态回放页**：WP54 三屏工作台 + demo 场景交付运行 `runs/20261121-114734-ACME-2026-09-30-f446/replay.html`（脚本化模型、合成 ACME 数据）原样作为 `index.html`。部署前逐模式核查页面无密钥（`sk-`/`api key`/`Bearer`/`.env`/`deepseek` 的 12 处命中全是 `risk-rounds`/`risk-three` 的子串）；未动仓库文件，暂存目录 /tmp/insightcrew-pages（不入库）。
+
+  账号 onezhaoyn@gmail.com（wrangler OAuth 已登录）；`wrangler pages project create insightcrew` + `pages deploy`。地址：**https://insightcrew.pages.dev**（本次哈希 https://b0da62ae.insightcrew.pages.dev）。线上核验：HTTP 200、整页 447,902 字节、打开即工作台（ACME·Buy·47/47·回放标记 4 颗），在内置浏览器留览。注意：公开只读地址，含合成演示数据与脚本化模型输出；主人此前（2026-11-21 上午）拒绝的是**原型**的公开部署，本次是其明确要求的**成品静态页**部署。
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.
