@@ -10,9 +10,11 @@
 .par-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:10px; align-items:start; }
 
 /* 卡片：一位角色的一次出场 */
-.pcard { border:1px solid var(--line); border-radius:var(--radius); background:var(--card); overflow:hidden; }
-.pcard > summary { list-style:none; cursor:pointer; padding:8px 12px; background:var(--lane);
+.pcard { border:1px solid var(--line); border-radius:var(--radius); background:var(--card);
+         background-image:var(--grad-surface); overflow:hidden; }
+.pcard > summary { list-style:none; cursor:pointer; padding:8px 12px; background:rgba(16,24,46,.5);
                    display:flex; align-items:center; justify-content:space-between; gap:10px; }
+@media (prefers-color-scheme: light) { .pcard > summary { background:var(--lane); } }
 .pcard > summary::-webkit-details-marker { display:none; }
 .pcard[open] > summary { border-bottom:1px solid var(--line); }
 .pcard.old > summary .who { text-decoration:line-through; color:var(--muted); }
@@ -40,9 +42,11 @@
 
 /* 辩论与风险：一轮一框，多空两栏 / 风险三栏 */
 .de-round { position:relative; margin:10px 0 14px; padding:14px 10px 10px; border:1px solid var(--line);
-            border-radius:var(--radius); background:var(--lane); }
-.round-tag { position:absolute; top:-9px; left:12px; font-size:10.5px; padding:0 8px; border-radius:3px;
-             background:var(--card); color:var(--accent); border:1px solid var(--accent-line); }
+            border-radius:var(--radius); background:rgba(16,24,46,.35); }
+@media (prefers-color-scheme: light) { .de-round { background:var(--lane); } }
+.round-tag { position:absolute; top:-9px; left:12px; font-size:10.5px; padding:0 8px; border-radius:4px;
+             background:var(--card); color:var(--accent); border:1px solid var(--accent-line);
+             font-family:var(--mono); }
 .de-two { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:10px; }
 .risk-three { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px; }
 @media (max-width:760px) { .de-two, .risk-three { grid-template-columns:1fr; } }

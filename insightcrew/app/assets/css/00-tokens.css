@@ -1,34 +1,44 @@
-/* 00-tokens.css —— 设计令牌。默认是交易终端式的深色一套，系统偏好浅色时换浅色一套。
-   主题色 --brand 固定为 #33D400，用于填充（主按钮、进度、选中标记）；--accent 是可作文字与描边的同色系，
-   浅色下压暗以满足对比度。涨/买/通过用绿，跌/卖/止损用红，进行中用青色，与主题绿分开。
-   正文与次要文字对各自底色的对比度均不低于 WCAG AA 的 4.5:1。 */
+/* 00-tokens.css —— 设计令牌（WP53 起为 kraken 主题，源自主人 OpenDesign 原型「专业交易分析系统」）。
+   默认深色一套：navy 底、紫色 accent（#7132f5 填充、#b7a6ff 可读文字），表面带渐变与克制的发光。
+   系统偏好浅色时换浅色一套：同一色相压深以满足对比度。变量名沿用拆分时的名字（10-base 起全部只引用令牌）。
+   语义色规则不变：涨/买/通过用绿，跌/卖/止损用红，警示用琥珀；「进行中」用主题紫。
+   正文与次要文字对各自底色的对比度均不低于 WCAG AA 的 4.5:1（tests/test_run_page.py 按对核算）。 */
 :root {
   color-scheme: dark;
-  --brand:#33D400; --brand-ink:#061200;
-  --ink:#e4ebe5; --soft:#aeb9b0; --muted:#8b978d; --line:#242c26; --bg:#0a0d0b; --card:#111612; --lane:#161c17;
-  --accent:#33D400; --accent-bg:#132409; --accent-line:#2b5a12;
-  --good:#33D400; --good-bg:#122308; --good-line:#285411;
-  --bad:#ff5b52; --bad-bg:#2b1211; --bad-line:#5e2421;
-  --warn:#f2b632; --warn-bg:#2a2009; --warn-line:#5b4614;
-  --info:#2ec7e8; --info-bg:#0a2229; --info-line:#1b4f5c;
-  --code:#79b8ff; --code-bg:#0e1a29; --code-line:#21405f;
-  --focus:#33D400; --shadow:none; --overlay:rgba(0,0,0,.55);
-  --font: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --brand:#7132f5; --brand-ink:#ffffff; --brand-2:#7d5cff;
+  --ink:#f8fafc; --soft:#c8d2e0; --muted:#98a4bc; --line:#26314f; --bg:#0b1020; --card:#121a33; --lane:#10182e;
+  --line-soft:#1b2740; --line-strong:#354368;
+  --accent:#b7a6ff; --accent-bg:#1c1b40; --accent-line:#4a3f85;
+  --good:#00c853; --good-bg:#0a2314; --good-line:#1f5b38;
+  --bad:#ff4d6d; --bad-bg:#2a121f; --bad-line:#6e2740;
+  --warn:#ffb020; --warn-bg:#2a2009; --warn-line:#5b4614;
+  --info:#b7a6ff; --info-bg:#1c1b40; --info-line:#4a3f85;
+  --code:#b7a6ff; --code-bg:#1c1b40; --code-line:#4a3f85;
+  --focus:#7d5cff; --shadow:0 16px 40px rgba(0,0,0,.22); --overlay:rgba(4,7,16,.72);
+  --grad-brand:linear-gradient(135deg,var(--brand-2) 0%,var(--brand) 52%,#5a26c4 100%);
+  --grad-surface:linear-gradient(145deg,rgba(125,92,255,.10),rgba(18,26,51,.97) 48%,rgba(113,50,245,.05));
+  --glow-brand:0 8px 24px rgba(113,50,245,.24);
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
-  --fs-1:11px; --fs-2:12px; --fs-3:13px; --fs-4:13.5px; --fs-5:17px; --fs-6:20px;
-  --radius-s:4px; --radius:6px; --radius-l:8px;
+  --fs-1:11px; --fs-2:12px; --fs-3:13px; --fs-4:14px; --fs-5:17px; --fs-6:20px;
+  --radius-s:6px; --radius:10px; --radius-l:14px;
 }
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;
-    --ink:#101a12; --soft:#3b483e; --muted:#566259; --line:#dce2dc; --bg:#f2f4f1; --card:#ffffff; --lane:#f6f8f5;
-    --accent:#1d7300; --accent-bg:#ebf8e2; --accent-line:#b5e29b;
-    --good:#1d7300; --good-bg:#ebf8e2; --good-line:#b5e29b;
-    --bad:#c4291f; --bad-bg:#fdeceb; --bad-line:#f2c3bf;
+    --brand:#6d28d9; --brand-ink:#ffffff; --brand-2:#7c3aed;
+    --ink:#191233; --soft:#3f3a5c; --muted:#5c5878; --line:#e3e0ee; --bg:#f4f3fa; --card:#ffffff; --lane:#f6f5fb;
+    --line-soft:#eceaf5; --line-strong:#c9c4de;
+    --accent:#5b21b6; --accent-bg:#efeafd; --accent-line:#cbb8f0;
+    --good:#1a6b0e; --good-bg:#e9f7e2; --good-line:#b5e29b;
+    --bad:#c4291f; --bad-bg:#fdeced; --bad-line:#f2c3bf;
     --warn:#875800; --warn-bg:#fdf4dc; --warn-line:#ead395;
-    --info:#086c86; --info-bg:#e2f3f7; --info-line:#b1dde8;
-    --code:#2b5c9c; --code-bg:#e9f0f9; --code-line:#c3d4ec;
-    --focus:#1d7300; --shadow:0 1px 2px rgba(16,26,18,.05); --overlay:rgba(16,26,18,.25);
+    --info:#5b21b6; --info-bg:#efeafd; --info-line:#cbb8f0;
+    --code:#5b21b6; --code-bg:#f1edfb; --code-line:#d5c9f2;
+    --focus:#6d28d9; --shadow:0 1px 2px rgba(25,18,51,.06); --overlay:rgba(25,18,51,.3);
+    --grad-brand:linear-gradient(135deg,var(--brand-2) 0%,var(--brand) 52%,#5b21b6 100%);
+    --grad-surface:linear-gradient(145deg,rgba(124,58,237,.05),#ffffff 48%,rgba(109,40,217,.03));
+    --glow-brand:0 6px 18px rgba(109,40,217,.18);
   }
 }

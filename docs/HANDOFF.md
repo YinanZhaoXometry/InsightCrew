@@ -4,7 +4,7 @@ The status board for the rewrite described in [BLUEPRINT.md](BLUEPRINT.md). The 
 
 **Every session reads this file first, and before it ends updates [section 2](#2-status) and appends to [section 8](#8-session-log).**
 
-Last updated: 2026-11-21 01:10, by the README new-user check (owner-asked; questions 38 and 43 to 45 earlier tonight). Submission is 2026-11-23 23:59.
+Last updated: 2026-11-21 11:10, by WP53 (the OpenDesign kraken theme; owner-asked). Submission is 2026-11-23 23:59.
 
 > **Version 2.3 is built: work packages 40 to 52, WP38 and WP39 are done** (status table below); what remains is the owner's acceptance and the open questions of section 7. Questions 38, 43, 44 and 45 were fixed on 2026-11-21 (session log). The rest of this paragraph was written before the build and is kept as history. Version 2.3 was planned and authorised as work packages 40 to 52, in [BLUEPRINT.md section 20](BLUEPRINT.md#20-version-23-hardening-run-control-and-the-workbench-page). It fixes the defects a review of version 2.2 found (five of them before WP38 spends money), adds a timing trace beside the journal, cancel and resume from the page, and rebuilds the run page around the user's questions. Start with WP40 (alone). [Section 5.6](#56-version-23-work-packages-40-to-52) says which packages run at the same time and which files each owns; [section 4](#4-what-the-owner-has-authorised) the version 2.3 authorisations. **WP38 now runs on `v2.3`, after WP41 and WP42, with a cap of 2 USD. WP39 comes last.** Version 2.2 as built stays at the tag `v2.2`, which WP40 creates.
 
@@ -97,6 +97,8 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | 51 | Version 2.3: page quality pass and the browser check | done | 起点取主人的样式基线（16:29–16:49 另一代理的未提交改动：键盘页签/aria/抽屉焦点/重试横幅/暗色终端式主题，本包核对后全数保留并续在其上）。第 7 节 WP48 的 renderCite 挂点请求照第二案落实（绑定声明在 00-core 最先加载、renderCite 两出口调用、40-evidence 删观察器直连）。质量清单逐条核对补齐：状态与活动区活区（sr-status 沿用基线，新增 sr-activity 播报段状态与在飞角色、不含每秒计时数字）、页签键盘操作（基线）、抽屉焦点进出（补上引用徽章重建后还焦点的回落）、无单靠颜色的状态（逐视图核对）、两套配色正文对比度全部 ≥4.5:1（脚本核算）、480px 五页签零溢出（修 .head-side 窄屏收缩与 .runctl 组内换行；宽表在自有盒内滚动）、失败请求横幅+重试（运行 404/断流走基线横幅；meta 与历史读不到就地加重的）、断流说明并自动重连（新增 #stream-note，实测停服→提示→重启→撤下）。WP50 遗留终验全过：plan 200 实样（阶段/并行/典型 13 上限 40/通道不可用带原因/组合）、取消 202（136ms 处 API 背靠背，页面确认框为真 confirm）与 409 理由、续跑 202（页面按钮，事件 39→47）与已结束 409、resumable 行续跑键、导出链接 HEAD 后显示、直播中 trace 行到达（瀑布在收尾前生长）。九张验收截图全拍（demo 交付/审计打回/REVIEW/通道不可用/全能力/取消续跑（瀑布含取消+续跑记号与未收尾横杠）/480px/暗色/静态 replay.html）。发现并记录问题 44（检查点前取消的续跑 EmptyInputError）与一次意外真实模型花费（0.002409 USD＋一笔在飞作废，见日志条目，问题 38 的一例）。测试 +4（pytest 2 项锁定质量层与挂点、Node 2 项挂点与活动播报）；890 tests、ruff/pyright 0；check.sh 六阶段全过。 |
 | 52 | Version 2.3: approval gate (stretch) | done | 20.15 放行（WP51 于 11-20 当天开始并完成，早于 11-22 12:00 门槛）；LangGraph 的 interrupt 经读安装源确认可用（guard 2 通过）。`Approval` 契约、`FlowConfig.approve`（默认关）、judges/audit 与 outcome 之间的 approval 节点（interrupt 暂停、Command(resume=…) 续起）、CLI `--approve` 终端问询、`POST /api/runs/{id}/approval`（202/404/409/422，暂停的事件流不带 error）、重放端口（flows 层预置注册表，门口入账——日志序号与真实运行全同位）、页面结论卡「待你确认」两按钮与 rejected_by_user 私有标签；两场景 approval_approved/approval_rejected ✓ 相符；浏览器实测接受→交付、拒绝→REVIEW(rejected_by_user)，两运行 replay 一致、verify 通过；approve 关着 check.sh 六阶段全过（906 tests、ruff/pyright 0、36/36 场景、53/53 重放、eval all）。问题 45、46。 |
 
+| 53 | The OpenDesign kraken theme for the run page (owner-authorised 2026-11-21; CSS only) | done | Owner's instruction「按 HANDOFF 把 OpenDesign 里专业交易分析系统的设计实现到 InsightCrew」. Six of the seven `assets/css/` files rethemed to the kraken design system of the owner's OpenDesign prototype (project `1d8880eb`): navy `#0b1020`/`#121a33` surfaces with purple grid texture and radial glow, purple `#7132f5` fills with readable `#b7a6ff` text (light scheme: same hue darkened, `#6d28d9`/`#5b21b6`), `I/C` gradient brand chip, 3px purple gradient tab underline, conclusion card with radial purple glow, gradient primary button and waterfall bars, purple mono citation chips; `40-evidence.css` untouched (fully token-driven). Every variable name, DOM node, JS file, label and the CSS file list unchanged; no package, no network, no spend. New tests: kraken tokens declared for both schemes + WCAG AA contrast computed for 14 text/background pairs per scheme (913 tests total). Browser-checked with headless Chrome in both colour schemes (static demo replay + live `serve` with `IC_FORCE_OFFLINE=1`): dark/light both applied, no green leftovers, no layout breakage. Details in the session log. |
+
 **Work packages 0 to 12 are done: that is version 2.0, and it is a complete submission.** [ROADMAP.md](ROADMAP.md) lists its known issues and next steps. Work packages 13 to 20 are version 2.1, in [BLUEPRINT.md section 18](BLUEPRINT.md#18-version-21-evidence-channels). Work packages 21 to 39 are version 2.2, in [BLUEPRINT.md section 19](BLUEPRINT.md#19-version-22-langgraph-orchestration-and-five-capabilities). Work packages 40 to 52 are version 2.3, in [BLUEPRINT.md section 20](BLUEPRINT.md#20-version-23-hardening-run-control-and-the-workbench-page).
 
 ## 3. The repository at handoff
@@ -183,6 +185,7 @@ Statuses: `not started`, `in progress`, `done` (every acceptance command passed 
 | Version 2.3: real-model spending | **WP38 only, cap 2 USD (owner, 2026-11-20).** The cap is the owner's yes for WP38's runs: no further asking below it; at 1.60 USD spent, stop and ask. Every other package runs scripted; when starting `serve` to look at the page, set `IC_FORCE_OFFLINE=1`. |
 | Version 2.3: the reference codebases | **Ideas only, from both.** No file of `TradingAgents-main/` or `open-multi-agent-main/` is copied or adapted by any package of version 2.3, and `THIRD_PARTY_NOTICES.md` gains nothing. |
 | The open questions of version 2.2 | **Settled (owner, 2026-11-20):** 14 is 2 USD; 15 to 19, 21 to 28 and 30 to 32 stand as each row's recommended reading; 20 is answered by the trace (BLUEPRINT decision 52). Questions 11 and 13 remain open. |
+| WP53: the OpenDesign kraken theme (owner, 2026-11-21) | **Yes.**「按 HANDOFF 把 OpenDesign 里专业交易分析系统的设计实现到 InsightCrew」. Scope as authorised: retheme the run page's CSS only (the seven files `insightcrew/app/assets/css/`, the file list unchanged) to the kraken design system of the owner's OpenDesign prototype (project `1d8880eb`, purple accent `#7132f5`, dark navy surfaces); keep every DOM node, JS file, label, test fixture and package as it is; both colour schemes keep WCAG AA 4.5:1 body contrast; no network request, no spend, no new file in `assets/`. The prototype's three blue leftovers are not carried over. Commit and push on `main`, one commit `WP53: ...`. |
 
 ## 5. What may run at the same time
 
@@ -2502,6 +2505,25 @@ Not run, and why: 真实模型 `analyze` 未跑（花费须先问；owner 未选
 补记（01:25，owner 批准第 3 条，确认与并行的 serve 会话不互斥后执行）：`.venv/bin/insightcrew analyze ACME --date 2026-09-30 --no-open` 真模型跑通端到端（key 读取、网络、deepseek-flash 与 deepseek-v4-pro 双档、审计、报告），但交付为 `REVIEW（malformed_output）`：trader#1 单次调用输出恰好 8000（上限打满，AGENTS 已记载的 reasoning 耗尽输出预算截断，非代码缺陷）。用量 14,573 入 + 15,390 出（trader 占 4,476+8,000），约 0.012 USD。`replay` 一致、`verify` 通过；run 目录 `runs/20261121-011110-ACME-2026-09-30-4b02`，未归档。新用户首跑遇 REVIEW 而非 delivered 属当日模型方差（11-20 的 eval v22 九格 8 交付）；是否调大 trader 的输出上限或加一次重试，是 owner 的决定（涉 prompt/上限须真模型验证）。与 serve 会话无冲突：不同 run 目录，决策日志有锁，未动其进程与文件。
 
 再补记（01:20 复跑，owner 批准"再跑一次；若复现则立项"）：同一命令第二次 `runs/20261121-011523-ACME-2026-09-30-63d9` → `delivered（ok）；accepted 2/3；verified`，3:33 全流程（含审计与评审），trader 输出 2,689（远低于 8,000），`replay` 一致、`verify` 通过。截断为偶发、不复现 → 不立项、不加第 7 节问题；AGENTS 的已知机制记载足够。用量 50,613 入 + 32,983 出（约 0.03 USD，与 README/EVALUATION 记录一致）；两次合计约 0.04 USD。README 的带 key 路径就此实证完毕：指引可用，REVIEW 与 delivered 都是系统按设计的正常交付。
+
+### 2026-11-21 11:10 · WP53 OpenDesign kraken 主题 · coordinator session (ZCode)
+
+Result: done — owner 指示「按 HANDOFF 把 OpenDesign 里专业交易分析系统的设计实现到 InsightCrew」。授权行与状态行见上（第 4 节末、状态表 WP53）。
+
+做法（CSS-only 重绘，DOM/JS/标签/测试夹具零改动）：
+  设计源：OpenDesign 桌面应用里的原型项目「专业交易分析系统」（id `1d8880eb-de37-4fa4-b191-86b3dcdf2d44`，kraken 设计系统），文件直接读自 `~/Library/Application Support/Open Design/namespaces/release-stable/data/projects/1d8880eb…/`（index.html + styles.css + views.css + compat.css，无需 MCP）。仓库里的 `docs/design/prototype-InsightCrew-UI.md`（未跟踪，09:16 落盘）是当初喂给 OpenDesign 的中文简报，本次未改动、未提交。
+  令牌（00-tokens.css 全量重写，变量名一个不改）：暗色默认 = kraken——bg `#0b1020`、card `#121a33`、lane `#10182e`、brand 填充 `#7132f5`、accent 文字 `#b7a6ff`（可读紫）、good/bad/warn `#00c853`/`#ff4d6d`/`#ffb020`、info 与 code 并入紫族（原型把「进行中」与引用徽章都画成紫）；新增 `--brand-2/--grad-brand/--grad-surface/--glow-brand/--line-soft/--line-strong`；圆角 6/10/14。浅色方案同一色相压深（brand `#6d28d9`、accent `#5b21b6`）保持 ≥4.5:1。语义规则沿用：涨/买/通过绿、跌/卖/止损红，「无单靠颜色」不受影响（状态都有文字）。
+  组件：10-base（body 48px 紫网格底纹 + 双径向光斑、页头 `I/C` 渐变方章 + 紫光底缘、卡片渐变表面、页签 3px 渐变下划线 + 激活紫底、抽屉 560px 深面板 + h2 渐变抬头、引用 chip 紫 mono、滚动条紫悬停、::selection 紫）；30-verdict（结论卡 radial 紫光 + 抬升阴影、评级 26px、数值格 17px mono、价格线 `--brand-2`）；35-process（角色卡渐变表面、轮框半透明、round-tag mono 紫）；50-usage（上限条与瀑布横杠渐变 + 紫光）；55-launch（主按钮渐变 + 发光、进行中阶段紫光、输入深底 `--bg` + 焦点紫环）。40-evidence 完全走令牌，未动。原型自带的 3 处蓝色残留（.ref/.replay-banner/.waterfall-bar）按约定不带入。
+  测试（tests/test_run_page.py +3）：kraken 令牌双方案齐全（brand/bg/accent 断言精确值、I/C 品牌章）＋ 对比度核算——两套方案各 14 对（正文/次要/静音/紫/绿/红/琥珀/code 对各自底色，含 brand-ink 对 brand）按 WCAG 公式计算 ≥4.5:1。
+
+Commands run, with the last lines of their output:
+  uv run pytest -q tests/test_run_page.py → 29 passed
+  uv run pytest -q → 913 passed in 28.64s；ruff → All checks passed!；pyright → 0 errors
+  ./scripts/check.sh → 三项检查 913/0/0、36/36 场景 ✓、53/53 重放一致、eval all 6/6；「check.sh：全部阶段通过。」
+  IC_FORCE_OFFLINE=1 analyze --scenario demo --no-open → delivered（ok）；accepted 2/3；verified；run 目录 runs/20261121-110316-ACME-2026-09-30-4a8d
+  浏览器核验（本机 Chrome 无头，不联网）：静态 replay.html 双方案各一截图（`--force-dark-mode` 出暗色，默认出浅色）＋ IC_FORCE_OFFLINE serve（9999）实时页暗色截图，视觉模型逐项核对——暗色：navy 底 + 顶部径向紫光（首查偏弱后从 .22 加到 .30）、页签紫渐变下划线、结论卡紫光抬升、引用 chip 紫、**无绿色主题残留**、无断版；浅色：白底紫字映射正确；实时页：主按钮渐变发光、表单深底可读、历史表无溢出。三张截图 /tmp/wp53_demo.png、/tmp/wp53_demo_dark.png、/tmp/wp53_live.png（临时，未入库）。serve 用后已停。
+
+Not run, and why: 原型里的三处蓝色残留不在 OpenDesign 项目里修（主人未选定由谁修；实现侧已按 kraken 紫落色，不受影响）。`docs/design/` 未跟踪文件不是本包产出，未提交（主人自行决定去留）。无网络请求（Chrome 截图走 file:// 与 127.0.0.1）、无真实模型、未读未打印 `.env`。
 
 ## 9. Prompts for starting a session
 

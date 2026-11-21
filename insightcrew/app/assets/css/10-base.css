@@ -1,8 +1,27 @@
-/* 10-base.css —— 基础组件：卡片、表格、页头、抽屉、回放控制与原始事件时间线。交易终端式：扁平、细线、数字等宽。 */
+/* 10-base.css —— 基础组件：卡片、表格、页头、抽屉、回放控制与原始事件时间线（WP53 起 kraken 主题：
+   navy 底 + 紫色网格底纹与径向光斑、渐变表面、圆角与克制发光；数字等宽不变）。 */
 * { box-sizing:border-box; }
 html { background:var(--bg); }
-body { margin:0; padding:0 24px 64px; background:var(--bg); color:var(--ink);
-       font:13.5px/1.6 var(--font); -webkit-font-smoothing:antialiased; }
+body { margin:0; padding:0 24px 64px; color:var(--ink);
+       font:14px/1.65 var(--font); -webkit-font-smoothing:antialiased;
+       background:
+         linear-gradient(rgba(125,92,255,.018) 1px,transparent 1px),
+         linear-gradient(90deg,rgba(125,92,255,.018) 1px,transparent 1px),
+         radial-gradient(circle at 88% -8%,rgba(113,50,245,.30),transparent 34rem),
+         radial-gradient(circle at 4% 42%,rgba(125,92,255,.10),transparent 30rem),
+         var(--bg);
+       background-size:48px 48px,48px 48px,auto,auto,auto;
+       background-attachment:fixed; }
+@media (prefers-color-scheme: light) {
+  body { background:
+         linear-gradient(rgba(109,40,217,.03) 1px,transparent 1px),
+         linear-gradient(90deg,rgba(109,40,217,.03) 1px,transparent 1px),
+         radial-gradient(circle at 88% -8%,rgba(124,58,237,.07),transparent 30rem),
+         radial-gradient(circle at 4% 42%,rgba(109,40,217,.04),transparent 28rem),
+         var(--bg);
+         background-size:48px 48px,48px 48px,auto,auto,auto;
+         background-attachment:fixed; }
+}
 .wrap { max-width:1240px; margin:0 auto; }
 h1 { font-size:20px; line-height:1.3; margin:0; letter-spacing:.1px; font-weight:650; }
 h2 { font-size:11.5px; margin:0 0 12px; color:var(--muted); font-weight:600; letter-spacing:.9px; text-transform:uppercase; }
@@ -10,23 +29,33 @@ h3 { font-size:12.5px; margin:16px 0 6px; color:var(--soft); font-weight:600; }
 [hidden] { display:none !important; }
 .muted { color:var(--muted); }
 .mono { font-family:var(--mono); font-size:12px; }
-.card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); }
+.card { background:var(--card); background-image:var(--grad-surface); border:1px solid var(--line);
+        border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); }
 section { margin-top:12px; }
 button { font:inherit; color:inherit; }
 .note { margin:10px 0 0; font-size:12px; color:var(--soft); }
-::selection { background:var(--accent-bg); color:var(--ink); }
-* { scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+::selection { background:rgba(125,92,255,.36); color:var(--ink); }
+* { scrollbar-width:thin; scrollbar-color:var(--line-strong) transparent; }
+*::-webkit-scrollbar { width:10px; height:10px; }
+*::-webkit-scrollbar-track { background:var(--bg); }
+*::-webkit-scrollbar-thumb { border:2px solid var(--bg); border-radius:8px; background:var(--line-strong); }
+*::-webkit-scrollbar-thumb:hover { background:var(--brand); }
 
-/* 页头：终端顶栏 */
-.top { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0 12px;
-       border-bottom:1px solid var(--line); margin-bottom:4px; }
-.brand { display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:700; letter-spacing:2px;
-         color:var(--accent); text-transform:uppercase; }
-.brand::before { content:""; width:8px; height:8px; border-radius:2px; background:var(--brand);
-                 box-shadow:0 0 8px color-mix(in srgb, var(--brand) 60%, transparent); }
+/* 页头：kraken 顶栏——品牌块是渐变方章，底缘一道紫色光边 */
+.top { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 0 14px;
+       border-bottom:1px solid var(--line); margin-bottom:6px;
+       box-shadow:0 1px 0 rgba(125,92,255,.10), 0 12px 32px rgba(0,0,0,.16); }
+.brand { display:inline-flex; align-items:center; gap:10px; font-size:15px; font-weight:700; letter-spacing:.2px;
+         color:var(--ink); }
+.brand::before { content:"I/C"; display:inline-grid; place-items:center; width:30px; height:30px; flex:none;
+                 border-radius:8px; border:1px solid rgba(255,255,255,.18);
+                 background:var(--grad-brand); color:#fff; font-family:var(--font);
+                 font-size:10px; font-weight:700; letter-spacing:.02em;
+                 box-shadow:0 0 18px rgba(113,50,245,.35); }
+#title { color:var(--accent); }
 #subtitle { color:var(--muted); font-size:12px; margin-top:2px; font-family:var(--mono); letter-spacing:-.1px; }
 .badge { flex:none; padding:3px 10px; border-radius:var(--radius-s); font-size:11.5px; font-weight:600; white-space:nowrap;
-         border:1px solid var(--line); background:var(--card); color:var(--soft); }
+         border:1px solid var(--line-strong); background:rgba(125,92,255,.08); color:var(--soft); }
 .badge.scripted { background:var(--warn-bg); border-color:var(--warn-line); color:var(--warn); }
 .badge.model { background:var(--accent-bg); border-color:var(--accent-line); color:var(--accent); }
 .badge.replay { background:var(--code-bg); border-color:var(--code-line); color:var(--code); }
@@ -35,23 +64,24 @@ button { font:inherit; color:inherit; }
           border:1px solid var(--bad-line); border-left:3px solid var(--bad); color:var(--bad);
           display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 
-/* 表格：紧凑行、等宽数字、行悬停高亮 */
+/* 表格：紧凑行、等宽数字、行悬停一抹紫 */
 table { border-collapse:collapse; width:100%; font-size:12.5px; }
 th, td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
 th { font-weight:600; color:var(--muted); background:var(--lane); white-space:nowrap; font-size:11px;
      letter-spacing:.5px; text-transform:uppercase; }
-tbody tr:hover td { background:var(--lane); }
+tbody tr:hover td { background:rgba(125,92,255,.07); }
 tr:last-child td { border-bottom:0; }
 td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; font-family:var(--mono); }
+td.num { color:var(--accent); }
 tr.total td { font-weight:600; background:var(--lane); }
 .pass { color:var(--good); font-weight:600; } .fail { color:var(--bad); font-weight:600; } .na { color:var(--muted); }
 
-/* 按钮：次要（描边）与主按钮（主题绿填充） */
+/* 按钮：次要（描边、悬停紫）与回放控制 */
 .ctl { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:4px 12px; min-height:30px;
-       border:1px solid var(--line); background:var(--lane); border-radius:var(--radius-s); cursor:pointer;
+       border:1px solid var(--line-strong); background:var(--lane); border-radius:var(--radius-s); cursor:pointer;
        font-size:12.5px; color:var(--soft); }
-.ctl:hover { border-color:var(--accent-line); color:var(--ink); }
-.ctl.on { background:var(--accent-bg); border-color:var(--accent); color:var(--accent); font-weight:600; }
+.ctl:hover { border-color:var(--brand-2); background:var(--accent-bg); color:var(--accent); }
+.ctl.on { background:var(--accent-bg); border-color:var(--accent-line); color:var(--accent); font-weight:600; }
 .ctl:disabled { opacity:.45; cursor:not-allowed; }
 
 /* 回放控制 */
@@ -65,13 +95,14 @@ tr.total td { font-weight:600; background:var(--lane); }
 #progress { font-variant-numeric:tabular-nums; min-width:64px; text-align:right; font-family:var(--mono); font-size:12px; }
 
 /* 时间线：每个角色一条泳道，角色的每次出场一栏，从左到右就是发生的顺序 */
-#lanes { overflow:auto; max-height:560px; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); }
+#lanes { overflow:auto; max-height:560px; border:1px solid var(--line); border-radius:var(--radius);
+         background:var(--card); background-image:var(--grad-surface); }
 .grid { display:grid; grid-template-columns:136px; grid-auto-columns:150px; gap:4px; padding:10px; min-width:max-content; }
 .cell { display:flex; flex-direction:column; gap:3px; min-width:0; z-index:1; padding:3px 0; }
 .lane-bg { grid-column:1 / -1; background:var(--lane); border-radius:var(--radius-s); }
 .lane-name { grid-column:1; position:sticky; left:0; z-index:2; display:flex; align-items:center; gap:6px;
              padding:4px 8px; font-size:12px; color:var(--soft); background:var(--lane); border-radius:var(--radius-s); min-height:42px; }
-.tag { font-size:10px; padding:0 5px; border-radius:3px; border:1px solid; flex:none; letter-spacing:.3px; }
+.tag { font-size:10px; padding:0 5px; border-radius:4px; border:1px solid; flex:none; letter-spacing:.3px; }
 .tag.model { color:var(--accent); border-color:var(--accent-line); background:var(--accent-bg); }
 .tag.code { color:var(--code); border-color:var(--code-line); background:var(--code-bg); }
 .tick { font-size:10px; color:var(--muted); text-align:center; font-variant-numeric:tabular-nums; font-family:var(--mono);
@@ -80,7 +111,7 @@ tr.total td { font-weight:600; background:var(--lane); }
       cursor:pointer; font-size:11.5px; line-height:1.35; overflow:hidden; width:100%; color:var(--ink); }
 .ev b { display:block; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ev span { display:block; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.ev:hover, .ev.selected { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+.ev:hover, .ev.selected { border-color:var(--brand-2); box-shadow:0 0 0 1px var(--brand-2), var(--glow-brand); }
 .ev.model { background:var(--accent-bg); border-color:var(--accent-line); }
 .ev.good { background:var(--good-bg); border-color:var(--good-line); }
 .ev.bad { background:var(--bad-bg); border-color:var(--bad-line); }
@@ -92,10 +123,12 @@ tr.total td { font-weight:600; background:var(--lane); }
 .ev.latest { animation:arrive .5s ease-out; }
 @keyframes arrive { from { transform:scale(.92); opacity:.2; } to { transform:none; opacity:1; } }
 
-/* 详情抽屉：右侧滑出 */
-#detail { position:fixed; top:0; right:0; bottom:0; width:min(620px, 94vw); z-index:20; overflow:auto;
-          background:var(--card); border-left:1px solid var(--line); box-shadow:-24px 0 48px var(--overlay);
+/* 详情抽屉：右侧滑出，kraken 的深面板（内容首行是浮动关闭键，不套抬头容器） */
+#detail { position:fixed; top:0; right:0; bottom:0; width:min(560px, 94vw); z-index:20; overflow:auto;
+          background:var(--lane); border-left:1px solid var(--line); box-shadow:-24px 0 64px var(--overlay);
           padding:16px 20px 40px; animation:slide-in .18s ease-out; }
+#detail h2 { background:var(--grad-surface); margin:0 -20px; padding:14px 20px 12px;
+             border-bottom:1px solid var(--line); }
 @keyframes slide-in { from { transform:translateX(24px); opacity:0; } to { transform:none; opacity:1; } }
 #detail .close { float:right; min-height:30px; }
 #detail h2 { font-size:15px; color:var(--ink); text-transform:none; letter-spacing:0; margin-bottom:10px; }
@@ -105,39 +138,41 @@ pre { margin:0; padding:10px 12px; background:var(--bg); border:1px solid var(--
 .kv dt { color:var(--muted); } .kv dd { margin:0; font-variant-numeric:tabular-nums; }
 .findings { margin:6px 0; padding-left:18px; } .findings li { margin:4px 0; }
 
-/* 页头右侧：运行状态（带圆点） */
+/* 页头右侧：运行状态（带圆点），kraken 软色徽 */
 .head-side { display:flex; gap:8px; align-items:center; flex:none; flex-wrap:wrap; justify-content:flex-end; }
 .pill { flex:none; display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:var(--radius-s);
-        font-size:11.5px; font-weight:600; white-space:nowrap; border:1px solid var(--line); background:var(--card); color:var(--soft); }
+        font-size:11.5px; font-weight:600; white-space:nowrap; border:1px solid var(--line-strong);
+        background:rgba(139,149,170,.08); color:var(--soft); }
 .pill::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
-.pill.st-running { background:var(--info-bg); border-color:var(--info-line); color:var(--info); }
+.pill.st-running { background:var(--accent-bg); border-color:var(--accent-line); color:var(--accent); }
 .pill.st-running::before { animation:blink 1.2s ease-in-out infinite; }
 .pill.st-delivered { background:var(--good-bg); border-color:var(--good-line); color:var(--good); }
 .pill.st-review { background:var(--bad-bg); border-color:var(--bad-line); color:var(--bad); }
 .pill.st-interrupted { background:var(--warn-bg); border-color:var(--warn-line); color:var(--warn); }
 @keyframes blink { 50% { opacity:.25; } }
 
-/* 引用徽章：角色引用的事实或条目编号（cite） */
-.chip { display:inline-block; padding:0 6px; border-radius:3px; border:1px solid var(--code-line); background:var(--code-bg);
-        color:var(--code); cursor:pointer; font-size:11px; line-height:1.7; }
-.chip:hover { border-color:var(--code); }
+/* 引用徽章：角色引用的事实或条目编号（cite）——kraken 的紫色 mono 徽章 */
+.chip { display:inline-block; padding:0 6px; border-radius:4px; border:1px solid var(--accent-line);
+        background:var(--accent-bg); color:var(--accent); cursor:pointer;
+        font-family:var(--mono); font-size:11px; font-weight:700; line-height:1.7; }
+.chip:hover { border-color:var(--brand-2); }
 
-/* 页签：终端式下划线，吸顶 */
-.tabs { display:flex; flex-wrap:wrap; gap:2px; margin-top:16px; border-bottom:1px solid var(--line);
+/* 页签：kraken 下划线（3px 渐变）+ 激活底色，吸顶 */
+.tabs { display:flex; flex-wrap:wrap; gap:2px; margin-top:16px; padding:0 6px; border-bottom:1px solid var(--line);
         position:sticky; top:0; z-index:10; background:var(--bg); }
-.tab { position:relative; padding:9px 14px; border:0; background:none; cursor:pointer; color:var(--muted);
+.tab { position:relative; padding:10px 14px; border:0; background:none; cursor:pointer; color:var(--muted);
        font-size:13px; font-weight:500; white-space:nowrap; }
-.tab:hover { color:var(--ink); }
-.tab.on { color:var(--ink); font-weight:600; }
-.tab.on::after { content:""; position:absolute; left:10px; right:10px; bottom:-1px; height:2px; border-radius:2px 2px 0 0;
-                 background:var(--brand); }
+.tab:hover { color:var(--ink); background:rgba(125,92,255,.06); }
+.tab.on { color:var(--accent); font-weight:600; background:var(--accent-bg); }
+.tab.on::after { content:""; position:absolute; left:6px; right:6px; bottom:-1px; height:3px;
+                 border-radius:3px 3px 0 0; background:var(--grad-brand); }
 .tabs ~ .view { margin-top:12px; }
 
 /* ---- 质量层：键盘焦点、动效偏好、窄屏、读屏专用文字 ---- */
 :focus-visible { outline:2px solid var(--focus); outline-offset:2px; border-radius:3px; }
 .ev:focus-visible, .chip:focus-visible, .ctl:focus-visible, .tab:focus-visible { outline-offset:1px; }
 .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
-.ctl, .tab, .chip, .ev, .primary { transition:border-color .15s ease, background-color .15s ease, color .15s ease, box-shadow .15s ease; }
+.ctl, .tab, .chip, .ev, .primary { transition:border-color .15s ease, background-color .15s ease, color .15s ease, box-shadow .15s ease, background-image .3s ease; }
 .banner .banner-retry { flex:none; }
 .view { overflow-x:auto; }                       /* 宽表格在自己的盒子里横向滚动，不撑破页面 */
 #detail { overscroll-behavior:contain; }
@@ -151,6 +186,7 @@ pre { margin:0; padding:10px 12px; background:var(--bg); border:1px solid var(--
   .ctl, .tab { min-height:40px; }
   .chip { padding:3px 8px; }
   #detail { width:100vw; padding:14px 14px 40px; border-left:0; }
+  #detail h2 { margin:0 -14px; }
   #playbar { gap:8px; }
   #slider { flex:1 1 100%; order:9; }
   .runctl-note { max-width:100%; }

@@ -1,22 +1,37 @@
-/* 30-verdict.css —— 结论卡与价格图（WP46）。多头评级为绿、空头为红；评级文字本身写明方向，不只靠颜色。 */
+/* 30-verdict.css —— 结论卡与价格图（WP46；WP53 起 kraken 主题：结论卡是首屏焦点，
+   带 radial 紫光与抬升阴影，四个价位是等宽数字的数值格）。多头评级为绿、空头为红；
+   评级文字本身写明方向，不只靠颜色。 */
 .two { display:grid; grid-template-columns:minmax(0, 5fr) minmax(0, 7fr); gap:12px; align-items:start; }
 @media (max-width:860px) { .two { grid-template-columns:1fr; } }
-.verdict { font-size:22px; font-weight:700; line-height:1.25; letter-spacing:-.2px; }
+#result { border-color:rgba(125,92,255,.44);
+          background:
+            radial-gradient(circle at 100% 0%,rgba(113,50,245,.26),transparent 44%),
+            var(--grad-surface);
+          box-shadow:0 24px 64px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.045); }
+@media (prefers-color-scheme: light) {
+  #result { border-color:var(--accent-line);
+            background:
+              radial-gradient(circle at 100% 0%,rgba(124,58,237,.08),transparent 44%),
+              var(--grad-surface);
+            box-shadow:var(--shadow); }
+}
+.verdict { font-size:26px; font-weight:650; line-height:1.3; letter-spacing:-.2px; }
 .verdict.long { color:var(--good); }
 .verdict.short { color:var(--bad); }
 .verdict.review { color:var(--bad); }
-.verdict.forming { color:var(--info); }
+.verdict.forming { color:var(--accent); }
 .verdict.forming::before { content:""; display:inline-block; width:8px; height:8px; border-radius:50%;
-                           background:var(--info); margin-right:9px; vertical-align:middle; animation:v-pulse 1.2s ease-in-out infinite; }
+                           background:var(--brand); margin-right:9px; vertical-align:middle;
+                           animation:v-pulse 1.2s ease-in-out infinite; }
 @keyframes v-pulse { 50% { opacity:.2; } }
 .verdict small { font-size:11.5px; font-weight:600; color:var(--muted); margin-left:8px; font-family:var(--mono);
-                 padding:1px 6px; border:1px solid var(--line); border-radius:3px; vertical-align:middle; }
+                 padding:1px 6px; border:1px solid var(--line); border-radius:4px; vertical-align:middle; }
 .levels { display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:0; margin:14px 0;
           background:var(--lane); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
-.level { padding:8px 10px; box-shadow:1px 0 0 var(--line), 0 1px 0 var(--line); }
-.level b { display:block; font-size:16px; font-weight:600; font-variant-numeric:tabular-nums; font-family:var(--mono); letter-spacing:-.3px; }
+.level { padding:9px 10px; box-shadow:1px 0 0 var(--line), 0 1px 0 var(--line); }
+.level b { display:block; font-size:17px; font-weight:650; font-variant-numeric:tabular-nums; font-family:var(--mono); letter-spacing:-.3px; }
 .level span { font-size:11px; color:var(--muted); }
-.level.lv-entry b { color:var(--info); }
+.level.lv-entry b { color:var(--accent); }
 .level.lv-stop b { color:var(--bad); }
 .level.lv-target b { color:var(--good); }
 .summary { margin:12px 0 0; font-size:13.5px; color:var(--ink); }
@@ -27,7 +42,7 @@
 .invalidation { margin:4px 0 0; padding-left:18px; color:var(--soft); font-size:12.5px; }
 .invalidation li { margin:3px 0; }
 .invalidation li::marker { color:var(--bad); }
-.advice { border-left:3px solid var(--accent); padding-left:10px; }
+.advice { border-left:3px solid var(--brand); padding-left:10px; }
 .tablink { background:none; border:0; padding:0; font:inherit; font-size:12.5px; font-weight:600;
            color:var(--accent); text-decoration:none; cursor:pointer; text-align:left; }
 .tablink:hover { text-decoration:underline; }
@@ -40,6 +55,6 @@ svg { display:block; width:100%; height:auto; }
 @media (max-width:860px) { #chart { position:static; } }
 .ch-grid { stroke:var(--line); }
 .ch-label { fill:var(--muted); font-family:var(--mono); }
-.ch-line { stroke:var(--accent); } .ch-dot { fill:var(--accent); }
-.ch-area { fill:var(--accent); opacity:.1; }
+.ch-line { stroke:var(--brand-2); } .ch-dot { fill:var(--brand-2); }
+.ch-area { fill:var(--brand); opacity:.12; }
 .ch-asof { stroke:var(--muted); }

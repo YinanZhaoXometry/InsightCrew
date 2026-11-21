@@ -301,3 +301,64 @@ def test_the_cite_panel_hook_is_declared_and_taken() -> None:
     assert "if (citePanelExtra) citePanelExtra(model, box);" in ASSET  # renderCite 两个出口都调用
     assert "citePanelExtra = evCiteExtra;" in ASSET                # 40-evidence 直连（观察器绕法已删）
     assert "MutationObserver" not in ASSET                         # 绕法不再出现
+
+
+# ---------- WP53：OpenDesign kraken 主题（只动 CSS；对比度按对核算，双方案 ≥ 4.5:1） ----------
+
+_TOKENS = (ASSETS / "css" / "00-tokens.css").read_text(encoding="utf-8")
+
+
+def _token_block() -> tuple[dict[str, str], dict[str, str]]:
+    """拆出两套方案的令牌：:root 是默认深色，@media(prefers-color-scheme: light) 里是浅色。"""
+    dark, _, rest = _TOKENS.partition("@media (prefers-color-scheme: light)")
+    light = rest
+    def parse(block: str) -> dict[str, str]:
+        found = dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})\b", block))
+        return found
+    return parse(dark), parse(light)
+
+
+def _luminance(hexcolor: str) -> float:
+    rgb = [int(hexcolor[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4) for c in rgb]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast(fore: str, back: str) -> float:
+    l1, l2 = sorted((_luminance(fore), _luminance(back)), reverse=True)
+    return (l1 + 0.05) / (l2 + 0.05)
+
+
+def test_the_kraken_tokens_are_declared_for_both_schemes() -> None:
+    """WP53：令牌换到主人的 OpenDesign kraken 主题（navy 底、紫色 accent），变量名一个不改。"""
+    dark, light = _token_block()
+    assert dark["--brand"] == "#7132f5" and dark["--bg"] == "#0b1020"      # kraken 紫 + navy 底
+    assert dark["--accent"] == "#b7a6ff"                                   # 可读紫（文字用）
+    assert light["--brand"] == "#6d28d9"                                   # 浅色方案压深同一色相
+    for name in ("--ink", "--soft", "--muted", "--line", "--card", "--lane", "--bg",
+                 "--accent", "--accent-bg", "--accent-line", "--good", "--good-bg",
+                 "--bad", "--bad-bg", "--warn", "--warn-bg", "--code", "--code-bg",
+                 "--brand", "--brand-ink", "--focus"):
+        assert dark.get(name), name                                        # 两套方案名字齐全
+        assert light.get(name), name
+    assert "--grad-brand" in _TOKENS and "--grad-surface" in _TOKENS       # 渐变令牌（无光标的方案里不核算）
+    assert "I/C" in (ASSETS / "css" / "10-base.css").read_text(encoding="utf-8")  # 品牌方章
+
+
+@pytest.mark.parametrize("scheme", ["dark", "light"])
+def test_body_text_keeps_wcag_aa_in_both_schemes(scheme: str) -> None:
+    """WP53：正文与语义文字对各自底色 ≥ 4.5:1（沿用 WP51 的核算口径，套到 kraken 令牌上）。"""
+    dark, light = _token_block()
+    tokens = dark if scheme == "dark" else light
+    pairs = [
+        ("--ink", "--bg"), ("--ink", "--card"), ("--ink", "--lane"),
+        ("--soft", "--card"), ("--soft", "--lane"),
+        ("--muted", "--card"), ("--muted", "--lane"),
+        ("--accent", "--card"), ("--accent", "--accent-bg"),
+        ("--good", "--good-bg"), ("--bad", "--bad-bg"),
+        ("--warn", "--warn-bg"), ("--code", "--code-bg"),
+        ("--brand-ink", "--brand"),
+    ]
+    for fore, back in pairs:
+        ratio = _contrast(tokens[fore], tokens[back])
+        assert ratio >= 4.5, f"{scheme}: {fore} on {back} is {ratio:.2f}:1"
