@@ -137,41 +137,48 @@ function renderPipeline(model) {
   const board = model.board;
   const started = model.started;
   const parallel = started && started.flow && started.flow.parallel !== false;
-  const chip = (key) => {
+  /* WP55：圆形节点（照原型）——点里是状态记号（✓/↺n/✕/—/序号），名字与状态词在下方，不只靠颜色 */
+  const node = (key) => {
     const entry = STAGES.find(([k]) => k === key);
-    const state = stageState(info, key);
-    const cls = state === "sentback" ? "revised" : state;
+    const st = stageState(info, key);
+    const cls = st === "sentback" ? "revised" : st;
+    let mark = String(STAGES.findIndex(([k]) => k === key) + 1).padStart(2, "0");
+    if (st === "done") mark = "✓";
+    else if (st === "sentback") mark = "↺" + info.redo[key];
+    else if (st === "halted") mark = "✕";
+    else if (st === "skipped") mark = "—";
     let title = entry[2] === "model" ? "由模型完成" : "由代码完成";
-    if (state === "sentback") title = "被打回 " + info.redo[key] + " 次后重跑完成（" + title + "）";
-    if (state === "skipped") title = "跳过：通道不可用" + (info.channels[key] && info.channels[key].reason ? "（" + info.channels[key].reason + "）" : "");
-    if (state === "halted") title = "运行在这里停下（" + title + "）";
-    return el("span", { class: "stage " + cls, title },
-      entry[1], el("span", { class: "kind" }, entry[2] === "model" ? "模型" : "代码"),
-      el("span", { class: "st" }, STAGE_WORD[state] || state),
-      state === "sentback" ? el("span", { class: "redo" }, "↺" + info.redo[key]) : null);
+    if (st === "sentback") title = "被打回 " + info.redo[key] + " 次后重跑完成（" + title + "）";
+    if (st === "skipped") title = "跳过：通道不可用" + (info.channels[key] && info.channels[key].reason ? "（" + info.channels[key].reason + "）" : "");
+    if (st === "halted") title = "运行在这里停下（" + title + "）";
+    return el("span", { class: "pnode st-" + cls, title },
+      el("span", { class: "pnode-dot" }, mark),
+      el("b", { class: "pnode-name" }, entry[1]),
+      el("span", { class: "pnode-line" },
+        el("span", { class: "st" }, STAGE_WORD[st] || st),
+        el("span", { class: "kind" }, entry[2] === "model" ? "模型" : "代码")));
   };
   const visible = STAGES.map(([key]) => key)
     .filter((key) => !CHANNEL_STAGES[key] || board[CHANNEL_STAGES[key]]);
   const grouped = parallel && ANALYST_KEYS.filter((key) => visible.includes(key)).length > 1;
-  const chips = [];
-  visible.forEach((key, i) => {
+  const kids = [];
+  visible.forEach((key) => {
     const inGroup = grouped && ANALYST_KEYS.includes(key);
     const leadsGroup = inGroup && key === ANALYST_KEYS[0];
-    if (i && !(inGroup && !leadsGroup)) chips.push(el("span", { class: "arrow" }, "→"));  /* 组内成员不加箭头 */
     if (leadsGroup) {                                   /* 并行模式：几位分析师同时跑，画成一个框里并列 */
       const group = el("span", { class: "parallel", title: "这几位分析师同时运行，产物按固定顺序落账" },
         el("span", { class: "par-tag" }, "并行"));
-      for (const k of ANALYST_KEYS) if (visible.includes(k)) group.append(chip(k));
-      chips.push(group);
+      for (const k of ANALYST_KEYS) if (visible.includes(k)) group.append(node(k));
+      kids.push(group);
       return;
     }
     if (inGroup) return;                                /* 组里已经画过 */
-    chips.push(chip(key));
+    kids.push(node(key));
   });
 
   /* 正在工作的角色（轨迹给的在飞跨度）＋总用时＋「模型调用中」提示 */
   if (working.length) {
-    chips.push(el("div", { class: "working", title: "轨迹里开着头没收尾的调用：这些角色此刻在等模型返回" },
+    kids.push(el("div", { class: "working", title: "轨迹里开着头没收尾的调用：这些角色此刻在等模型返回" },
       working.map((w) => el("span", { class: "work-role" },
         el("b", null, w.label), el("span", { class: "mono ms" }, elapsedText(w.elapsedMs))))));
   }
@@ -179,9 +186,9 @@ function renderPipeline(model) {
   const meta = [];
   if (model.started && total !== null) meta.push((watching ? "已用时 " : "总用时 ") + elapsedText(total));
   if (watching || working.length) meta.push("模型调用中：结果返回后一次显示");
-  if (meta.length) chips.push(el("div", { class: "activity-meta" },
+  if (meta.length) kids.push(el("div", { class: "activity-meta" },
     meta.map((text) => el("span", { class: "meta-bit" }, text))));
-  fill($("pipeline"), chips);
+  fill($("pipeline"), kids);
 }
 
 /* 读屏：活动区的变化（进行到哪一段、谁在飞）变化时播报一次（20.10 质量清单「活动区是活区」）。
@@ -248,15 +255,17 @@ function runNote(text) {
 
 function buildRunControls() {
   const host = document.querySelector(".head-side");
+  const actions = $("ws-actions");                 /* WP55：导出键归位到大符号标题区 */
   if (!host || !$("run-state")) return;
   host.append(el("span", { class: "runctl" },
     el("button", { class: "ctl warn", type: "button", id: "btn-cancel", hidden: true,
                    on: { click: cancelRun } }, "取消"),
     el("button", { class: "ctl", type: "button", id: "btn-resume", hidden: true,
                    on: { click: () => resumeRun(state.runId) } }, "续跑"),
-    el("a", { class: "ctl", id: "export-report", hidden: true }, "导出报告"),
-    el("a", { class: "ctl", id: "export-replay", hidden: true }, "导出回放"),
     el("span", { class: "runctl-note", id: "runctl-note" })));
+  if (actions) actions.append(el("span", { class: "runctl" },
+    el("a", { class: "ctl", id: "export-report", hidden: true }, "导出报告"),
+    el("a", { class: "ctl", id: "export-replay", hidden: true }, "导出回放")));
   setInterval(() => {                                   /* 计时器每秒走一格 */
     if (state.live && state.runId && !state.ended) requestRender();
   }, 1000);

@@ -296,6 +296,19 @@ def test_the_page_declares_the_three_screens_of_wp54() -> None:
     assert "marksFor" in ASSET and "showScreen" in ASSET                 # 26-screens 的两个入口
 
 
+def test_the_page_declares_the_workspace_layout_of_wp55() -> None:
+    """WP55：大符号标题区、横向结论大卡、圆形节点流水线。"""
+    for marker in ('id="ws-head"', 'id="ws-info"', 'id="ws-actions"'):   # 大符号标题区
+        assert marker in ASSET, marker
+    assert "renderWorkspaceHead" in ASSET and "ws-ticker" in ASSET       # 渲染入口与大代码样式
+    for marker in ("ccard-main", "ccard-side", "ccard-foot", "ccard-rating"):  # 结论大卡的三段
+        assert marker in ASSET, marker
+    assert "研究结论" in ASSET and "thesis-grid" in ASSET                 # 标签行与论点/失效双栏
+    assert "pnode-dot" in ASSET and "STAGE_WORD" in ASSET                # 圆形节点（状态词仍在）
+    assert 'id="result"' in ASSET and 'id="chart"' in ASSET              # 结论与图都在，但不再是 .two 双栏
+    assert 'class="two"' not in ASSET
+
+
 def test_the_page_declares_the_quality_layer_of_wp51() -> None:
     """20.10 质量清单落在页面上的静态部分：活区、页签键盘操作、抽屉对话框、断流说明。"""
     page = ASSET

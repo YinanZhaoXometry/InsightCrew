@@ -73,7 +73,7 @@ function render() {
         ? el("button", { class: "ctl banner-retry", type: "button", on: { click: () => openRun(state.runId, false) } }, "重试")
         : null] : []);
   }
-  renderHeader(model); renderRunState(model); renderPipeline(model); announceStatus();
+  renderHeader(model); renderRunState(model); renderPipeline(model); renderWorkspaceHead(model); announceStatus();
   for (const v of VIEWS)
     if (v.always || v.id === state.tab) v.render(model, $(v.target || "view-" + v.id));
   renderDetail(model);

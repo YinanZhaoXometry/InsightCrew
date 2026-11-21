@@ -83,7 +83,7 @@ function verdictData(model) {
   };
 }
 
-const level = (label, value, cls) =>
+const level = (label, value, cls) =>          // WP55 起不再使用（数值格并入 ccard-side），留作历史引用的安全兜底
   el("div", { class: "level" + (cls ? " " + cls : "") }, el("b", null, value), el("span", null, label));
 
 /* ---------- 两条信任行（20.10）：标签本身是链接，链去各自的页签 ---------- */
@@ -176,7 +176,46 @@ function approvalControls() {
     " ", el("span", { id: "approval-note" }, ""));
 }
 
-/* ---------- 结果卡 ---------- */
+/* ---------- 工作台顶部的大符号标题区（WP55，照原型的 workspace-heading） ---------- */
+
+function renderWorkspaceHead(model) {
+  const head = $("ws-head"), info = $("ws-info");
+  if (!head || !info) return;
+  const started = model.started;
+  if (!started) { head.hidden = true; fill(info); return; }
+  head.hidden = false;
+  const board = model.board, request = started.request || {};
+  const scope = board["request/scope"] || {}, instrument = board["ledger/instrument"] || {};
+  const ticker = instrument.ticker || scope.ticker || request.ticker || "";
+  fill(info,
+    el("p", { class: "eyebrow" }, MODE_TEXT[started.mode] || started.mode || ""),
+    el("div", { class: "ws-symbol" },
+      el("h2", { class: "ws-ticker" }, ticker || "—"),
+      instrument.name ? el("span", { class: "ws-name" }, instrument.name) : null,
+      el("span", { class: "ws-tag" }, started.universe || "")),
+    el("p", { class: "ws-meta" },
+      "分析日 " + (scope.as_of || request.as_of || "最近交易日")
+      + (state.runId ? " · 运行 " + state.runId : "")
+      + " · 数字由代码计算并复算，模型只负责判断"));
+}
+
+/* ---------- 结果卡（WP55：原型的横向大卡——左结论右指标格，底部信任条） ---------- */
+
+function ccBadge(status, text) {                   // 状态徽：交付/REVIEW/中断/运行中/待确认
+  return el("span", { class: "pill st-" + status }, text);
+}
+
+function metric(label, value, cls) {               // 右侧指标格的一行：标签 + 等宽大数
+  return el("div", { class: "ccard-metric" + (cls ? " " + cls : "") },
+    el("span", null, label), el("b", null, value));
+}
+
+function ccFrame(badge, line, kids) {              // 大卡的公共骨架：标签行 + 结论行 + 正文
+  return el("div", { class: "ccard" },
+    el("div", { class: "ccard-main" },
+      el("div", { class: "ccard-label" }, el("span", null, "研究结论"), badge),
+      line, ...kids));
+}
 
 function renderResult(model) {
   const box = $("result");
@@ -187,41 +226,36 @@ function renderResult(model) {
   if (waitingApproval(model)) {                      // 审批门（20.11）：待你确认，接受或拒绝
     const the = thesis || {}, prop = proposal || {};
     const withCur = (label) => currency ? label + "（" + currency + "）" : label;
-    fill(box, el("h2", null, "结果"),
-      el("div", { class: "verdict forming" }, "待你确认"),
+    fill(box, ccFrame(ccBadge("running", "待你确认"), el("strong", { class: "ccard-rating verdict" }, "待你确认"), [
       el("p", { class: "muted" }, "审计与评审都已通过；等你确认后才交付。"),
-      el("div", { class: "levels" },
-        level(withCur("入场价"), num(prop.entry), "lv-entry"),
-        level(withCur("止损价"), num(prop.stop), "lv-stop"),
-        level(withCur("目标价"), num(prop.target), "lv-target"),
-        level("仓位（占权益）", num(prop.size_pct) + "%"),
-        level("评级", the.rating || "—"),
-        level("持有（交易日）", prop.horizon_days === undefined || prop.horizon_days === null ? "—" : prop.horizon_days)),
       el("p", { class: "note" }, "只能接受或拒绝：方案本身不能在此修改，改过的方案必须重新通过审计。"),
-      approvalControls());
+      approvalControls()]),
+      el("div", { class: "ccard-side" },
+        metric(withCur("入场价"), num(prop.entry), "m-entry"),
+        metric(withCur("止损价"), num(prop.stop), "m-stop"),
+        metric(withCur("目标价"), num(prop.target), "m-target"),
+        metric("仓位（占权益）", num(prop.size_pct) + "%"),
+        metric("评级", the.rating || "—"),
+        metric("持有（交易日）", prop.horizon_days === undefined || prop.horizon_days === null ? "—" : prop.horizon_days)));
     return;
   }
   if (status === "interrupted") {                    // 中断：到了哪一步；续跑按钮（静态页说明）
-    fill(box, el("h2", null, "结果"),
-      el("div", { class: "verdict review" }, "运行中断，未形成结论"),
+    fill(box, ccFrame(ccBadge("interrupted", "已中断"), el("strong", { class: "ccard-rating verdict review" }, "运行中断，未形成结论"), [
       el("p", { class: "muted" }, progress.line),
       el("p", { class: "note" }, "这次运行没有正常结束；已完成的阶段仍可查看，已入账的模型调用都在日志里。"),
-      resumeControl());
+      resumeControl()]));
     return;
   }
   if (!outcome) {                                    // 运行中：知道了什么 + 结论形成中
-    fill(box, el("h2", null, "结果"),
-      el("div", { class: "verdict forming" }, "结论形成中"),
+    fill(box, ccFrame(ccBadge("running", "运行中"), el("strong", { class: "ccard-rating verdict forming" }, "结论形成中"), [
       el("p", { class: "muted" }, progress.line),
       el("p", { class: "note" }, complete()
         ? "这次运行没有留下结果。"
-        : "运行尚未结束，结果在最后一步写出；每个数字由代码计算并复算。"));
+        : "运行尚未结束，结果在最后一步写出；每个数字由代码计算并复算。")]));
     return;
   }
   if (outcome.status !== "delivered") {              // REVIEW：这一块不出现任何评级与价位
-    const kids = [el("h2", null, "结果"),
-      el("div", { class: "verdict review" }, "REVIEW：未给出评级"),
-      el("p", null, "原因：" + approvalReasonText(outcome.reason) + "。")];
+    const kids = [el("p", { class: "ccard-why" }, "原因：" + approvalReasonText(outcome.reason) + "。")];
     const decision = model.board["approval/decision"];
     if (decision && decision.decision === "rejected" && decision.note)
       kids.push(el("p", { class: "muted" }, "你的备注：" + decision.note));
@@ -233,32 +267,39 @@ function renderResult(model) {
       kids.push(el("p", { class: "muted" }, "没有可用的真实模型；脚本化模型只能回答场景里写好的内容。"
         + (state.meta ? "可以选的离线场景：" + state.meta.scenarios.map((s) => s.name).join("、") + "。" : "")));
     }
-    kids.push(trustBlock(outcome));
-    fill(box, kids);
+    fill(box, ccFrame(ccBadge("review", "REVIEW"), el("strong", { class: "ccard-rating verdict review" }, "REVIEW：未给出评级"), kids));
     return;
   }
   const the = thesis || {}, prop = proposal || {};   // 交付：结论在上，证据与失效条件在下
   const withCur = (label) => currency ? label + "（" + currency + "）" : label;
   const points = the.points || [], invalidation = the.invalidation || [];
   const side = /buy|overweight/i.test(the.rating || "") ? " long" : /sell|underweight/i.test(the.rating || "") ? " short" : "";
-  fill(box, el("h2", null, "结果"),
-    el("div", { class: "verdict" + side }, "评级 " + (the.rating || "—") + " · 操作 " + (prop.action || "—"),
-      currency ? el("small", null, currency) : null),
-    el("div", { class: "levels" },
-      level(withCur("入场价"), num(prop.entry), "lv-entry"),
-      level(withCur("止损价"), num(prop.stop), "lv-stop"),
-      level(withCur("目标价"), num(prop.target), "lv-target"),
-      level("仓位（占权益）", num(prop.size_pct) + "%"),
-      level("持有（交易日）", prop.horizon_days === undefined || prop.horizon_days === null ? "—" : prop.horizon_days)),
-    the.summary ? el("p", { class: "summary" }, the.summary) : null,
-    points.length ? el("h3", { class: "v-h" }, "为什么（主管论点）") : null,
-    points.length ? el("ul", { class: "points" }, points.map((point) => el("li", null,
-      el("span", { class: "ptext" }, point.text), " ",
-      ...(point.cites || []).map((id) => cite(id))))) : null,
-    invalidation.length ? el("h3", { class: "v-h" }, "什么情况说明这个判断错了（失效条件）") : null,
-    invalidation.length ? el("ul", { class: "invalidation" }, invalidation.map((text) => el("li", null, text))) : null,
-    prop.rationale ? el("p", { class: "muted" }, "方案说明：" + prop.rationale) : null,
-    trustBlock(outcome));
+  fill(box,
+    el("div", { class: "ccard" },
+      el("div", { class: "ccard-main" },
+        el("div", { class: "ccard-label" }, el("span", null, "研究结论"), ccBadge("delivered", "已交付")),
+        el("div", { class: "ccard-action" },
+          el("strong", { class: "ccard-rating verdict" + side }, "评级 " + (the.rating || "—") + " · 操作 " + (prop.action || "—")),
+          currency ? el("small", { class: "ccard-cur" }, currency) : null),
+        the.summary ? el("p", { class: "ccard-summary" }, the.summary) : null,
+        (points.length || invalidation.length) ? el("div", { class: "thesis-grid" },
+          el("div", null,
+            points.length ? el("h3", null, "为什么（主管论点）") : null,
+            points.length ? el("ul", { class: "points" }, points.map((point) => el("li", null,
+              el("span", { class: "ptext" }, point.text), " ",
+              ...(point.cites || []).map((id) => cite(id))))) : null),
+          el("div", null,
+            invalidation.length ? el("h3", null, "什么情况说明这个判断错了（失效条件）") : null,
+            invalidation.length ? el("ul", { class: "invalidation" }, invalidation.map((text) => el("li", null, text))) : null)) : null,
+        prop.rationale ? el("p", { class: "muted" }, "方案说明：" + prop.rationale) : null),
+      el("div", { class: "ccard-side" },
+        metric(withCur("入场价"), num(prop.entry), "m-entry"),
+        metric(withCur("止损价"), num(prop.stop), "m-stop"),
+        metric(withCur("目标价"), num(prop.target), "m-target"),
+        metric("仓位（占权益）", num(prop.size_pct) + "%"),
+        metric("评级", the.rating || "—"),
+        metric("持有（交易日）", prop.horizon_days === undefined || prop.horizon_days === null ? "—" : prop.horizon_days)),
+      el("div", { class: "ccard-foot" }, trustBlock(outcome))));
 }
 
 /* ---------- 价格图：今天的收盘与价位照旧，另标出分析日 ---------- */

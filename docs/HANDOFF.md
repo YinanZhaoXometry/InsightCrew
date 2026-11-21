@@ -2552,6 +2552,21 @@ Result: done — owner 要求「部署到这个 Cloudflare，部署完给地址�
 
   账号 onezhaoyn@gmail.com（wrangler OAuth 已登录）；`wrangler pages project create insightcrew` + `pages deploy`。地址：**https://insightcrew.pages.dev**（本次哈希 https://b0da62ae.insightcrew.pages.dev）。线上核验：HTTP 200、整页 447,902 字节、打开即工作台（ACME·Buy·47/47·回放标记 4 颗），在内置浏览器留览。注意：公开只读地址，含合成演示数据与脚本化模型输出；主人此前（2026-11-21 上午）拒绝的是**原型**的公开部署，本次是其明确要求的**成品静态页**部署。
 
+### 2026-11-21 18:10 · WP55 工作台三处对齐原型 · coordinator session (ZCode)
+
+Result: done — owner 对比六张截图后定案「C + 首页保持空屏讲故事」。三处全部落地（页签保持五个、功能零损失、首页未动）：
+  ① 大符号标题区：`#ws-head`（eyebrow 模式词 + 30px 等宽大代码 + 名称 + 数据集标签 + 运行 meta），导出报告/导出回放两键从页头 runctl 移入 `#ws-actions`（取消/续跑/状态留在页头）；`renderWorkspaceHead` 在 render() 里随帧画。
+  ② 结论横向大卡：`.ccard` 三段（左 `ccard-main`：研究结论标签行+状态徽、评级大字（clamp 22–30px）、摘要、论点/失效双栏 `thesis-grid`、方案说明；右 `ccard-side` 六行指标格 入场/止损/目标/仓位/评级/持有，等宽右对齐、入场紫/止损红/目标绿；底 `ccard-foot` 两条信任行）。四态与 WP52 审批按钮、续跑、静态页说明全部保留（`ccFrame` 公共骨架）；价格图改为结论与流水线之下的全宽卡（`.two` 双栏删除）。
+  ③ 圆形节点流水线：`.pnode`（34px 圆点：✓/↺n/✕/—/两位序号 + 段名 + 状态词 + 模型/代码小徽；完成绿底描边、进行中紫底发光、打回琥珀、未完成红、跳过虚线），并行组仍虚线框并列；箭头分隔符删除（顺序由次序给出）。两步预估面板的阶段条仍用旧 `.stage` 样式（idle 态）。
+  打磨：视觉模型过目后修三处（ws-head 下缘间距 12px、`.kind` 字号 10px、失效条件行高 1.6）。
+
+Commands run, with the last lines of their output:
+  uv run pytest -q → 915 passed；ruff → All checks passed!；pyright → 0 errors
+  ./scripts/check.sh → 三项检查 915/0/0、36/36 场景 ✓、53/53 重放一致、eval all 6/6；「check.sh：全部阶段通过。」
+  IC_FORCE_OFFLINE=1 analyze --scenario demo --no-open → delivered（ok）；accepted 2/3；verified（新运行 20261121-203118-…-4cfa）
+  浏览器核验（serve:9999，IAB 1440×960）：?run= 工作台——ws-head 显示 ACME+名称+合成数据标签+导出两键（HEAD 探测通过后显示）、结论大卡评级 Buy 与六指标格、9 个圆节点（交易员 ↺1 琥珀）、并行组虚线框、全宽图；视觉模型逐项核对通过（列四项打磨级小项，三项已修，一项为窄屏徽章换行——已有 flex-wrap 不改）。截图 /tmp/wp55_workspace.png、静态暗色 /tmp/wp55_static_dark.png。
+  未做：浅色方案截图——macOS 傍晚起自动深色外观，无头 Chrome 跟随系统（`--blink-settings=preferredColorScheme` 无效）；WP53 已验浅色且本次未动令牌与双方案逻辑，对比度测试仍双方案核算，跳过。
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.
