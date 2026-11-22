@@ -28,3 +28,6 @@ runs/
 
 # 真实行情（fetch 命令写入，不进 git）
 data/market/real/
+
+# Pages 构建脚本的输出（scripts/pages-build.sh，后台 git 集成发布用）
+_pages/

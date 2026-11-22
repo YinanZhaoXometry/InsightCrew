@@ -2580,20 +2580,20 @@ Commands run, with the last lines of their output:
   git archive HEAD → ../InsightCrew.zip 重建（本段入库后的最终 HEAD）；空目录解包 → uv sync → pytest -q → 915 passed → IC_FORCE_OFFLINE=1 analyze --no-open「结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified」exit 0（replay.html 生成）。
   无网络请求（uv 走本地缓存）、无真实模型、未读未打印 `.env`。
 
-### 2026-11-22 23:15 · Pages 自动部署工作流（deploy-pages.yml） · coordinator session (ZCode)
+### 2026-11-22 23:15 · Pages 自动部署：后台 git 集成 + scripts/pages-build.sh · coordinator session (ZCode)
 
-Result: done（本地就绪，未提交）— owner 问「push main 是否自动部署 Cloudflare」，答案当时是否；本次按 owner 选择补上「只做 Pages 自动部署」这一条。隧道不做：GitHub Actions 的服务器临时、跑完即销毁，没有持久的 CI 隧道形态（owner 在两个选项里选了 Pages-only）。
+Result: done — owner 问「push main 是否自动部署 Cloudflare」，答案当时是否；本次补上。路线两度选择：先按批准的计划做了 GitHub Actions 工作流（deploy-pages.yml，wrangler-action + API token secrets）；owner 实际在 Cloudflare 后台走了 git 集成（该操作删掉了原 `insightcrew` 项目），构建失败「Could not detect a directory containing static files」——仓库没有现成静态目录，页面是生成的。向 owner 讲明两条路线的差别后，owner 定案**后台 git 集成路线**：不需要任何 secrets，Cloudflare 构建机自己生成页面再发布。已写好的 deploy-pages.yml 未提交即丢弃（GitHub Actions 不再是部署路径）。
 
-新增 `.github/workflows/deploy-pages.yml`（2026-11-21 手动部署的同法自动化，项目 `insightcrew` 已存在）：
-  触发 push main / 手动 dispatch；`concurrency: pages-deploy` 防重叠。步骤：checkout → setup-uv → `uv sync --frozen` → `IC_FORCE_OFFLINE=1 uv run insightcrew analyze --scenario demo --no-open --quiet`（脚本化模型、合成 ACME 数据，零模型花费）→ 取最新 `runs/<id>/replay.html` 作 `_pages/index.html` → 密钥扫描（精确模式 `sk-[A-Za-z0-9_-]{16,}`、JWT `eyJ…`、`Bearer `、`IC_API_KEY`、`onezhaoyn`；裸 `sk-` 会误中 risk-rounds，弃用）→ `cloudflare/wrangler-action@v3` `pages deploy _pages --project-name=insightcrew --branch=main`（`--branch=main` 更新生产地址 insightcrew.pages.dev 而非 preview）。不新增包、无前端 build step，符合 AGENTS 约束。
-  生效前提（一次性，owner 在 GitHub 上做）：仓库 secrets `CLOUDFLARE_API_TOKEN`（Cloudflare 控制台建 token：Account → Cloudflare Pages → Edit）与 `CLOUDFLARE_ACCOUNT_ID`。按约定：secrets 配好之后才提交推送（否则 wrangler 步骤红叉）。
-  文档更正：第 4 节「CI workflow 未推送、从未运行」已过时——ci.yml 已随 2026-11-21 打包入库的 HEAD 推上远端；本次 push 后 Actions 将首次真正运行（deploy-pages 与 ci 同批）。AGENTS 与 BLUEPRINT 20.12/20.16 里的同款说法同此更正，本次不改那两个文件。
+交付：`scripts/pages-build.sh`（风格对齐 check.sh），即后台「构建命令」要跑的脚本：
+  ① 找 uv，没有就 `python3 -m pip install uv`（Cloudflare 构建镜像不预装）② `uv sync --frozen` ③ `IC_FORCE_OFFLINE=1 uv run insightcrew analyze --scenario demo --no-open --quiet`（脚本化模型、合成 ACME 数据，零模型花费）④ 最新 `runs/<id>/replay.html` → `_pages/index.html` ⑤ 密钥扫描（精确模式 `sk-[A-Za-z0-9_-]{16,}`、JWT `eyJ…`、`Bearer `、`IC_API_KEY`、`onezhaoyn`；裸 `sk-` 会误中 risk-rounds，不能用），命中即退出 1 = 构建失败不发布。`.gitignore` 加 `_pages/`（构建输出不入库）。
+  owner 后台配置（一次性）：Pages 项目 → Settings → Build & deployment：Framework preset None、**Build command** `bash scripts/pages-build.sh`、**Build output directory** `_pages`、Production branch `main`，保存后 Retry deployment。**项目必须叫 `insightcrew`** 才保得住 `insightcrew.pages.dev`（Pages 项目不能改名；原项目已被删、名字已空出；owner 的失败项目若叫了别的名字，需删掉重建一次）。
+  注：每次构建全量克隆 + 装依赖 + 一次 demo 运行（约 3–5 分钟）；每次 push main 自动部署，部署状态会回写到 GitHub commit 上。
 
 Commands run, with the last lines of their output:
-  IC_FORCE_OFFLINE=1 analyze --scenario demo --no-open --quiet → delivered（ok）；accepted 2/3；核验 verified（新运行 20261122-231127-…-0d93，replay.html 454,541 字节自包含单页）
-  密钥扫描 grep（工作流同一模式）→ 0 命中
-  deploy-pages.yml、ci.yml → yaml.safe_load 均通过
-  未提交未推送：等 owner 配好两个 secrets 再提交推送；无网络请求、无真实模型、未读未打印 `.env`。
+  bash scripts/pages-build.sh（本地按 CF 同法跑）→ · uv sync --frozen / 结果：delivered（原因 ok）；判断：accepted 2/3；核验：verified（新运行 20261123-002453-…-f166，页面已含 WP56 的 e27b83b 改动）/ pages-build.sh：完成。输出 _pages/index.html（485,751 字节）；密钥扫描 0 命中
+  git check-ignore _pages/ → 命中，构建输出不入库
+  insightcrew.pages.dev 经 1.1.1.1 → NXDOMAIN（原项目确被删除；owner 配好后台并重试部署成功后，同一子域名恢复）
+  提交并推送 scripts/pages-build.sh、.gitignore、HANDOFF（WP56 的 e27b83b 同批上远端，owner 已知情）；无真实模型、未读未打印 `.env`。
 
 ### 2026-11-23 00:10 · WP56 页面严格照 OpenDesign 原型（dark-only、图标库、取消模态、原型比例） · coordinator session (ZCode)
 
