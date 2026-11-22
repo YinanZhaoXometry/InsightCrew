@@ -28,6 +28,14 @@ function svg(tag, attrs, text) {
   return node;
 }
 
+/* 原型的描边图标（WP56）：page.html 的 .svg-library 里有 28 枚 <symbol>，这里按 id 引用。
+   只在浏览器的渲染路径里调用（Node 测试的假 DOM 没有 createElementNS）。 */
+function icon(name, cls) {
+  const node = svg("svg", { class: "icon" + (cls ? " " + cls : ""), "aria-hidden": "true" });
+  node.append(svg("use", { href: "#i-" + name }));
+  return node;
+}
+
 function fill(node, ...kids) {
   node.replaceChildren(...kids.flat(Infinity).filter((kid) => kid !== null && kid !== undefined && kid !== false));
 }

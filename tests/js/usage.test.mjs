@@ -216,7 +216,7 @@ test("已中断的运行：表照画，瀑布里有未收尾的横杠与取消�
   assert.ok(findAll(box, "wf-mark")[0].className.includes("cancelled"));
   assert.ok(text.includes("被中断的调用不记用量"));
   assert.ok(!trs(box).slice(1).some((r) => textOf(r).includes("多方研究员")));   // 未返回的调用不进用量表
-  assert.ok(findAll(box, "wf-name").some((n) => textOf(n) === "多方研究员"));    // 但瀑布里画得出它
+  assert.ok(findAll(box, "wf-name").some((n) => textOf(n).includes("多方研究员")));   // 但瀑布里画得出它（WP56 起名字带步号小字）
 });
 
 test("进行中的运行：还没有完成的调用时说明缘由，瀑布照画", () => {

@@ -99,18 +99,18 @@ function judgmentText(judgment) {
   return judgment;
 }
 
-function tabLink(tab, label, title) {
+function tabLink(tab, label, title, ic) {
   return el("button", { class: "tablink", type: "button", title: title || null,
-                        on: { click: () => selectTab(tab) } }, label);
+                        on: { click: () => selectTab(tab) } }, ic ? [icon(ic), label] : label);
 }
 
 function trustBlock(outcome) {
   return el("ul", { class: "confidence" },
-    el("li", null, tabLink("audit", "事实与规则", "数字与规则的核验在「规则与审计」页签"),
+    el("li", null, tabLink("audit", "事实与规则", "数字与规则的核验在「规则与审计」页签", "shield"),
       outcome.facts_and_rules === "verified"
         ? "已核验：数字由代码计算并复算，规则由代码逐条检查。"
         : "未核验：审计没有确认当前版本。"),
-    el("li", null, tabLink("process", "模型评审", "评审的逐条意见在「过程」页签"),
+    el("li", null, tabLink("process", "模型评审", "评审的逐条意见在「过程」页签", "scale"),
       judgmentText(outcome.judgment)));
 }
 
@@ -274,14 +274,27 @@ function renderResult(model) {
   const withCur = (label) => currency ? label + "（" + currency + "）" : label;
   const points = the.points || [], invalidation = the.invalidation || [];
   const side = /buy|overweight/i.test(the.rating || "") ? " long" : /sell|underweight/i.test(the.rating || "") ? " short" : "";
+  /* 版本胶囊（原型 .version-pill）：被审计打回后修订交付的运行，标出交付的是第几版 */
+  const written = model.events.filter((e) => e.type === "artifact.written" && e.data.key === "trader/proposal");
+  const lastVersion = written.length ? written[written.length - 1].data.version : null;
+  const pill = lastVersion !== null && lastVersion > 1
+    ? el("span", { class: "version-pill", title: "第 " + lastVersion + " 版方案通过复审后交付" },
+        "v" + lastVersion + " · 复审通过")
+    : null;
+  const refs = prop.cites || [];                     // 方案引用的编号：结论卡上的一行引用片（原型的 .conclusion-refs）
   fill(box,
     el("div", { class: "ccard" },
       el("div", { class: "ccard-main" },
         el("div", { class: "ccard-label" }, el("span", null, "研究结论"), ccBadge("delivered", "已交付")),
         el("div", { class: "ccard-action" },
-          el("strong", { class: "ccard-rating verdict" + side }, "评级 " + (the.rating || "—") + " · 操作 " + (prop.action || "—")),
-          currency ? el("small", { class: "ccard-cur" }, currency) : null),
+          el("strong", { class: "ccard-rating verdict" + side }, the.rating || "—"),
+          el("span", { class: "action-label" }, "操作 " + (prop.action || "—")),
+          currency ? el("small", { class: "ccard-cur" }, currency) : null,
+          pill),
         the.summary ? el("p", { class: "ccard-summary" }, the.summary) : null,
+        refs.length ? el("div", { class: "conclusion-refs" },
+          refs.map((id) => cite(id)),
+          el("span", { class: "ref-note" }, "引用均可反查原文")) : null,
         (points.length || invalidation.length) ? el("div", { class: "thesis-grid" },
           el("div", null,
             points.length ? el("h3", null, "为什么（主管论点）") : null,

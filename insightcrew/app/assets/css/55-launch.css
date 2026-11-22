@@ -1,29 +1,115 @@
-/* 55-launch.css —— 发起表单、计划预览、历史，以及流水线/实时活动区（WP50 接手）。 */
+/* 55-launch.css —— 发起表单、计划预览、历史与流水线/实时活动区（WP50/55 起；WP56 照原型：
+   流水线是原型的 .pipeline 列解剖——rail 连接线 + 32px 圆节点 + 底缘 3px 状态色，
+   进行中的段紫渐变 + 节点渐变白标；表单是原型的 .form-section（分隔线分节、46px 输入框），
+   「分析配置」折叠保留原型的 .advanced 盒子。页头的取消/续跑/导出带描边图标。 */
 
-/* 流水线（WP55 起照原型画成圆形节点）：每段 等待 / 进行中 / 完成 / 被打回↺n / 跳过 / 未完成；
-   圆点里是状态记号，名字与状态词在下方——不只靠颜色。 */
-#pipeline { display:flex; flex-wrap:wrap; gap:14px 10px; align-items:flex-start; padding:14px 16px 12px;
+/* ---------- 流水线（原型的 .pipeline 七列解剖；段数多时自动换列） ---------- */
+#pipeline { display:grid; grid-template-columns:repeat(auto-fit, minmax(104px, 1fr)); gap:var(--sp-1);
+            align-items:start; padding:var(--sp-5) var(--sp-4) var(--sp-3);
             background:var(--card); background-image:var(--grad-surface);
-            border:1px solid var(--line); border-radius:var(--radius); margin-top:12px; }
-.pnode { display:grid; justify-items:center; gap:5px; min-width:66px; max-width:100px; text-align:center; }
-.pnode-dot { display:grid; place-items:center; width:34px; height:34px; border-radius:50%;
-             border:1.5px solid var(--line-strong); background:var(--lane); color:var(--muted);
-             font-family:var(--mono); font-size:11px; font-weight:700; }
-.pnode-name { font-size:12px; font-weight:600; color:var(--soft); line-height:1.3; }
-.pnode-line { display:flex; gap:5px; align-items:center; font-size:10.5px; color:var(--muted); }
-.pnode-line .kind { border:1px solid currentColor; border-radius:3px; padding:0 4px; font-size:10px; letter-spacing:.3px; }
-.pnode.st-done .pnode-dot { border-color:var(--good-line); background:var(--good-bg); color:var(--good); }
+            border:1px solid var(--line); border-radius:var(--radius-l); margin-top:var(--sp-3); }
+.pnode { position:relative; display:flex; flex-direction:column; align-items:center; gap:7px; min-width:0;
+         min-height:112px; padding:0 3px 10px; border:0; border-bottom:3px solid var(--line);
+         border-radius:4px 4px 0 0; background:transparent; color:var(--muted); text-align:center; }
+.pnode:hover { background:var(--lane); color:var(--soft); }
+.pnode-rail { position:relative; display:flex; justify-content:center; align-items:center; height:34px; width:100%; }
+.pnode-rail::after { position:absolute; top:16px; left:calc(50% + 18px); width:calc(100% + 5px); height:1px;
+                     background:var(--line-strong); content:""; }
+.pnode:last-child .pnode-rail::after, .pnode:last-of-type .pnode-rail::after { display:none; }
+.pnode-dot { position:relative; z-index:1; display:grid; place-items:center; width:32px; height:32px;
+             border:1px solid var(--line-strong); border-radius:50%; background:var(--surface-warm);
+             color:var(--muted); font-family:var(--mono); font-size:11px; font-weight:700; }
+.pnode-dot .icon { width:15px; height:15px; }
+.pnode-name { font-size:var(--fs-1); font-weight:650; line-height:1.45; color:var(--soft); }
+.pnode-line { display:flex; gap:5px; align-items:center; justify-content:center; font-size:10px;
+              color:var(--faint); line-height:1.4; }
+.pnode-line .kind { border:1px solid currentColor; border-radius:3px; padding:0 4px; font-size:10px;
+                    letter-spacing:.3px; }
+.pnode.st-done { border-bottom-color:var(--good); color:var(--good); }
+.pnode.st-done .pnode-dot { border-color:rgba(0,200,83,.40); background:var(--good-bg); color:var(--good); }
 .pnode.st-done .pnode-name { color:var(--ink); }
-.pnode.st-running .pnode-dot { border-color:var(--brand-2); background:var(--accent-bg); color:var(--accent);
-                               box-shadow:var(--glow-brand); }
+.pnode.st-running { border-bottom-color:var(--brand); color:var(--accent);
+                    background:linear-gradient(145deg,rgba(113,50,245,.22),rgba(27,36,80,.68));
+                    box-shadow:0 8px 24px rgba(113,50,245,.12); }
+.pnode.st-running .pnode-dot { border-color:var(--brand-2); background:var(--grad-brand); color:#fff;
+                               box-shadow:0 0 20px rgba(113,50,245,.30); }
 .pnode.st-running .pnode-name { color:var(--accent); }
+.pnode.st-revised { border-bottom-color:var(--warn); color:var(--warn); background:var(--warn-bg); }
 .pnode.st-revised .pnode-dot { border-color:var(--warn-line); background:var(--warn-bg); color:var(--warn); }
+.pnode.st-halted { border-bottom-color:var(--bad); color:var(--bad); background:var(--bad-bg); }
 .pnode.st-halted .pnode-dot { border-color:var(--bad-line); background:var(--bad-bg); color:var(--bad); }
-.pnode.st-skipped { opacity:.7; }
+.pnode.st-skipped { border-bottom-style:dashed; opacity:.7; }
 .pnode.st-skipped .pnode-dot { border-style:dashed; }
-/* 旧的段条样式：两步预估面板里的阶段条仍用（.stage idle） */
-.stage { display:flex; align-items:center; gap:6px; padding:4px 10px 4px 9px; border-radius:var(--radius-s); font-size:12px;
-         border:1px solid var(--line); border-left:3px solid var(--line); background:var(--lane); color:var(--muted); }
+/* 并行分析师组：一个虚线框里并列（原型的并行语义，框样式照 WP55） */
+.parallel { display:flex; align-items:flex-start; gap:10px; padding:12px 10px 8px; border:1px dashed var(--accent-line);
+            border-radius:var(--radius); background:transparent; position:relative; margin:4px 0 2px; }
+.parallel .par-tag { position:absolute; top:-8px; left:10px; font-size:10px; padding:0 6px; border-radius:3px;
+                     background:var(--card); color:var(--accent); border:1px solid var(--accent-line); }
+
+/* 正在工作的角色（计时器每秒走动）与总用时 */
+.working { display:flex; flex-wrap:wrap; gap:6px 14px; width:100%; padding:2px 2px 0; }
+.work-role { display:inline-flex; align-items:baseline; gap:6px; font-size:var(--fs-2); color:var(--soft); }
+.work-role::before { content:"▸ "; color:var(--info); }
+.work-role .ms { font-variant-numeric:tabular-nums; color:var(--info); font-family:var(--mono); }
+.activity-meta { display:flex; flex-wrap:wrap; gap:6px 14px; width:100%; font-size:var(--fs-1); color:var(--muted);
+                 padding:4px 2px 0; border-top:1px solid var(--line); margin-top:4px; }
+.activity-meta .meta-bit:first-child { color:var(--soft); font-variant-numeric:tabular-nums; font-family:var(--mono); }
+
+/* ---------- 页头的运行控制：取消 / 续跑 / 导出（原型的危险描边与图标键） ---------- */
+.runctl { display:flex; gap:6px; align-items:center; flex:none; flex-wrap:wrap; }
+.runctl .ctl .icon, .runctl .primary .icon { width:15px; height:15px; }
+.runctl-note { max-width:340px; font-size:var(--fs-1); color:var(--muted); }
+
+/* ---------- 新建分析屏的表单（原型的 .form-section：分隔线分节；.advanced 折叠盒在 15-screens.css） ---------- */
+#form { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px 16px; align-content:start; }
+@media (max-width:640px) { #form { grid-template-columns:minmax(0, 1fr); } }
+fieldset.fgroup { border:0; padding:0; margin:0; min-width:0; background:transparent;
+                  display:flex; flex-wrap:wrap; gap:10px 16px; align-items:flex-end; align-content:flex-start; }
+fieldset.fgroup + fieldset.fgroup, fieldset.fgroup + details.fgroup { border-top:1px solid var(--line);
+                                                                      padding-top:var(--sp-4); margin-top:var(--sp-5); }
+fieldset.fgroup > legend { font-size:var(--fs-4); font-weight:650; color:var(--ink); padding:0 0 var(--sp-3);
+                           width:100%; }
+.fgroup > label:not(.inline):not(.chan-line) { min-width:0; }
+#form label.inline { white-space:nowrap; }
+#form label:has(#f-scenario) { flex:1 1 100%; }
+#form .primary { justify-self:end; min-width:160px; }
+#form label { display:flex; flex-direction:column; gap:7px; font-size:var(--fs-2); font-weight:600;
+              color:var(--soft); min-width:0; }
+#form label .lab { color:var(--soft); }
+#form label.inline { flex-direction:row; align-items:center; gap:9px; padding-bottom:7px; color:var(--soft);
+                     font-weight:400; min-height:36px; }
+#form input, #form select { font:inherit; font-size:var(--fs-2); color:var(--ink); width:100%; min-height:46px;
+                            padding:9px 12px; border:1px solid var(--line-strong); border-radius:var(--radius);
+                            background:#0e162b; }
+#form input:hover:not(:disabled), #form select:hover:not(:disabled) { border-color:var(--brand-2); }
+#form input:focus, #form select:focus { outline:none; border-color:var(--brand-2); box-shadow:var(--focus-ring); }
+#form input:disabled, #form select:disabled { background:transparent; color:var(--muted); border-style:dashed; }
+#form input[type="checkbox"] { min-height:0; width:17px; height:17px; flex:none; accent-color:var(--brand); }
+#f-ticker, #f-date, #f-rounds, #f-risk-rounds { font-family:var(--mono); }
+#f-scenario { width:100%; min-width:0; } #f-ticker { width:130px; } #f-rounds { width:90px; }
+#f-risk-rounds { width:90px; } #f-portfolio { min-width:0; width:100%; }
+.field-note { font-size:var(--fs-1); color:var(--muted); line-height:1.5; }   /* 原型的 field-help：静色说明 */
+.field-error { font-size:var(--fs-1); color:var(--bad); min-height:0; }
+/* 证据通道：五个复选框各占一行（原型的 .check-row 几何） */
+.chan { display:flex; flex-direction:column; gap:var(--sp-1); flex:1 1 100%; }
+#form label.chan-line { flex-direction:row; align-items:center; gap:9px; min-height:36px; font-size:var(--fs-2);
+                        color:var(--soft); font-weight:400; }
+.chan-line input { flex:none; }
+.chan-line b { color:var(--ink); font-weight:600; font-family:var(--mono); font-size:var(--fs-2); }
+.chan-line .muted { font-size:var(--fs-1); }
+#f-channels[data-off="1"] .chan-line { opacity:.55; }
+.error { margin:10px 0 0; font-size:var(--fs-2); color:var(--bad); }
+.rowctl { display:inline-flex; gap:10px; }
+summary { cursor:pointer; color:var(--soft); font-size:var(--fs-2); }
+summary:hover { color:var(--ink); }
+.fold-title { color:var(--ink); font-weight:600; font-size:var(--fs-2); }
+/* 计划预览的阶段条（两步预估面板里复用流水线的段样式） */
+.plan-strip { display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin:8px 0; }
+.plan-line { color:var(--soft); margin:4px 0; font-variant-numeric:tabular-nums; }
+/* 旧的两步预估面板阶段条（.stage idle）——小徽章形态保留 */
+.stage { display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 9px; border-radius:var(--radius-s);
+         font-size:var(--fs-1); border:1px solid var(--line); border-left:3px solid var(--line);
+         background:var(--lane); color:var(--muted); }
 .stage .kind { font-size:9.5px; padding:0 4px; border-radius:3px; border:1px solid currentColor; letter-spacing:.3px; }
 .stage .st { font-size:10.5px; }
 .stage .redo { font-size:11px; font-weight:700; }
@@ -31,76 +117,9 @@
 .stage.done { color:var(--ink); border-left-color:var(--good); }
 .stage.done .st { color:var(--good); }
 .stage.done .kind { color:var(--muted); }
-.stage.running { background:var(--accent-bg); border-color:var(--accent-line); border-left-color:var(--brand); color:var(--accent);
-                 font-weight:600; box-shadow:var(--glow-brand); }
+.stage.running { background:var(--accent-bg); border-color:var(--accent-line); border-left-color:var(--brand);
+                 color:var(--accent); font-weight:600; box-shadow:var(--glow-brand); }
 .stage.revised { background:var(--warn-bg); border-color:var(--warn-line); border-left-color:var(--warn); color:var(--warn); }
 .stage.halted { background:var(--bad-bg); border-color:var(--bad-line); border-left-color:var(--bad); color:var(--bad); font-weight:600; }
 .stage.skipped { background:transparent; border-style:dashed; border-left-style:solid; color:var(--muted); }
-.arrow { color:var(--muted); font-size:11px; }   /* 顺序由标记次序给出，箭头只是装饰：不用降透明度压对比度 */
-/* 并行分析师组：几位分析师同时跑，画成一个虚线框里的并列节点 */
-.parallel { display:flex; align-items:flex-start; gap:10px; padding:12px 10px 8px; border:1px dashed var(--accent-line);
-            border-radius:var(--radius); background:transparent; position:relative; margin:4px 0 2px; }
-.parallel .par-tag { position:absolute; top:-8px; left:10px; font-size:10px; padding:0 6px; border-radius:3px;
-                     background:var(--card); color:var(--accent); border:1px solid var(--accent-line); }
-/* 正在工作的角色（计时器每秒走动）与总用时 */
-.working { display:flex; flex-wrap:wrap; gap:6px 14px; width:100%; padding:2px 2px 0; }
-.work-role { display:inline-flex; align-items:baseline; gap:6px; font-size:12px; color:var(--soft); }
-.work-role::before { content:"▸ "; color:var(--info); }
-.work-role .ms { font-variant-numeric:tabular-nums; color:var(--info); font-family:var(--mono); }
-.activity-meta { display:flex; flex-wrap:wrap; gap:6px 14px; width:100%; font-size:11.5px; color:var(--muted);
-                 padding:4px 2px 0; border-top:1px solid var(--line); margin-top:4px; }
-.activity-meta .meta-bit:first-child { color:var(--soft); font-variant-numeric:tabular-nums; font-family:var(--mono); }
-
-/* 页头的运行控制：取消 / 续跑 / 导出 */
-.runctl { display:flex; gap:6px; align-items:center; flex:none; flex-wrap:wrap; }
-.runctl .ctl.warn { border-color:var(--bad-line); color:var(--bad); background:transparent; }
-.runctl .ctl.warn:hover { background:var(--bad-bg); }
-.runctl-note { max-width:340px; font-size:11.5px; color:var(--muted); }
-
-/* 新建分析屏的表单（WP54：三组 + 可展开的分析配置；两步预估面板的样式在 15-screens.css） */
-#form { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px 14px; align-content:start; }
-@media (max-width:640px) { #form { grid-template-columns:minmax(0, 1fr); } }
-.fgroup { border:1px solid var(--line); border-radius:var(--radius); padding:8px 12px 12px; margin:0; min-width:0; background:var(--lane);
-          display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; align-content:flex-start; }
-.fgroup > label:not(.inline):not(.chan-line) { min-width:0; }
-#form label.inline { white-space:nowrap; }
-#form label:has(#f-scenario) { flex:1 1 100%; }
-#form .primary { justify-self:end; min-width:160px; }
-.fgroup legend { font-size:10.5px; color:var(--muted); padding:0 6px; letter-spacing:.9px; text-transform:uppercase; font-weight:600; }
-#form label { display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:var(--muted); }
-#form label .lab { color:var(--muted); }
-#form label.inline { flex-direction:row; align-items:center; gap:6px; padding-bottom:7px; color:var(--soft); font-size:12.5px; }
-#form input, #form select { font:inherit; font-size:13px; color:var(--ink); padding:5px 9px; border:1px solid var(--line-strong);
-                            border-radius:var(--radius-s); background:var(--bg); min-height:32px; }
-#form input:hover:not(:disabled), #form select:hover:not(:disabled) { border-color:var(--brand-2); }
-#form input:focus, #form select:focus { outline:none; border-color:var(--brand-2); box-shadow:0 0 0 3px var(--accent-bg); }
-#form input:disabled, #form select:disabled { background:transparent; color:var(--muted); border-style:dashed; }
-#form input[type="checkbox"] { min-height:0; width:14px; height:14px; accent-color:var(--brand); }
-#f-ticker, #f-date, #f-rounds, #f-risk-rounds { font-family:var(--mono); }
-#f-scenario { width:100%; min-width:0; } #f-ticker { width:130px; } #f-rounds { width:70px; }
-#f-risk-rounds { width:70px; } #f-portfolio { min-width:0; width:100%; }
-.field-note { font-size:11px; color:var(--code); min-height:14px; font-family:var(--mono); }
-.field-error { font-size:11px; color:var(--bad); min-height:0; }
-/* 证据通道：五个复选框各占一行 */
-.chan { display:flex; flex-direction:column; gap:6px; flex:1 1 100%; }
-#form label.chan-line { flex-direction:row; align-items:baseline; gap:8px; font-size:12px; color:var(--muted); }
-.chan-line input { flex:none; }
-.chan-line b { color:var(--soft); font-weight:600; font-family:var(--mono); font-size:12px; }
-.chan-line .muted { font-size:11.5px; }
-#f-channels[data-off="1"] .chan-line { opacity:.55; }
-.primary { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:6px 22px; min-height:34px;
-           border-radius:var(--radius-s); border:1px solid rgba(125,92,255,.78); background:var(--grad-brand);
-           color:var(--brand-ink); font-weight:700; letter-spacing:.4px; cursor:pointer; box-shadow:var(--glow-brand); }
-.primary:hover:not(:disabled) { filter:brightness(1.12); box-shadow:0 0 0 3px var(--accent-bg), var(--glow-brand); }
-.primary:active:not(:disabled) { transform:translateY(1px); }
-.primary:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
-.linkish { border:0; background:none; padding:0; color:var(--accent); cursor:pointer; text-decoration:none; font-weight:600; }
-.linkish:hover { text-decoration:underline; }
-.error { margin:10px 0 0; font-size:12.5px; color:var(--bad); }
-.rowctl { display:inline-flex; gap:10px; }
-summary { cursor:pointer; color:var(--soft); font-size:12.5px; }
-summary:hover { color:var(--ink); }
-.fold-title { color:var(--ink); font-weight:600; font-size:13.5px; letter-spacing:.2px; }
-/* 计划预览的阶段条（两步预估面板里复用流水线的段样式） */
-.plan-strip { display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin:8px 0; }
-.plan-line { color:var(--soft); margin:4px 0; font-variant-numeric:tabular-nums; }
+.arrow { color:var(--muted); font-size:11px; }   /* 顺序由标记次序给出，箭头只是装饰 */

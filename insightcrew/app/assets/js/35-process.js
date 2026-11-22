@@ -205,8 +205,9 @@ function processCard(turn, body) {
   /* 一张卡片 = 一次出场。被取代的旧版本默认折叠（details 不带 open）；每张都有
      「查看提示词与原始回复」，点开就是原始事件页签里今天那个事件详情抽屉。 */
   const kids = [el("summary", null,
-    el("span", { class: "phead" }, turnMeta(turn)),
-    el("button", { class: "ctl raw", type: "button", title: "打开事件抽屉：这次调用的提示词与原始回复",
+    el("span", { class: "phead" }, el("span", { class: "role-avatar" }, laneName(turn.actor).slice(0, 1)),
+      turnMeta(turn)),
+    el("button", { class: "ctl raw small", type: "button", title: "打开事件抽屉：这次调用的提示词与原始回复",
                    on: { click: (ev) => { ev.preventDefault(); ev.stopPropagation(); openDetail(turn.seq); } } },
       "查看提示词与原始回复"))];
   if (turn.failed) {

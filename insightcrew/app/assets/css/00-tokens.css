@@ -1,44 +1,35 @@
-/* 00-tokens.css —— 设计令牌（WP53 起为 kraken 主题，源自主人 OpenDesign 原型「专业交易分析系统」）。
-   默认深色一套：navy 底、紫色 accent（#7132f5 填充、#b7a6ff 可读文字），表面带渐变与克制的发光。
-   系统偏好浅色时换浅色一套：同一色相压深以满足对比度。变量名沿用拆分时的名字（10-base 起全部只引用令牌）。
-   语义色规则不变：涨/买/通过用绿，跌/卖/止损用红，警示用琥珀；「进行中」用主题紫。
-   正文与次要文字对各自底色的对比度均不低于 WCAG AA 的 4.5:1（tests/test_run_page.py 按对核算）。 */
+/* 00-tokens.css —— 设计令牌（WP56 起严格照主人 OpenDesign 原型的最终渲染：styles.css 的 :root
+   + compat.css 深色覆盖层的精确值；仅深色一套——主人定的「整站只保留深色」）。
+   navy 底（#0b1020/#121a33）、紫色 accent（#7132f5 填充、#b7a6ff 可读文字）、语义软底用原型的 rgba。
+   变量名沿用拆分时的名字（10-base 起全部只引用令牌）；比例照原型：字阶 12/14/16/18/22/28/38、
+   圆角 8/12/18、间距 4/8/12/16/24/32/48、容器 1440、mono 栈 SFMono-Regular/Consolas。
+   正文与次要文字对各自底色的对比度均不低于 WCAG AA 的 4.5:1（tests/test_run_page.py 按对核算，
+   rgba 软底先对 --card 合成再算）。 */
 :root {
   color-scheme: dark;
   --brand:#7132f5; --brand-ink:#ffffff; --brand-2:#7d5cff;
-  --ink:#f8fafc; --soft:#c8d2e0; --muted:#98a4bc; --line:#26314f; --bg:#0b1020; --card:#121a33; --lane:#10182e;
+  --ink:#f8fafc; --soft:#cbd5e1; --muted:#8b95aa; --faint:#9aa4b8;
+  --line:#26314f; --bg:#0b1020; --card:#121a33; --lane:#10182e;
   --line-soft:#1b2740; --line-strong:#354368;
-  --accent:#b7a6ff; --accent-bg:#1c1b40; --accent-line:#4a3f85;
-  --good:#00c853; --good-bg:#0a2314; --good-line:#1f5b38;
-  --bad:#ff4d6d; --bad-bg:#2a121f; --bad-line:#6e2740;
-  --warn:#ffb020; --warn-bg:#2a2009; --warn-line:#5b4614;
-  --info:#b7a6ff; --info-bg:#1c1b40; --info-line:#4a3f85;
-  --code:#b7a6ff; --code-bg:#1c1b40; --code-line:#4a3f85;
-  --focus:#7d5cff; --shadow:0 16px 40px rgba(0,0,0,.22); --overlay:rgba(4,7,16,.72);
+  --surface-blue:#1b2450; --surface-warm:#1b2450;      /* 原型的两个备面：运行控制条、禁用键、轨道 */
+  --accent:#b7a6ff; --accent-bg:rgba(125,92,255,.14); --accent-line:rgba(125,92,255,.36);
+  --good:#00c853; --good-bg:rgba(0,200,83,.12); --good-line:rgba(0,200,83,.34);
+  --bad:#ff4d6d; --bad-bg:rgba(255,77,109,.12); --bad-line:rgba(255,77,109,.36);
+  --warn:#ffb020; --warn-bg:rgba(255,176,32,.12); --warn-line:rgba(255,176,32,.36);
+  --info:#b7a6ff; --info-bg:rgba(125,92,255,.14); --info-line:rgba(125,92,255,.36);
+  --code:#b7a6ff; --code-bg:rgba(125,92,255,.14); --code-line:rgba(125,92,255,.36);
+  --focus:#7d5cff; --focus-ring:0 0 0 3px rgba(125,92,255,.32);
+  --shadow:0 16px 40px rgba(0,0,0,.22); --elev-raised:0 24px 64px rgba(0,0,0,.32);
+  --overlay:rgba(4,7,16,.72);
   --grad-brand:linear-gradient(135deg,var(--brand-2) 0%,var(--brand) 52%,#5a26c4 100%);
   --grad-surface:linear-gradient(145deg,rgba(125,92,255,.10),rgba(18,26,51,.97) 48%,rgba(113,50,245,.05));
+  --grad-hero:radial-gradient(circle at 92% 0%,rgba(113,50,245,.28),transparent 42%),
+              linear-gradient(135deg,#1b2450 0%,#121a33 58%,#0e172d 100%);
   --glow-brand:0 8px 24px rgba(113,50,245,.24);
+  --container:1440px;
   --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
-  --fs-1:11px; --fs-2:12px; --fs-3:13px; --fs-4:14px; --fs-5:17px; --fs-6:20px;
-  --radius-s:6px; --radius:10px; --radius-l:14px;
-}
-@media (prefers-color-scheme: light) {
-  :root {
-    color-scheme: light;
-    --brand:#6d28d9; --brand-ink:#ffffff; --brand-2:#7c3aed;
-    --ink:#191233; --soft:#3f3a5c; --muted:#5c5878; --line:#e3e0ee; --bg:#f4f3fa; --card:#ffffff; --lane:#f6f5fb;
-    --line-soft:#eceaf5; --line-strong:#c9c4de;
-    --accent:#5b21b6; --accent-bg:#efeafd; --accent-line:#cbb8f0;
-    --good:#1a6b0e; --good-bg:#e9f7e2; --good-line:#b5e29b;
-    --bad:#c4291f; --bad-bg:#fdeced; --bad-line:#f2c3bf;
-    --warn:#875800; --warn-bg:#fdf4dc; --warn-line:#ead395;
-    --info:#5b21b6; --info-bg:#efeafd; --info-line:#cbb8f0;
-    --code:#5b21b6; --code-bg:#f1edfb; --code-line:#d5c9f2;
-    --focus:#6d28d9; --shadow:0 1px 2px rgba(25,18,51,.06); --overlay:rgba(25,18,51,.3);
-    --grad-brand:linear-gradient(135deg,var(--brand-2) 0%,var(--brand) 52%,#5b21b6 100%);
-    --grad-surface:linear-gradient(145deg,rgba(124,58,237,.05),#ffffff 48%,rgba(109,40,217,.03));
-    --glow-brand:0 6px 18px rgba(109,40,217,.18);
-  }
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
+  --fs-1:12px; --fs-2:14px; --fs-3:16px; --fs-4:18px; --fs-5:22px; --fs-6:28px; --fs-7:38px;
+  --radius-s:8px; --radius:12px; --radius-l:18px;
 }

@@ -4,11 +4,11 @@
 /* ---------- 页头 ---------- */
 
 function renderHeader(model) {
+  /* WP56 起页头是固定的品牌块（原型解剖）：运行标识在大符号标题区（ws-head），页头只换
+     document.title 与右侧的模式徽章。#title/#subtitle 不再被改写。 */
   const started = model.started;
   const badge = $("badge");
   if (!started) {
-    $("title").textContent = "多智能体交易辅助系统";
-    $("subtitle").textContent = "数字由代码计算并复算，方案由代码按规则审计，模型只负责判断。";
     document.title = "InsightCrew";
     if (state.meta) {
       badge.hidden = false;
@@ -22,9 +22,6 @@ function renderHeader(model) {
   const board = model.board, request = started.request || {};
   const scope = board["request/scope"] || {}, instrument = board["ledger/instrument"] || {};
   const ticker = instrument.ticker || scope.ticker || request.ticker || "";
-  $("title").textContent = ticker + (instrument.name ? " · " + instrument.name : "");
-  $("subtitle").textContent = "分析日 " + (scope.as_of || request.as_of || "最近交易日")
-    + " · 数据集 " + (started.universe || "") + (state.runId ? " · 运行 " + state.runId : "");
   document.title = ticker + " · InsightCrew";
   const names = started.models || {};
   badge.hidden = false;
@@ -78,7 +75,11 @@ function render() {
     if (v.always || v.id === state.tab) v.render(model, $(v.target || "view-" + v.id));
   renderDetail(model);
   $("playbar").hidden = !state.events.length;    // 回放条在工作台顶部（WP54）：有事件才出现
-  $("btn-play").textContent = state.playing ? "暂停" : complete() ? "重新播放" : "播放";
+  const playLabel = state.playing ? "暂停" : complete() ? "重新播放" : "播放";
+  if ($("btn-play").dataset.label !== playLabel) {         // 只在标签变了才重画（图标节点不每帧重建）
+    $("btn-play").dataset.label = playLabel;
+    fill($("btn-play"), icon(state.playing ? "pause" : "play"), playLabel);
+  }
   $("btn-play").classList.toggle("on", state.playing);
   for (const button of $("speeds").querySelectorAll("button")) button.classList.toggle("on", button.dataset.speed === state.speed);
   $("slider").max = String(state.events.length);

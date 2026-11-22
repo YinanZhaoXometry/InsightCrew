@@ -115,11 +115,21 @@ function citedByText(entries) {                     // 谁引用了它：角色�
   }).join("；");
 }
 
+const EVENT_KIND_TEXT = { "run.started": "运行", "run.finished": "运行", "model.called": "模型调用",
+                          "model.failed": "模型调用", "gate.checked": "独立审计", "artifact.written": "产物",
+                          "route": "路由", "budget.exceeded": "预算" };
+
+function setDrawerHead(type, title) {               // 抬头（WP56 照原型）：眉标是对象类型，标题在下
+  const kind = $("detail-type"), heading = $("detail-title");
+  if (kind) kind.textContent = type;
+  if (heading) heading.textContent = title;
+}
+
 function renderCite(model, box) {                   // 引用徽章点开的面板：事实或条目本身（WP48 换成完整证据面板）
   const id = state.cited, fact = model.facts[id], item = model.items[id];
+  setDrawerHead("引用", id);
   const rows = [["编号", id]];
-  const kids = [el("button", { class: "ctl close", type: "button", on: { click: closeDetail } }, "关闭"),
-                el("h2", null, "引用")];
+  const kids = [];
   if (fact) {
     rows.push(["种类", "事实（" + (FACT_KIND_TEXT[fact.kind] || fact.kind) + "）"],
               ["数值", withUnit(fact.value, fact.unit)], ["含义", fact.label || "—"],
@@ -132,7 +142,7 @@ function renderCite(model, box) {                   // 引用徽章点开的面�
   } else {
     kids.push(el("dl", { class: "kv" }, [el("dt", null, "编号"), el("dd", null, id)]),
               el("p", { class: "note" }, "未知引用：这次运行里没有这个编号对应的事实或条目。"));
-    fill(box, kids); box.hidden = false;
+    fill(box, kids);
     if (citePanelExtra) citePanelExtra(model, box);   // 挂点（00-core 声明）：未知引用要不要补，由挂点自己判断
     return;
   }
@@ -141,29 +151,29 @@ function renderCite(model, box) {                   // 引用徽章点开的面�
   kids.push(el("h3", null, "谁引用了它"), el("p", { class: "note" },
     by && by.length ? citedByText(by) : "没有角色在产物里引用过它。"));
   fill(box, kids);
-  box.hidden = false;
   if (citePanelExtra) citePanelExtra(model, box);     // 挂点（00-core 声明，§7 共享文件请求）：40-evidence 接「在证据中查看」
 }
 
 function renderDetail(model) {
-  const box = $("detail");
+  const box = $("detail"), scrim = $("drawer-scrim");
   const hadFocus = box.contains(document.activeElement);   // 抽屉每次渲染都重建：焦点在里面时，重建后放回关闭键
-  renderDetailBody(model, box);
-  const close = box.hidden ? null : box.querySelector(".close");
+  renderDetailBody(model, $("detail-body"));
+  box.hidden = state.cited ? false : !state.events.some((event) => event.seq === state.selected);
+  if (scrim) scrim.hidden = box.hidden;
+  const close = box.hidden ? null : $("detail-close");
   if (close && (drawerWantsFocus || hadFocus)) { close.focus(); drawerWantsFocus = false; }
 }
 
-function renderDetailBody(model, box) {
-  if (state.cited) { renderCite(model, box); return; }
+function renderDetailBody(model, body) {
+  if (state.cited) { renderCite(model, body); return; }
   const e = state.events.find((event) => event.seq === state.selected);
-  box.hidden = !e;
-  if (!e) return;
+  if (!e) { fill(body); return; }
   const d = e.data, lane = LANES.find(([key]) => key === e.actor);
+  setDrawerHead(EVENT_KIND_TEXT[e.type] || "事件", describe(e)[0]);
   const pairs = [["事件", "#" + e.seq + " · " + e.type], ["执行者", (lane ? lane[1] : e.actor || "系统") + (e.step ? "（" + e.step + "）" : "")]];
   if (e.ts) pairs.push(["时间", e.ts]);
   if (e.caused_by && e.caused_by.length) pairs.push(["依据的事件", e.caused_by.map((seq) => "#" + seq).join(" ")]);
-  const kids = [el("button", { class: "ctl close", type: "button", on: { click: closeDetail } }, "关闭"),
-                el("h2", null, describe(e)[0])];
+  const kids = [];
   const json = (value) => el("pre", null, JSON.stringify(value, null, 2));
 
   if (e.type === "model.called") {
@@ -190,7 +200,7 @@ function renderDetailBody(model, box) {
     if (e.type === "route") pairs.push(["重跑", "从" + (STAGE_NAME[d.to] || d.to) + "开始，以及它之后的每一段"], ["原因", d.why || ""]);
     kids.push(el("dl", { class: "kv" }, pairs.map(([k, v]) => [el("dt", null, k), el("dd", null, v)])), json(d));
   }
-  fill(box, kids);
+  fill(body, kids);
 }
 
 /* ---------- 回放 ---------- */
@@ -239,6 +249,8 @@ $("slider").addEventListener("input", (ev) => {
   requestRender();
 });
 $("lanes").addEventListener("wheel", () => { state.follow = false; }, { passive: true });
+const scrim = $("drawer-scrim");
+if (scrim) scrim.addEventListener("click", closeDetail);   // 原型的抽屉遮罩：点遮罩等于关闭
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && (state.selected || state.cited)) closeDetail(); });
 
 function renderEvents(model, box) { renderTimeline(model); }

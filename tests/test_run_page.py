@@ -330,19 +330,16 @@ def test_the_cite_panel_hook_is_declared_and_taken() -> None:
     assert "MutationObserver" not in ASSET                         # 绕法不再出现
 
 
-# ---------- WP53：OpenDesign kraken 主题（只动 CSS；对比度按对核算，双方案 ≥ 4.5:1） ----------
+# ---------- WP56：严格照主人的 OpenDesign 原型（dark-only、原型比例、图标库、取消模态） ----------
 
 _TOKENS = (ASSETS / "css" / "00-tokens.css").read_text(encoding="utf-8")
+_BASE = (ASSETS / "css" / "10-base.css").read_text(encoding="utf-8")
 
 
-def _token_block() -> tuple[dict[str, str], dict[str, str]]:
-    """拆出两套方案的令牌：:root 是默认深色，@media(prefers-color-scheme: light) 里是浅色。"""
-    dark, _, rest = _TOKENS.partition("@media (prefers-color-scheme: light)")
-    light = rest
-    def parse(block: str) -> dict[str, str]:
-        found = dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})\b", block))
-        return found
-    return parse(dark), parse(light)
+def _token(name: str) -> str:
+    found = re.search(r"--" + re.escape(name) + r":\s*([^;]+);", _TOKENS)
+    assert found, name
+    return found.group(1).strip()
 
 
 def _luminance(hexcolor: str) -> float:
@@ -356,36 +353,69 @@ def _contrast(fore: str, back: str) -> float:
     return (l1 + 0.05) / (l2 + 0.05)
 
 
-def test_the_kraken_tokens_are_declared_for_both_schemes() -> None:
-    """WP53：令牌换到主人的 OpenDesign kraken 主题（navy 底、紫色 accent），变量名一个不改。"""
-    dark, light = _token_block()
-    assert dark["--brand"] == "#7132f5" and dark["--bg"] == "#0b1020"      # kraken 紫 + navy 底
-    assert dark["--accent"] == "#b7a6ff"                                   # 可读紫（文字用）
-    assert light["--brand"] == "#6d28d9"                                   # 浅色方案压深同一色相
-    for name in ("--ink", "--soft", "--muted", "--line", "--card", "--lane", "--bg",
-                 "--accent", "--accent-bg", "--accent-line", "--good", "--good-bg",
-                 "--bad", "--bad-bg", "--warn", "--warn-bg", "--code", "--code-bg",
-                 "--brand", "--brand-ink", "--focus"):
-        assert dark.get(name), name                                        # 两套方案名字齐全
-        assert light.get(name), name
-    assert "--grad-brand" in _TOKENS and "--grad-surface" in _TOKENS       # 渐变令牌（无光标的方案里不核算）
-    assert "I/C" in (ASSETS / "css" / "10-base.css").read_text(encoding="utf-8")  # 品牌方章
+def _composite(fore_rgba: str, back_hex: str) -> str:
+    """rgba 软底叠在深色卡片色上之后的合成色：页面上的软底就是这样渲染的。"""
+    match = re.fullmatch(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", fore_rgba)
+    assert match, fore_rgba
+    r, g, b, a = int(match.group(1)), int(match.group(2)), int(match.group(3)), float(match.group(4))
+    base = [int(back_hex[i:i + 2], 16) for i in (1, 3, 5)]
+    mixed = [round(a * c + (1 - a) * v) for c, v in zip((r, g, b), base, strict=False)]
+    return "#" + "".join(f"{v:02x}" for v in mixed)
 
 
-@pytest.mark.parametrize("scheme", ["dark", "light"])
-def test_body_text_keeps_wcag_aa_in_both_schemes(scheme: str) -> None:
-    """WP53：正文与语义文字对各自底色 ≥ 4.5:1（沿用 WP51 的核算口径，套到 kraken 令牌上）。"""
-    dark, light = _token_block()
-    tokens = dark if scheme == "dark" else light
-    pairs = [
-        ("--ink", "--bg"), ("--ink", "--card"), ("--ink", "--lane"),
-        ("--soft", "--card"), ("--soft", "--lane"),
-        ("--muted", "--card"), ("--muted", "--lane"),
-        ("--accent", "--card"), ("--accent", "--accent-bg"),
-        ("--good", "--good-bg"), ("--bad", "--bad-bg"),
-        ("--warn", "--warn-bg"), ("--code", "--code-bg"),
-        ("--brand-ink", "--brand"),
-    ]
-    for fore, back in pairs:
-        ratio = _contrast(tokens[fore], tokens[back])
-        assert ratio >= 4.5, f"{scheme}: {fore} on {back} is {ratio:.2f}:1"
+def test_the_kraken_tokens_are_declared() -> None:
+    """WP56：令牌是原型的精确值（navy 底、紫色 accent、原型比例）；只有深色一套（主人定的）。"""
+    assert _token("brand") == "#7132f5" and _token("bg") == "#0b1020"      # kraken 紫 + navy 底
+    assert _token("accent") == "#b7a6ff"                                   # 可读紫（文字用）
+    assert _token("card") == "#121a33" and _token("lane") == "#10182e"
+    assert _token("muted") == "#8b95aa" and _token("soft") == "#cbd5e1"
+    assert "prefers-color-scheme" not in _TOKENS                           # 整站只保留深色
+    for name in ("ink", "soft", "muted", "faint", "line", "card", "lane", "bg",
+                 "accent", "accent-bg", "accent-line", "good", "good-bg",
+                 "bad", "bad-bg", "warn", "warn-bg", "code", "code-bg",
+                 "brand", "brand-ink", "focus", "focus-ring", "container", "elev-raised",
+                 "grad-brand", "grad-surface", "grad-hero", "surface-blue", "surface-warm"):
+        assert _token(name), name
+    for name, value in (("--fs-1", "12px"), ("--fs-2", "14px"), ("--fs-3", "16px"), ("--fs-4", "18px"),
+                        ("--fs-5", "22px"), ("--fs-6", "28px"), ("--fs-7", "38px"),
+                        ("--radius-s", "8px"), ("--radius", "12px"), ("--radius-l", "18px"),
+                        ("--sp-7", "48px")):
+        assert _token(name.lstrip("-")) == value, (name, value)
+    assert "brand-mark" in _BASE                                           # 品牌方章的样式
+    assert "I/C" in (ASSETS / "page.html").read_text(encoding="utf-8")     # 方章文字在页面骨架里
+
+
+def test_the_page_declares_the_visual_structures_of_wp56() -> None:
+    """WP56 补齐的结构：28 枚描边图标、取消模态、抽屉的抬头与遮罩、双行页签的 mono 眉标。"""
+    library = re.search(r'<svg class="svg-library"[^>]*>(.*?)</svg>', ASSET, re.S)
+    assert library, "页面缺图标库"
+    symbols = re.findall(r'<symbol id="i-([\w-]+)"', library.group(1))
+    assert len(symbols) == 28 and len(set(symbols)) == 28                  # 原型的 28 枚，一个不重
+    for must in ("plus", "arrow-right", "arrow-left", "arrow-up-right", "history", "chevron-right",
+                 "chevron-left", "skip-back", "skip-forward", "square", "minus", "check", "x",
+                 "clock", "play", "pause", "download", "link", "info", "alert", "shield"):
+        assert must in symbols, must
+    assert 'id="cancel-dialog"' in ASSET and "确认取消运行" in ASSET and "继续观察" in ASSET
+    assert 'id="drawer-scrim"' in ASSET
+    assert 'id="detail-type"' in ASSET and 'id="detail-title"' in ASSET and 'id="detail-close"' in ASSET
+    for eyebrow in ("WHY", "TRACE", "RULES", "USAGE", "EVENTS"):
+        assert f'class="tab-eyebrow">{eyebrow}</span>' in ASSET, eyebrow
+
+
+@pytest.mark.parametrize("pair", [
+    ("--ink", "--bg"), ("--ink", "--card"), ("--ink", "--lane"),
+    ("--soft", "--card"), ("--soft", "--lane"),
+    ("--muted", "--card"), ("--muted", "--lane"),
+    ("--accent", "--card"), ("--faint", "--card"),
+    ("--good", "--card"), ("--bad", "--card"), ("--warn", "--card"), ("--code", "--card"),
+    ("--accent", "--accent-bg"), ("--good", "--good-bg"), ("--bad", "--bad-bg"),
+    ("--warn", "--warn-bg"), ("--code", "--code-bg"),
+    ("--brand-ink", "--brand"),
+])
+def test_body_text_keeps_wcag_aa_on_dark(pair) -> None:
+    """WP56：正文与语义文字对深色底 ≥ 4.5:1（rgba 软底先按原型叠在卡片色上合成再算）。"""
+    fore = _token(pair[0].lstrip("-"))
+    back_token = _token(pair[1].lstrip("-"))
+    back = _composite(back_token, "#121a33") if back_token.startswith("rgba") else back_token
+    ratio = _contrast(fore, back)
+    assert ratio >= 4.5, f"{pair[0]} on {pair[1]} is {ratio:.2f}:1"

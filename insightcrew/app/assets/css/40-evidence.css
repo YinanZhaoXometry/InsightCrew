@@ -1,4 +1,7 @@
-/* 40-evidence.css —— 证据页签与规则审计页签（WP48，BLUEPRINT 20.10）。 */
+/* 40-evidence.css —— 证据页签与规则审计页签（WP48 起；WP56 照原型：
+   事实表用 .data-table 的几何（基础样式已换）、编号是紫色 mono 键、种类徽章是 .tag 式；
+   规则是 .rule-item 行（代码列 accent mono + 细节 + 结果 + chevron），
+   审计轮次是 .audit-block（头带按判定着色的深色渐变、stamp 在右）。 */
 
 /* 信号列表（各条目小节沿用） */
 .signals { margin:6px 0; padding-left:18px; } .signals li { margin:3px 0; }
@@ -6,18 +9,20 @@
 
 /* 事实表的搜索行：输入框是持久节点，重绘不换 */
 .ev-search { display:flex; align-items:center; gap:8px; margin:8px 0 2px; flex-wrap:wrap; }
-.ev-search label { font-size:12.5px; color:var(--soft); }
-.ev-search input { flex:1; min-width:220px; max-width:460px; padding:6px 10px; min-height:32px;
-                   border:1px solid var(--line); border-radius:var(--radius-s); background:var(--card); color:var(--ink); font:inherit; }
-.ev-search input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bg); }
-.ev-count { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ev-search label { font-size:var(--fs-2); color:var(--soft); }
+.ev-search input { flex:1; min-width:220px; max-width:460px; padding:8px 12px; min-height:40px;
+                   border:1px solid var(--line-strong); border-radius:var(--radius); background:#0e162b;
+                   color:var(--ink); font:inherit; font-size:var(--fs-2); }
+.ev-search input:hover { border-color:var(--brand-2); }
+.ev-search input:focus { outline:none; border-color:var(--brand-2); box-shadow:var(--focus-ring); }
+.ev-count { font-size:var(--fs-1); color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
 
 /* 宽表在自己的框里横滚，不把页面撑破 */
 .ev-scroll { overflow-x:auto; }
 
-/* 事实的种类徽章：账本 / 基本面 / 工具 / 宏观，徽章带文字，不只靠颜色区分 */
-.kbadge { display:inline-block; padding:0 6px; border-radius:3px; border:1px solid; font-size:11px;
-          line-height:1.7; white-space:nowrap; }
+/* 事实的种类徽章：账本 / 基本面 / 工具 / 宏观（原型的 .tag 形状），徽章带文字，不只靠颜色区分 */
+.kbadge { display:inline-block; padding:1px 6px; border-radius:4px; border:1px solid; font-size:10px;
+          font-family:var(--mono); line-height:1.7; white-space:nowrap; }
 .kbadge.ledger { color:var(--code); border-color:var(--code-line); background:var(--code-bg); }
 .kbadge.fundamentals { color:var(--good); border-color:var(--good-line); background:var(--good-bg); }
 .kbadge.tool { color:var(--warn); border-color:var(--warn-line); background:var(--warn-bg); }
@@ -29,17 +34,57 @@ tr.hl td { background:var(--accent-bg); }
 /* 引用抽屉里的补充按钮区 */
 .cite-actions { margin-top:12px; }
 
-/* 规则与审计页签：分层图例与轮次卡片 */
-.layers { margin:6px 0; padding-left:18px; } .layers li { margin:3px 0; font-size:12.5px; color:var(--soft); }
-.layer { display:inline-block; padding:0 6px; border-radius:3px; border:1px solid; font-size:11px;
-         line-height:1.7; white-space:nowrap; font-weight:600; }
+/* 规则与审计页签：分层图例 */
+#view-audit h2 { font-size:var(--fs-5); }
+#view-audit h3 { margin:var(--sp-6) 0 var(--sp-3); }
+.layers { margin:6px 0; padding-left:18px; } .layers li { margin:3px 0; font-size:var(--fs-2); color:var(--soft); }
+.layer { display:inline-block; padding:1px 6px; border-radius:4px; border:1px solid; font-size:10px;
+         font-family:var(--mono); line-height:1.7; white-space:nowrap; font-weight:600; }
 .layer.L1 { color:var(--code); border-color:var(--code-line); background:var(--code-bg); }
 .layer.L2 { color:var(--good); border-color:var(--good-line); background:var(--good-bg); }
 .layer.L3 { color:var(--warn); border-color:var(--warn-line); background:var(--warn-bg); }
 
-.rnd { border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; margin:10px 0;
-       background:var(--card); }
-.rnd-head { display:flex; gap:10px; flex-wrap:wrap; align-items:baseline; }
-.rnd-head b { white-space:nowrap; }
-.rnd-line { color:var(--soft); font-size:12.5px; min-width:0; }
-.rnd .findings { margin:8px 0 4px; }
+/* 规则行（原型的 .rule-item：42px 代码列 + 名称/细节 + 结果 + chevron；高亮的挂琥珀色） */
+.rule-list { display:grid; gap:0; border:1px solid var(--line); border-radius:var(--radius);
+             background:var(--card); background-image:var(--grad-surface); padding:6px 12px; }
+.rule-item { display:grid; grid-template-columns:150px minmax(0,1fr) auto 16px; gap:10px; align-items:center;
+             padding:13px 4px; border:0; border-bottom:1px solid var(--line); color:var(--soft);
+             text-align:left; }
+.rule-item:last-child { border-bottom:0; }
+.rule-item:hover { background:var(--lane); }
+.rule-item.rule-highlight { margin:4px -6px; padding-inline:10px; border:1px solid rgba(255,176,32,.34);
+                            border-radius:6px; background:var(--warn-bg); }
+.rule-code { color:var(--accent); font-family:var(--mono); font-size:var(--fs-1); font-weight:700; }
+.rule-copy { min-width:0; }
+.rule-copy strong { display:block; font-size:var(--fs-2); line-height:1.5; color:var(--ink); }
+.rule-copy small { display:block; margin-top:3px; color:var(--muted); font-size:var(--fs-1); line-height:1.45; }
+.rule-result { font-size:var(--fs-1); font-weight:650; white-space:nowrap; }
+.rule-result.pass { color:var(--good); }
+.rule-result.fail { color:var(--bad); }
+.rule-result.na { color:var(--warn); }
+.rule-result.neutral { color:var(--muted); }
+.rule-item > .icon { width:13px; height:13px; color:var(--faint); }
+
+/* 审计轮次（原型的 .audit-block：头带按判定着色、stamp 在右、正文独立） */
+.audit-block { overflow:hidden; border:1px solid var(--line); border-radius:var(--radius-s);
+               background:var(--card); margin:var(--sp-3) 0; }
+.audit-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+                padding:16px 20px; background:var(--grad-surface); border-bottom:1px solid var(--line); }
+.audit-block.audit-rejected .audit-header {
+  border-bottom-color:rgba(255,77,109,.36);
+  background:linear-gradient(135deg,rgba(255,77,109,.12),rgba(18,26,51,.94)); }
+.audit-block.audit-passed .audit-header {
+  border-bottom-color:rgba(0,200,83,.36);
+  background:linear-gradient(135deg,rgba(0,200,83,.13),rgba(18,26,51,.94)); }
+.audit-title { display:flex; align-items:flex-start; gap:12px; }
+.audit-title h3 { margin:2px 0 0; font-size:var(--fs-3); }
+.audit-title p { margin:4px 0 0; color:var(--muted); font-size:var(--fs-1); font-family:var(--mono); }
+.audit-icon { display:inline-grid; place-items:center; width:36px; height:36px; flex:none; border-radius:8px;
+              background:rgba(113,50,245,.16); color:var(--accent); }
+.audit-block.audit-rejected .audit-icon { background:var(--bad-bg); color:var(--bad); }
+.audit-block.audit-passed .audit-icon { background:var(--good-bg); color:var(--good); }
+.audit-stamp { flex:none; color:var(--muted); font-family:var(--mono); font-size:var(--fs-1);
+               white-space:nowrap; padding-top:2px; }
+.audit-stamp.pass { color:var(--good); }
+.audit-stamp.fail { color:var(--bad); }
+.audit-body { padding:14px 20px 16px; }

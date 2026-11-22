@@ -1,20 +1,26 @@
-/* 35-process.css —— 过程页签（WP47）：角色卡片、并列栏、辩论与风险的三栏、修订对照。 */
+/* 35-process.css —— 过程页签（WP47 起；WP56 照原型：角色卡是 .finding-card 的几何——
+   角色头像章、职责小字、底部信息条；辩论与风险的三栏、修订对照沿用结构，几何随原型）。 */
 
 /* 各节的容器 */
-#view-process h3 { margin-top:22px; }
+#view-process h2 { font-size:var(--fs-5); }
+#view-process h3 { margin:var(--sp-6) 0 var(--sp-3); }
 #view-process h4.psub { margin:14px 0 6px; }
 .solo { display:block; }
-.pcol { display:flex; flex-direction:column; gap:10px; min-width:0; }
+.pcol { display:flex; flex-direction:column; gap:12px; min-width:0; }
 
-/* 并列栏：并行分析师 / 一轮评审 / 风险三方，并排放不下时自动换列 */
-.par-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:10px; align-items:start; }
+/* 并列栏：并行分析师 / 一轮评审 / 风险三方，并排放不下时自动换列（原型的 .finding-grid 三列） */
+.par-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:var(--sp-3); align-items:start; }
 
-/* 卡片：一位角色的一次出场 */
-.pcard { border:1px solid var(--line); border-radius:var(--radius); background:var(--card);
-         background-image:var(--grad-surface); overflow:hidden; }
-.pcard > summary { list-style:none; cursor:pointer; padding:8px 12px; background:rgba(16,24,46,.5);
+/* 角色头像章（原型的 .role-avatar：紫渐变小方章 + 角色名首字） */
+.role-avatar { display:inline-grid; place-items:center; width:34px; height:34px; flex:none; border-radius:8px;
+               background:linear-gradient(135deg,rgba(125,92,255,.30),rgba(113,50,245,.12));
+               color:var(--accent); font-size:13px; font-weight:700; }
+
+/* 卡片：一位角色的一次出场（原型的 .finding-card：8px 圆角、深面、悬停不变） */
+.pcard { border:1px solid var(--line); border-radius:var(--radius-s); background:rgba(11,16,32,.30);
+         overflow:hidden; }
+.pcard > summary { list-style:none; cursor:pointer; padding:12px 14px; background:rgba(11,16,32,.35);
                    display:flex; align-items:center; justify-content:space-between; gap:10px; }
-@media (prefers-color-scheme: light) { .pcard > summary { background:var(--lane); } }
 .pcard > summary::-webkit-details-marker { display:none; }
 .pcard[open] > summary { border-bottom:1px solid var(--line); }
 .pcard.old > summary .who { text-decoration:line-through; color:var(--muted); }
@@ -22,43 +28,44 @@
 .pcard.actor-bull { border-top:2px solid var(--good); }
 .pcard.actor-bear { border-top:2px solid var(--bad); }
 .pcard.actor-bull .who { color:var(--good); } .pcard.actor-bear .who { color:var(--bad); }
-.phead { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; min-width:0; }
-.phead .who { font-size:13px; }
-.phead .step { color:var(--muted); font-size:11px; }
-.phead .meta-bit { color:var(--muted); font-size:11.5px; }
+.phead { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; min-width:0; }
+.phead .who { font-size:var(--fs-2); }
+.phead .step { color:var(--muted); font-size:var(--fs-1); }
+.phead .meta-bit { color:var(--muted); font-size:var(--fs-1); }
 .phead .old-tag { color:var(--warn); }
-.pcard .ctl.raw { flex:none; font-size:11.5px; padding:3px 10px; min-height:26px; }
-.pbody { padding:10px 12px; }
+.pcard .ctl.raw { flex:none; }
+.pbody { padding:14px 16px; }
 .pbody > * { margin:0; }
 .pbody > * + * { margin-top:8px; }
-.pnar { font-size:13.5px; line-height:1.65; }
-.fail { color:var(--bad); font-size:13px; }
-.rebuttal { font-size:12.5px; color:var(--soft); border-left:3px solid var(--line); padding-left:10px; }
-.inval b { display:block; font-size:12px; color:var(--muted); margin-bottom:2px; }
-.inval ul { margin:0; padding-left:18px; font-size:12.5px; color:var(--soft); }
-.plist { margin:0; padding-left:18px; font-size:13px; }
+.pnar { font-size:var(--fs-2); line-height:1.7; }
+.fail { color:var(--bad); font-size:var(--fs-2); }
+.rebuttal { font-size:var(--fs-2); color:var(--soft); border-left:3px solid var(--line); padding-left:10px; }
+.inval b { display:block; font-size:var(--fs-1); color:var(--muted); margin-bottom:2px; }
+.inval ul { margin:0; padding-left:18px; font-size:var(--fs-2); color:var(--soft); }
+.plist { margin:0; padding-left:18px; font-size:var(--fs-2); }
 .plist li { margin:4px 0; line-height:1.55; }
 .chips { display:inline-flex; flex-wrap:wrap; gap:4px; vertical-align:baseline; }
 
-/* 辩论与风险：一轮一框，多空两栏 / 风险三栏 */
-.de-round { position:relative; margin:10px 0 14px; padding:14px 10px 10px; border:1px solid var(--line);
-            border-radius:var(--radius); background:rgba(16,24,46,.35); }
-@media (prefers-color-scheme: light) { .de-round { background:var(--lane); } }
-.round-tag { position:absolute; top:-9px; left:12px; font-size:10.5px; padding:0 8px; border-radius:4px;
+/* 辩论与风险：一轮一框（原型的 .debate-side 盒子：lane 底、8px 圆角），多空两栏 / 风险三栏 */
+.de-round { position:relative; margin:14px 0 18px; padding:16px 12px 12px; border:1px solid var(--line);
+            border-radius:var(--radius-s); background:var(--lane); }
+.round-tag { position:absolute; top:-10px; left:12px; font-size:10.5px; padding:0 8px; border-radius:4px;
              background:var(--card); color:var(--accent); border:1px solid var(--accent-line);
              font-family:var(--mono); }
-.de-two { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:10px; }
-.risk-three { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px; }
+.de-two { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:var(--sp-3); }
+.risk-three { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:var(--sp-3); }
 @media (max-width:760px) { .de-two, .risk-three { grid-template-columns:1fr; } }
 
-/* 修订对照：一版一列；表宽时在自己的框里横滚 */
+/* 修订对照：一版一列；表宽时在自己的框里横滚（原型的 .version-compare 几何由 45-audit 承担，
+   这里的对照表沿用 .data-table 基础样式） */
 .rev { margin-top:6px; }
-.tscroll { overflow-x:auto; }
+.tscroll { overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius-s); }
 .tscroll table { min-width:420px; }
+.tscroll th { font-size:10px; }
 .tscroll td .diff, .tscroll th .diff { background:var(--warn-bg); border-radius:4px; padding:1px 5px;
                                        font-weight:600; }
 .tscroll td .diff::after { content:" ▲"; font-size:10px; }
-.sentback { margin:8px 0 0; padding:8px 12px; border-left:3px solid var(--warn); background:var(--lane);
-            border-radius:0 var(--radius-s) var(--radius-s) 0; }
+.sentback { margin:8px 0 0; padding:10px 14px; border-left:3px solid var(--warn);
+            background:rgba(255,176,32,.055); border-radius:0 var(--radius-s) var(--radius-s) 0; }
 .sentback .note { margin:0 0 4px; }
 .quorum { font-weight:600; color:var(--soft); }

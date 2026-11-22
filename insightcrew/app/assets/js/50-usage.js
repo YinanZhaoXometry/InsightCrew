@@ -154,13 +154,16 @@ function waterfallEl(model, marks) {
     const track = el("div", { class: "wf-track" });
     for (const b of lane.bars) {
       const bar = el("i", { class: "wf-bar" + (b.open ? " open" : b.span.ok === false ? " bad" : ""),
-                            title: barTitle(b) });
+                            title: barTitle(b) },
+        el("b", null, b.open ? "…" : msText(b.span.ms)));   // 杠内写时长（原型）；太窄时 CSS 截断
       bar.style.left = (b.left * 100) + "%";
       bar.style.width = Math.max(b.width * 100, 0.7) + "%";
       track.append(bar);
     }
     rows.append(el("div", { class: "wf-row" },
-      el("div", { class: "wf-name", title: lane.role }, usageRoleName(lane.role)), track));
+      el("div", { class: "wf-name" },
+        el("strong", null, usageRoleName(lane.role)),
+        el("small", null, (lane.bars[0].span.step || ""))), track));
   }
   const overlay = el("div", { class: "wf-marks" });
   for (const mark of marks) {
@@ -176,6 +179,10 @@ function waterfallEl(model, marks) {
   rows.append(overlay);
   const half = t0 + axis / 2;
   return el("div", { class: "wf" },
+    el("div", { class: "wf-legend" },
+      el("span", null, el("i", { class: "legend-bar" }), "执行时长"),
+      el("span", null, el("i", { class: "legend-open" }), "未收尾（进行中或被中断）"),
+      el("span", null, el("i", { class: "legend-mark" }), "续跑 / 取消的记号")),
     el("div", { class: "wf-axis" }, el("span", { class: "wf-name" }, ""),
       el("div", { class: "ticks" },
         el("span", { style: "left:0%" }, clockText(t0)),
@@ -183,11 +190,14 @@ function waterfallEl(model, marks) {
         el("span", { style: "left:100%" }, clockText(t1)))),
     rows,
     el("p", { class: "note" },
-      "每条横杠是一次模型调用，横向是时间：并行分析师的横杠互相重叠。蓝色为完成，红色为失败，",
+      "每条横杠是一次模型调用，横向是时间：并行分析师的横杠互相重叠。紫色为完成，红色为失败，",
       "黄色虚线为未收尾（进行中或被中断）；竖线是续跑与取消的记号。悬停查看每条的开始与时长。"));
 }
 
 /* ---------- 页签 ---------- */
+
+const costStat = (label, value, small) => el("div", { class: "cost-stat" }, el("span", null, label),
+  el("strong", { class: "mono" }, value), el("small", null, small));
 
 function renderUsage(model, box) {
   const kids = [el("h2", null, "用量与成本")];
@@ -200,6 +210,12 @@ function renderUsage(model, box) {
     fill(box, kids, el("div", { class: "muted" }, "还没有模型调用。"));
     return;
   }
+  /* 顶上的四张汇总卡（WP56 照原型的 .cost-summary）：调用与请求、token、费用、历时 */
+  kids.push(el("div", { class: "cost-summary" },
+    costStat("模型调用", count(total.calls) + " / " + count(total.requests), "请求含纠正重试"),
+    costStat("token 用量", count(total.tokens), "输入 " + count(total.input) + " + 输出 " + count(total.output)),
+    costStat("已入账费用", costText(total), "USD；未定价的调用不进合计"),
+    costStat("运行历时", seconds !== null ? num(seconds, 1) + " 秒" : "未测量", "取轨迹覆盖的范围")));
   if (!total.calls) kids.push(el("div", { class: "muted" }, "还没有已完成的模型调用；进行中的调用只出现在下面的瀑布里。"));
   else kids.push(usageTable(model, hasTrace));
   if (!hasTrace) kids.push(el("p", { class: "note" }, NO_TRACE_NOTE));

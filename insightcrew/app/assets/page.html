@@ -10,16 +10,49 @@
 </style>
 </head>
 <body>
+<!-- 图标库（WP56，照主人的 OpenDesign 原型 index.html 的 28 枚描边符号，原样 path）： -->
+<svg class="svg-library" aria-hidden="true">
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5m6 6-6-6 6-6"/></symbol>
+  <symbol id="i-arrow-up-right" viewBox="0 0 24 24"><path d="M7 17 17 7M7 7h10v10"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+  <symbol id="i-skip-back" viewBox="0 0 24 24"><path d="M6 5v14M18 6l-9 6 9 6Z"/></symbol>
+  <symbol id="i-skip-forward" viewBox="0 0 24 24"><path d="M18 5v14M6 6l9 6-9 6Z"/></symbol>
+  <symbol id="i-square" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m5 9 7 7 7-7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h4M9 13h6M9 17h5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="m10 14 4-4m-6 6-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 6 1-1a4 4 0 0 0 0-6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m12 3 10 18H2Z"/><path d="M12 9v5M12 18h.01"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 8a7 7 0 0 1 11.8-1L20 12M4 12l2.1 5a7 7 0 0 0 11.8-1"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 13v7H4V6h7"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6Z"/><path d="m8 12 3 3 5-6"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3M10 10h4v4h-4Z"/></symbol>
+  <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 6h14M5 6 2 13h6Zm14 0-3 7h6ZM8 21h8"/></symbol>
+</svg>
+
+<!-- 页头（WP56 照原型解剖）：品牌方章 + 名称/小节，右侧运行状态、模式徽章与新建键。
+     #title/#subtitle 保留为页头文案节点（渲染不再往里写运行信息：运行标识在 ws-head）。 -->
 <header class="top">
-  <div>
-    <div class="brand">InsightCrew</div>
-    <h1 id="title">分析工作台</h1>
-    <div id="subtitle">数字由代码计算并复算，方案由代码按规则审计，模型只负责判断。</div>
+  <div class="brand" aria-label="InsightCrew 分析工作台">
+    <span class="brand-mark" aria-hidden="true">I/C</span>
+    <div><h1 class="brand-name" id="title">InsightCrew</h1><span class="brand-section" id="subtitle">分析工作台</span></div>
   </div>
   <div class="head-side">
     <span class="pill" id="run-state" hidden></span>
     <span class="badge" id="badge" hidden></span>
-    <button class="ctl" id="btn-new" type="button" hidden>新建分析</button>
+    <button class="primary" id="btn-new" type="button" hidden><svg class="od-icon" aria-hidden="true"><use href="#i-plus"/></svg>新建分析</button>
   </div>
 </header>
 <p class="disclaimer">本页面由课程项目自动生成，不构成投资建议；系统不执行、不路由、也不模拟任何订单。</p>
@@ -37,7 +70,7 @@
         <h2 class="hero-title">每一个交易结论，都能回到证据。</h2>
         <p class="hero-lead">选择标的与分析日期，先确认成本，再观察多智能体协作。结论、规则、版本和费用，始终在同一条可追溯链路里。</p>
         <div class="hero-actions">
-          <button class="primary" id="btn-hero-new" type="button">开始一次分析</button>
+          <button class="primary" id="btn-hero-new" type="button">开始一次分析<svg class="od-icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
           <button class="ctl" id="btn-hero-demo" type="button">使用演示配置</button>
         </div>
         <p class="hero-note">仅提供研究建议，不连接真实行情、模型或交易服务。</p>
@@ -121,11 +154,11 @@
     <div class="card" id="chart"></div>
 
     <div class="tabs" id="tabs" aria-label="页签" role="tablist">
-      <button class="tab" type="button" role="tab" id="tab-process" aria-controls="view-process" data-view="process">过程</button>
-      <button class="tab" type="button" role="tab" id="tab-evidence" aria-controls="view-evidence" data-view="evidence">证据</button>
-      <button class="tab" type="button" role="tab" id="tab-audit" aria-controls="view-audit" data-view="audit">规则与审计</button>
-      <button class="tab" type="button" role="tab" id="tab-usage" aria-controls="view-usage" data-view="usage">用量与耗时</button>
-      <button class="tab" type="button" role="tab" id="tab-events" aria-controls="view-events" data-view="events">原始事件</button>
+      <button class="tab" type="button" role="tab" id="tab-process" aria-controls="view-process" data-view="process"><span class="tab-label">过程</span><span class="tab-eyebrow">WHY</span></button>
+      <button class="tab" type="button" role="tab" id="tab-evidence" aria-controls="view-evidence" data-view="evidence"><span class="tab-label">证据</span><span class="tab-eyebrow">TRACE</span></button>
+      <button class="tab" type="button" role="tab" id="tab-audit" aria-controls="view-audit" data-view="audit"><span class="tab-label">规则与审计</span><span class="tab-eyebrow">RULES</span></button>
+      <button class="tab" type="button" role="tab" id="tab-usage" aria-controls="view-usage" data-view="usage"><span class="tab-label">用量与耗时</span><span class="tab-eyebrow">USAGE</span></button>
+      <button class="tab" type="button" role="tab" id="tab-events" aria-controls="view-events" data-view="events"><span class="tab-label">原始事件</span><span class="tab-eyebrow">EVENTS</span></button>
     </div>
 
     <section class="card view" id="view-process" role="tabpanel" aria-labelledby="tab-process" tabindex="0" hidden></section>
@@ -148,7 +181,37 @@
   <div id="history-body" class="muted">（加载中）</div>
 </section>
 
-<aside id="detail" hidden role="dialog" aria-label="事件详情"></aside>
+<!-- 抽屉（WP56 照原型：遮罩 + 抬头放对象类型与标题，返回/关闭是图标键；内容在 drawer-body） -->
+<div id="drawer-scrim" hidden></div>
+<aside id="detail" hidden role="dialog" aria-label="事件详情">
+  <div class="drawer-head">
+    <div><p class="eyebrow" id="detail-type"></p><h2 id="detail-title"></h2></div>
+    <div class="drawer-head-actions">
+      <button class="icon-btn" id="detail-back" type="button" aria-label="返回上一对象" hidden><svg class="od-icon" aria-hidden="true"><use href="#i-arrow-left"/></svg></button>
+      <button class="icon-btn" id="detail-close" type="button" aria-label="关闭详情"><svg class="od-icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+  </div>
+  <div class="drawer-body" id="detail-body"></div>
+</aside>
+
+<!-- 取消运行的确认层（WP56 照原型的 modal：写清在飞调用不记用量、可续跑） -->
+<dialog id="cancel-dialog" class="modal" aria-labelledby="cancel-title">
+  <div class="modal-head">
+    <div><p class="eyebrow">Cancel run</p><h2 id="cancel-title">取消这次分析？</h2></div>
+    <button class="icon-btn" id="cancel-close" type="button" aria-label="关闭"><svg class="od-icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="modal-body">
+    <p>已完成的角色产出和事件都会保留；运行保持未完成，之后可以从最近的完成段续跑。</p>
+    <div class="cancel-cost"><span id="cancel-cost-label">截至目前的已发生用量</span><strong id="cancel-cost">—</strong></div>
+    <p class="small muted">正在进行的这一次模型调用，用量不会记入任何文件。取消以系统回报为准。</p>
+  </div>
+  <div class="modal-actions">
+    <button class="ctl" id="cancel-keep" type="button">继续观察</button>
+    <button class="ctl warn" id="cancel-confirm" type="button">确认取消运行</button>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script type="application/json" id="embedded">null</script>
 <script>
@@ -156,7 +219,8 @@
    页面自己折叠黑板，只做展示。它显示的每个价格、价位、比率与规则数值都是事件里现成的值；
    唯一的求和是模型用量（token 与调用成本）的累计。运行数据一律作为文本插入。
    源文件拆在 assets/css/ 与 assets/js/（BLUEPRINT 20.9），这里由 app/replay_html.py 拼装。
-   WP54 起页面分三屏（空状态 / 新建分析 / 工作台），照主人的 OpenDesign 原型。 */
+   WP54 起页面分三屏（空状态 / 新建分析 / 工作台），照主人的 OpenDesign 原型；
+   WP56 起视觉元素严格照原型：图标库、页头解剖、取消模态、抽屉抬头、原型比例。 */
 (() => {
 "use strict";
 /*@@js*/

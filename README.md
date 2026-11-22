@@ -142,7 +142,7 @@ From [docs/EVALUATION.md](docs/EVALUATION.md). Every number comes from a command
 | Version 2.2/2.3 cells on a real model (`eval v22`, run 2026-11-20) | Pilot plus 9 cells, all archived with `trace.jsonl`: 8 delivered, 1 `review` (contested, model variance); 0.3174 USD of the 2 USD cap |
 | Parallel against serial, from the traces | The five-analyst group in the all-on run overlapped: call durations sum to 48.0 s, the group spans 13.7 s |
 | Replay of every archived journal | 53 of 53 identical (`一致`); `verify` passes on 53 of 53 |
-| Tests | 915 passed with Node present; without Node the 2 page-Node tests skip (913 passed, 2 skipped) |
+| Tests | 933 passed with Node present; without Node the 2 page-Node tests skip (931 passed, 2 skipped) |
 
 No live endpoint of the new sources (news feeds, StockTwits, Reddit, FRED, Polymarket) has been fetched yet: their adapters are tested offline against hand-built fixtures, and each live request is asked for first.
 
@@ -196,7 +196,7 @@ The main ones. The full list is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#1
 | `uv run insightcrew check` | Settings without the key, and what the configured models accept |
 | `uv run insightcrew fetch AAPL 0700.HK` | Downloads real daily bars and, after them, v2.1 evidence (US from SEC EDGAR when `IC_SEC_CONTACT` is set, HK announcements from Eastmoney). Version 2.2 kinds are separate flags, off by default: `--news`, `--social`, `--macro` (needs `IC_FRED_API_KEY`), `--markets` (Polymarket). Each live request is asked for first |
 | `scripts/check.sh` | One command for the whole proof: the three checks, every scenario, a replay sweep of every archived journal, and `eval all`. This is what was actually run; the CI workflow file (`.github/workflows/ci.yml`) has **never been pushed and never run** |
-| `uv run pytest` | 915 tests with Node present (without Node, the 2 page-Node tests skip). No network, no key |
+| `uv run pytest` | 933 tests with Node present (without Node, the 2 page-Node tests skip). No network, no key |
 
 **Without uv.** `python3 -m venv .venv`, then `.venv/bin/pip install -e .`, then `.venv/bin/insightcrew serve` (on Windows, `.venv\Scripts\`). This needs Python 3.12 or later and ignores `uv.lock`, so the package versions may differ from the ones tested. It was tried on Python 3.15.2, where pip chose newer minor versions, and the offline demo ran. The test tools are not installed this way.
 

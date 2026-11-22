@@ -110,23 +110,22 @@ function auRoundCards(model) {
 /* ---------- 规则与审计页签 ---------- */
 
 function auRuleTable(model, delivered) {
+  /* WP56 照原型的 .rule-item 行：代码列 + 名称/细节 + 结果 + chevron；
+     公式、界限、计算值与说明收进细节行（内容不少，形态照原型） */
   const rows = auRuleRows(model, delivered);
-  const header = delivered ? ["规则", "公式", "界限", "计算值", "结论", "说明"]
-                           : ["规则", "界限", "计算值", "结论", "说明"];   // 公式只进已交付的运行
-  return table(header, rows.map((row) => {
+  return el("div", { class: "rule-list" }, rows.map((row) => {
     const [text, cls] = AU_STATUS[row.status] || [row.status, ""];
-    const cells = delivered ? [
-      [el("div", null, row.label), el("div", { class: "mono muted" }, row.key)],
-      row.formula,
-    ] : [
-      [el("div", null, row.label), el("div", { class: "mono muted" }, row.key)],
-    ];
-    cells.push(row.limit === null ? "—" : num(row.limit),
-               row.actual === null ? "—" : num(row.actual),
-               el("span", { class: cls }, text),
-               row.message);
-    return cells;
-  }), delivered ? [2, 3] : [1, 2]);
+    const detail = [delivered && row.formula ? "公式 " + row.formula : "",
+      "界限 " + (row.limit === null ? "—" : num(row.limit)),
+      "计算值 " + (row.actual === null ? "—" : num(row.actual)), row.message]
+      .filter(Boolean).join(" · ");
+    return el("div", { class: "rule-item" },
+      el("span", { class: "rule-code" }, row.key),
+      el("span", { class: "rule-copy" }, el("strong", null, row.label),
+        detail ? el("small", null, detail) : null),
+      el("span", { class: "rule-result " + (cls || "neutral") }, text),
+      icon("chevron-right"));
+  }));
 }
 
 function auFindingsList(findings) {
@@ -179,23 +178,28 @@ function renderAudit(model, box) {
       "交易员的每一版方案都由独立审计检查过；被否决的版本不是结论。按顺序列出每一轮的发现、流程的去向与修正它的那一版。"));
     const currency = (board["ledger/instrument"] || {}).currency || "";
     for (const card of cards) {
-      const head = [el("b", null, "第 " + card.version + " 版方案"),
-        el("span", { class: "mono muted" }, "#" + card.seq),
-        el("span", { class: "rnd-line" }, auProposalLine(card.proposal, currency))];
-      if (!card.checked) {
-        head.push(el("span", { class: "na" }, "未检查"));
-      } else if (card.pass) {
-        head.push(el("span", { class: "pass" }, "审计通过"));
-      } else {
-        head.push(el("span", { class: "fail" }, "发现 " + card.findings.length + " 个问题"));
-      }
+      /* WP56 照原型的 .audit-block：头带按判定着色（通过绿调 / 否决红调 / 未检查中性），
+         stamp 在右侧；正文是发现、去向与修正它的那一版 */
+      const stamp = !card.checked ? "未检查"
+        : card.pass ? "审计通过" : "发现 " + card.findings.length + " 个问题";
+      const cls = !card.checked ? "" : card.pass ? "audit-passed" : "audit-rejected";
       const body = [];
       if (!card.checked) body.push(el("p", { class: "note" }, "这一版还没有被审计检查：运行在审计之前结束或仍在途中。"));
       if (card.findings.length) body.push(auFindingsList(card.findings));
       if (card.routeText) body.push(el("p", { class: "note" }, card.routeText));
       if (!card.pass && card.fixedBy) body.push(el("p", { class: "note" }, card.fixedBy));
       if (card.finalPass) body.push(el("p", { class: "note" }, "这一版就是交付的方案。"));
-      kids.push(el("div", { class: "rnd" }, el("div", { class: "rnd-head" }, ...head), ...body));
+      kids.push(el("section", { class: "audit-block " + cls },
+        el("div", { class: "audit-header" },
+          el("div", { class: "audit-title" },
+            el("span", { class: "audit-icon" },
+              icon(card.finalPass || (card.checked && card.pass) ? "shield" : card.checked ? "alert" : "clock")),
+            el("div", null,
+              el("span", { class: "eyebrow" }, "INDEPENDENT AUDIT"),
+              el("h3", null, "第 " + card.version + " 版方案"),
+              el("p", null, auProposalLine(card.proposal, currency) + " · #" + card.seq))),
+          el("span", { class: "audit-stamp " + (card.checked ? (card.pass ? "pass" : "fail") : "na") }, stamp)),
+        el("div", { class: "audit-body" }, body)));
     }
   }
   fill(box, kids);

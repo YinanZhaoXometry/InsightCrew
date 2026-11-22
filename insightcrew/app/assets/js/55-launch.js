@@ -116,9 +116,9 @@ function buildSetup() {
         lab("组合文件", el("select", { id: "f-portfolio" }),
             el("span", { class: "field-error", id: "err-portfolio" })))),
     el("div", { class: "form-foot" },
-      el("span", { class: "muted", id: "mode-note" }, ""),
+      el("span", { class: "muted", id: "mode-note" }, "启动前不会调用模型，也不会产生费用。"),
       el("span", { class: "form-foot-btns" },
-        el("button", { class: "ctl", type: "button", id: "btn-estimate" }, "查看花费预估"),
+        el("button", { class: "ctl", type: "button", id: "btn-estimate" }, "查看花费预估", icon("arrow-right")),
         el("button", { class: "primary", type: "submit", id: "btn-start" }, "开始"))));
   fill(host, form,
     el("p", { class: "note", id: "scenario-note", hidden: true }),
@@ -239,14 +239,19 @@ function markEstimateStale() {
   updateStartButton();
 }
 
+function setEstimateButton(label) {                  /* 键上带箭头图标（原型），重画时一起填 */
+  const button = $("btn-estimate");
+  if (button) { fill(button, label, icon("arrow-right")); }
+}
+
 async function refreshPlan() {
   if (!planAvailable || !state.meta) return;
   const button = $("btn-estimate");
-  if (button) { button.disabled = true; button.textContent = "预估中……"; }
+  if (button) { button.disabled = true; setEstimateButton("预估中……"); }
   const seq = planSeq += 1;
   const { status, data } = await getJSON("/api/plan",
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formBody(snapshot())) });
-  if (button) { button.disabled = false; button.textContent = "查看花费预估"; }
+  if (button) { button.disabled = false; setEstimateButton("查看花费预估"); }
   if (seq !== planSeq || !state.meta) return;          /* 过期的回复：表单又改过了 */
   if (status === 404) {                                /* 服务端没有这个接口：预估一步收起，直接开始 */
     planAvailable = false; estimateReady = false;
@@ -300,7 +305,7 @@ function renderEstimate(rows) {
       el("div", { class: "est-card" }, el("span", null, "token 上限"),
         el("b", { class: "mono" }, rows.runTokens ? count(rows.runTokens) : "不设"),
         el("small", null, "整个运行")),
-      el("div", { class: "est-card" }, el("span", null, "成本上限"),
+      el("div", { class: "est-card est-cost" }, el("span", null, "成本上限"),
         el("b", { class: "mono" }, rows.runCost !== null && rows.runCost !== undefined ? num(rows.runCost, 6) : "不设"),
         el("small", null, "USD"))),
     el("div", { class: "plan-strip" }, chips)];
@@ -420,9 +425,10 @@ async function loadHistory() {
       el("span", { class: "hist-mode muted" }, MODE_TEXT[run.mode] || run.mode),
       el("span", { class: "pill st-" + (run.status === "delivered" ? "delivered" : run.status === "review" ? "review" : "interrupted") },
         STATUS_TEXT[run.status] || run.status),
-      el("span", { class: "hist-why muted" }, run.reason && run.reason !== "ok" ? reasonText(run.reason) : "")),
-    run.resumable ? el("button", { class: "ctl hist-resume", type: "button",
-      on: { click: () => resumeRun(run.run_id) } }, "续跑") : null)));
+      el("span", { class: "hist-why muted" }, run.reason && run.reason !== "ok" ? approvalReasonText(run.reason) : ""),
+      el("span", { class: "hist-chev" }, icon("chevron-right"))),
+    run.resumable ? el("button", { class: "ctl small hist-resume", type: "button",
+      on: { click: () => resumeRun(run.run_id) } }, icon("play"), "续跑") : null)));
 }
 
 /* 实时模式才重排表单：静态 replay.html 的 setup 屏整个隐藏，不进来 */

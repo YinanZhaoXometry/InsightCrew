@@ -1,31 +1,69 @@
-/* 50-usage.css —— 用量与耗时：上限进度条与轨迹瀑布（WP49；WP53 起 kraken 渐变与发光）。 */
-.meter { height:7px; border-radius:4px; background:var(--lane); border:1px solid var(--line); overflow:hidden; }
+/* 50-usage.css —— 用量与耗时：汇总四卡、上限进度条与轨迹瀑布（WP49 起；WP56 照原型：
+   .cost-summary 四张统计卡、budget-bar 式进度条、瀑布是原型 .waterfall 的几何——
+   角色名两行、31px 轨道、渐变横杠内嵌时长、图例的渐变条与记号线）。 */
+
+/* 顶上的四张汇总卡（原型的 .cost-summary：1.3fr + 3×1fr） */
+.cost-summary { display:grid; grid-template-columns:1.3fr repeat(3, 1fr); gap:var(--sp-3);
+                margin:var(--sp-3) 0 var(--sp-4); }
+.cost-stat { padding:var(--sp-4); border:1px solid var(--line); border-radius:var(--radius-s);
+             background:var(--lane); display:grid; gap:3px; }
+.cost-stat span { display:block; color:var(--muted); font-size:var(--fs-1); }
+.cost-stat strong { display:block; margin-top:4px; font-family:var(--mono); font-size:var(--fs-5);
+                    font-variant-numeric:tabular-nums; line-height:1.35; white-space:nowrap; color:var(--ink); }
+.cost-stat small { display:block; margin-top:4px; color:var(--faint); font-size:10px; }
+@media (max-width:900px) { .cost-summary { grid-template-columns:1fr 1fr; } }
+@media (max-width:680px) { .cost-summary { grid-template-columns:1fr; } }
+
+/* 上限进度条（原型的 .budget-bar：7px 圆角轨 + 渐变填充） */
+.meter { height:7px; border-radius:4px; background:var(--surface-warm); border:1px solid var(--line); overflow:hidden; }
 .meter i { display:block; width:0; height:100%; background:var(--grad-brand); }   /* 未测量时不画满：宽度只由数值给出 */
 .meter.over i { background:var(--bad); }
 
 /* 与上限的比较：标签 · 进度条 · 数值 */
 .limits { margin-top:4px; }
-.limit-row { display:grid; grid-template-columns:96px 1fr max-content; gap:10px; align-items:center; margin:7px 0; }
-.limit-row .lab { font-size:12.5px; color:var(--soft); }
-.limit-row .val { font-size:12px; color:var(--soft); font-variant-numeric:tabular-nums; white-space:nowrap; font-family:var(--mono); }
+.limit-row { display:grid; grid-template-columns:110px 1fr max-content; gap:10px; align-items:center; margin:7px 0; }
+.limit-row .lab { font-size:var(--fs-2); color:var(--soft); }
+.limit-row .val { font-size:var(--fs-1); color:var(--soft); font-variant-numeric:tabular-nums;
+                  white-space:nowrap; font-family:var(--mono); }
+
+/* 图例（原型的 .waterfall-legend） */
+.wf-legend { display:flex; flex-wrap:wrap; gap:12px; color:var(--muted); font-size:10px;
+             margin:0 0 var(--sp-2); }
+.wf-legend span { display:inline-flex; align-items:center; gap:5px; }
+.legend-bar { display:inline-block; width:18px; height:7px; border-radius:2px; background:var(--grad-brand); }
+.legend-open { display:inline-block; width:18px; height:7px; border-radius:2px; background:var(--warn-bg);
+               border:1px dashed var(--warn); }
+.legend-mark { display:inline-block; width:0; height:10px; border-left:2px dashed var(--code); }
 
 /* 调用瀑布：一个角色一行，一次调用一条横杠；竖线是续跑与取消的记号 */
-.wf { --wf-name:132px; --wf-gap:10px; margin-top:6px; }
+.wf { --wf-name:132px; --wf-gap:12px; margin-top:6px; padding:var(--sp-4); border:1px solid var(--line);
+      border-radius:var(--radius-s); background:var(--lane); }
 .wf-axis { display:grid; grid-template-columns:var(--wf-name) 1fr; gap:var(--wf-gap); margin-bottom:4px; }
-.wf-axis .ticks { position:relative; height:15px; font-size:10.5px; color:var(--muted);
-                  font-variant-numeric:tabular-nums; }
+.wf-axis .ticks { position:relative; height:15px; font-size:10px; color:var(--faint);
+                  font-variant-numeric:tabular-nums; font-family:var(--mono); }
 .wf-axis .ticks span { position:absolute; transform:translateX(-50%); white-space:nowrap; }
 .wf-axis .ticks span:first-child { transform:none; }
 .wf-axis .ticks span:last-child { transform:translateX(-100%); }
 .wf-rows { position:relative; display:grid; gap:4px; }
-.wf-row { display:grid; grid-template-columns:var(--wf-name) 1fr; gap:var(--wf-gap); align-items:center; }
-.wf-name { font-size:12px; color:var(--soft); text-align:right; white-space:nowrap;
-           overflow:hidden; text-overflow:ellipsis; }
-.wf-track { position:relative; height:18px; background:var(--lane); border:1px solid var(--line); border-radius:var(--radius-s); }
-.wf-bar { position:absolute; top:2px; bottom:2px; min-width:3px; border-radius:3px; background:var(--grad-brand);
-          box-shadow:0 2px 8px rgba(113,50,245,.25); }
+.wf-row { display:grid; grid-template-columns:var(--wf-name) 1fr; gap:var(--wf-gap); align-items:center;
+          min-height:36px; }
+.wf-name { min-width:0; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wf-name strong { display:block; font-size:var(--fs-1); font-weight:600; color:var(--soft);
+                  overflow:hidden; text-overflow:ellipsis; }
+.wf-name small { display:block; margin-top:1px; color:var(--muted); font-family:var(--mono); font-size:9px;
+                 overflow:hidden; text-overflow:ellipsis; }
+.wf-track { position:relative; height:31px; background:var(--surface-warm); border:1px solid var(--line);
+            border-radius:var(--radius-s); }
+.wf-bar { position:absolute; top:3px; bottom:3px; min-width:3px; border-radius:4px; background:var(--grad-brand);
+          border:1px solid rgba(125,92,255,.28); box-shadow:0 4px 14px rgba(113,50,245,.14);
+          overflow:hidden; }
+.wf-bar b { position:absolute; inset:0; display:flex; align-items:center; padding:0 6px; font-weight:500;
+            font-family:var(--mono); font-size:9px; font-style:normal; color:#fff; white-space:nowrap;
+            overflow:hidden; text-overflow:ellipsis; }
 .wf-bar.bad { background:var(--bad); }
-.wf-bar.open { background:var(--warn-bg); border:1px dashed var(--warn); }
+.wf-bar.bad b { color:#fff; }
+.wf-bar.open { background:var(--warn-bg); border:1px dashed var(--warn); box-shadow:none; }
+.wf-bar.open b { color:var(--warn); }
 .wf-marks { position:absolute; left:calc(var(--wf-name) + var(--wf-gap)); right:0; top:0; bottom:0; }
 .wf-mark { position:absolute; top:0; bottom:0; width:0; border-left:2px dashed var(--code); }
 .wf-mark.cancelled { border-left-color:var(--bad); }
@@ -33,3 +71,7 @@
              color:var(--code); background:var(--card); padding:0 3px; border-radius:4px;
              border:1px solid var(--line); white-space:nowrap; }
 .wf-mark.cancelled b { color:var(--bad); }
+@media (max-width:680px) {
+  .wf { --wf-name:86px; --wf-gap:8px; padding:10px; }
+  .wf-bar b { display:none; }
+}

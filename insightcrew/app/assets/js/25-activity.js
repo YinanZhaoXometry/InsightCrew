@@ -108,6 +108,7 @@ function activityRoles(spans, nowMs) {
 
 function renderRunState(model) {
   const pill = $("run-state");
+  cancelModel = model;                               /* 取消确认层用它写「截至目前的用量」 */
   if (!model.started && !state.runId) { pill.hidden = true; return; }
   pill.hidden = false;
   /* 流已经收尾、日志里却没有 run.finished：实时页上这是一次中断，不是「进行中」（模型层的 live 只说页面由服务提供） */
@@ -137,22 +138,23 @@ function renderPipeline(model) {
   const board = model.board;
   const started = model.started;
   const parallel = started && started.flow && started.flow.parallel !== false;
-  /* WP55：圆形节点（照原型）——点里是状态记号（✓/↺n/✕/—/序号），名字与状态词在下方，不只靠颜色 */
+  /* WP56：照原型的 .stage 列解剖——rail 连接线 + 32px 圆节点（完成 ✓、未完成 ✕、跳过 —、
+     被打回 ↺n、其余序号），名字与状态词在下方，不只靠颜色 */
   const node = (key) => {
     const entry = STAGES.find(([k]) => k === key);
     const st = stageState(info, key);
     const cls = st === "sentback" ? "revised" : st;
     let mark = String(STAGES.findIndex(([k]) => k === key) + 1).padStart(2, "0");
-    if (st === "done") mark = "✓";
+    if (st === "done") mark = icon("check");
     else if (st === "sentback") mark = "↺" + info.redo[key];
-    else if (st === "halted") mark = "✕";
-    else if (st === "skipped") mark = "—";
+    else if (st === "halted") mark = icon("x");
+    else if (st === "skipped") mark = icon("minus");
     let title = entry[2] === "model" ? "由模型完成" : "由代码完成";
     if (st === "sentback") title = "被打回 " + info.redo[key] + " 次后重跑完成（" + title + "）";
     if (st === "skipped") title = "跳过：通道不可用" + (info.channels[key] && info.channels[key].reason ? "（" + info.channels[key].reason + "）" : "");
     if (st === "halted") title = "运行在这里停下（" + title + "）";
     return el("span", { class: "pnode st-" + cls, title },
-      el("span", { class: "pnode-dot" }, mark),
+      el("span", { class: "pnode-rail" }, el("span", { class: "pnode-dot" }, mark)),
       el("b", { class: "pnode-name" }, entry[1]),
       el("span", { class: "pnode-line" },
         el("span", { class: "st" }, STAGE_WORD[st] || st),
@@ -245,7 +247,7 @@ function hookTrace() {
 
 /* ---------- 页头的取消、续跑与导出 ---------- */
 
-let cancelPending = false, resumePending = false, noteRun = "";
+let cancelPending = false, resumePending = false, noteRun = "", cancelModel = null;
 const exportProbe = new Map();                          /* runId → { report, replay, asked } */
 
 function runNote(text) {
@@ -259,13 +261,13 @@ function buildRunControls() {
   if (!host || !$("run-state")) return;
   host.append(el("span", { class: "runctl" },
     el("button", { class: "ctl warn", type: "button", id: "btn-cancel", hidden: true,
-                   on: { click: cancelRun } }, "取消"),
+                   on: { click: cancelRun } }, icon("square"), "取消"),
     el("button", { class: "ctl", type: "button", id: "btn-resume", hidden: true,
-                   on: { click: () => resumeRun(state.runId) } }, "续跑"),
+                   on: { click: () => resumeRun(state.runId) } }, icon("play"), "续跑"),
     el("span", { class: "runctl-note", id: "runctl-note" })));
   if (actions) actions.append(el("span", { class: "runctl" },
-    el("a", { class: "ctl", id: "export-report", hidden: true }, "导出报告"),
-    el("a", { class: "ctl", id: "export-replay", hidden: true }, "导出回放")));
+    el("a", { class: "ctl", id: "export-report", hidden: true }, icon("download"), "导出报告"),
+    el("a", { class: "ctl", id: "export-replay", hidden: true }, icon("history"), "导出回放")));
   setInterval(() => {                                   /* 计时器每秒走一格 */
     if (state.live && state.runId && !state.ended) requestRender();
   }, 1000);
@@ -309,9 +311,22 @@ function exportLinks(runId) {
   return entry;
 }
 
-async function cancelRun() {
+function cancelRun() {
+  /* 取消先过确认层（WP56 照原型的 modal：写清在飞调用不记用量、可续跑）；确认才发请求 */
   if (cancelPending || !state.runId) return;
-  if (!window.confirm("确定取消这次运行吗？\n正在进行的这一次模型调用的用量不会记入任何文件；运行保持未完成，可以续跑。")) return;
+  const dialog = $("cancel-dialog");
+  if (!dialog || typeof dialog.showModal !== "function") { void requestCancel(); return; }
+  const cost = $("cancel-cost");
+  if (cost && cancelModel) {
+    const total = runElapsed(cancelModel.events, state.live && !state.ended ? Date.now() : null);
+    const calls = cancelModel.events.filter((e) => e.type === "model.called").length;
+    cost.textContent = (total !== null ? elapsedText(total) : "—") + " · 模型调用 " + calls + " 次";
+  }
+  dialog.showModal();
+}
+
+async function requestCancel() {
+  if (cancelPending || !state.runId) return;
   cancelPending = true; runNote(""); requestRender();
   const runId = state.runId;
   let reply;
@@ -339,6 +354,14 @@ async function resumeRun(runId) {
   else if (reply.status === 404) runNote("这个服务还没有续跑接口（等 WP45 的服务端）。");
   else runNote("续跑没有成功（HTTP " + reply.status + "）。");
   requestRender(); loadHistory();
+}
+
+/* 取消确认层的三个键（WP56）：确认才发请求，关闭与「继续观察」只收层 */
+if (typeof document !== "undefined" && $("cancel-dialog")) {
+  const dialog = $("cancel-dialog");
+  $("cancel-close").addEventListener("click", () => dialog.close());
+  $("cancel-keep").addEventListener("click", () => dialog.close());
+  $("cancel-confirm").addEventListener("click", () => { dialog.close(); void requestCancel(); });
 }
 
 /* 实时模式才有页头控制：静态 replay.html（事件嵌在页面里）没有服务，一个都不画 */

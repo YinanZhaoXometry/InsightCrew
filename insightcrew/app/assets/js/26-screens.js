@@ -15,7 +15,16 @@ function showScreen(name) {
   const button = $("btn-new");
   if (button) button.hidden = !state.live || name === "setup";
   const back = $("btn-back-work");
-  if (back) back.textContent = state.runId ? "返回工作台" : "返回首页";
+  if (back) fill(back, icon("arrow-left"), state.runId ? "返回工作台" : "返回首页");
+  /* 预估面板的空态（原型的 .estimate-empty）：还没预估过就先说明两步预估怎么走 */
+  const estimate = $("estimate");
+  if (name === "setup" && estimate && typeof estimateReady !== "undefined"
+      && !estimateReady && !estimate.querySelector(".est-cards")) {
+    estimate.hidden = false;
+    estimate.classList.remove("stale");
+    fill(estimate, el("div", { class: "estimate-empty" }, icon("file"),
+      el("p", null, "先看花费预估：在左侧选好标的与日期，点「查看花费预估」，这里会给出将运行的阶段、典型调用与数据覆盖；确认后才启动。")));
+  }
   requestRender();
 }
 
