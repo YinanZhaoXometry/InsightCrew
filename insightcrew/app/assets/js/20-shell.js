@@ -65,7 +65,11 @@ function render() {
   if (banner.dataset.key !== bannerKey) {        // 只在内容变了才重画：role=alert 每次重画都会再播报一遍
     banner.dataset.key = bannerKey;
     fill(banner, state.error ? [
-      "这次运行没有正常结束：" + state.error + "。这是程序的问题，不是分析结论。",
+      state.endStatus === "interrupted"
+        // 中断的运行（取消、截断的日志）不是程序错误：工作台里已有「已中断」卡与续跑入口，
+        // 横幅只解释发生了什么、指向下一步（WP57：原文「这是程序的问题」对正常中断是错怪）。
+        ? "这次运行没有跑完（" + state.error + "）。已完成的阶段仍可查看；中断的运行可以从「过去的运行」里续跑。"
+        : "这次运行没有正常结束：" + state.error + "。",
       state.live && state.runId
         ? el("button", { class: "ctl banner-retry", type: "button", on: { click: () => openRun(state.runId, false) } }, "重试")
         : null] : []);

@@ -9,6 +9,7 @@ const state = {
   shown: 0,           // 已揭示的条数：回放的位置
   ended: true,        // 事件是否已经到齐
   error: null,        // 事件流以 error 收尾时的说明
+  endStatus: "",      // 收尾消息的 status：finished / interrupted（中断与程序错误分开说，WP57）
   trace: [],          // 耗时轨迹（静态模式嵌在页面里；实时模式等事件流送上，WP45）
   bars: null, currency: "", barsAsked: false,
   playing: false, speed: "normal", timer: null,
@@ -42,8 +43,9 @@ function resetRun(runId) {
   if (state.source) state.source.close();
   clearTimeout(state.timer);
   streamNote("");
-  Object.assign(state, { runId, events: [], shown: 0, ended: !runId, error: null, trace: [], bars: null, currency: "",
-                         barsAsked: false, playing: false, source: null, selected: 0, cited: "", follow: true });
+  Object.assign(state, { runId, events: [], shown: 0, ended: !runId, error: null, endStatus: "", trace: [], bars: null,
+                         currency: "", barsAsked: false, playing: false, source: null, selected: 0, cited: "",
+                         follow: true });
 }
 
 function openRun(runId, watch) {
@@ -73,7 +75,9 @@ function openRun(runId, watch) {
     source.close();
     streamNote("");
     state.ended = true;
-    state.error = JSON.parse(message.data).error;
+    const end = JSON.parse(message.data);
+    state.error = end.error;
+    state.endStatus = end.status || "";
     if (state.playing && state.speed === "instant") { state.shown = state.events.length; state.playing = false; }
     requestRender();
     loadHistory();

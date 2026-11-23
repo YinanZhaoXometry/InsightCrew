@@ -5,6 +5,7 @@
 #view-process h2 { font-size:var(--fs-5); }
 #view-process h3 { margin:var(--sp-6) 0 var(--sp-3); }
 #view-process h4.psub { margin:14px 0 6px; }
+.proc-toggle { display:flex; gap:var(--sp-2); margin-top:var(--sp-2); }
 .solo { display:block; }
 .pcol { display:flex; flex-direction:column; gap:12px; min-width:0; }
 
@@ -33,6 +34,10 @@
 .phead .step { color:var(--muted); font-size:var(--fs-1); }
 .phead .meta-bit { color:var(--muted); font-size:var(--fs-1); }
 .phead .old-tag { color:var(--warn); }
+/* 折叠时的摘要行：占满第二行，超长省略（WP57：收起的卡片仍可扫读） */
+.pdigest { flex-basis:100%; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+           color:var(--soft); font-size:var(--fs-2); }
+.pcard[open] .pdigest { color:var(--muted); }
 .pcard .ctl.raw { flex:none; }
 .pbody { padding:14px 16px; }
 .pbody > * { margin:0; }

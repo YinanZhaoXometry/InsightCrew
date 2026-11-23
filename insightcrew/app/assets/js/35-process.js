@@ -183,6 +183,34 @@ function chipsOf(ids) {
   return el("span", { class: "chips" }, ids.map((id) => cite(id)));
 }
 
+function turnDigest(turn) {
+  /* 折叠时的一行摘要：让收起的卡片仍可扫读（WP57 主人的「文字墙」修订）。取产物里最
+     能代表这次出场的一句话：交易员/主管给动作与关键值，评审给判定，其余取第一条论断
+     或叙述。只挑现成的值，不计算事实。 */
+  if (turn.failed || !turn.call || turn.call.output === null || turn.call.output === undefined) return "";
+  const out = turn.call.output;
+  if (out.action !== undefined)
+    return "操作 " + (out.action || "—") + " · 入场 " + fieldText("entry", out.entry, "")
+      + " · 仓位 " + fieldText("size_pct", out.size_pct, "");
+  if (out.rating !== undefined)
+    return "评级 " + (out.rating || "—") + " · 持有 "
+      + (out.horizon_days === undefined ? "—" : out.horizon_days) + " 个交易日";
+  if (out.accept !== undefined) {
+    const target = JUDGE_TARGET_TEXT[out.target] === undefined ? (out.target || "") : JUDGE_TARGET_TEXT[out.target];
+    return (out.accept ? "接受" : "反对") + (target ? "（问题出在" + target + "）" : "");
+  }
+  if (out.size_pct !== undefined || out.stop !== undefined || out.target !== undefined)
+    return "建议：仓位 " + (out.size_pct === null || out.size_pct === undefined ? "不改动" : fieldText("size_pct", out.size_pct, ""))
+      + "，止损 " + (out.stop === null || out.stop === undefined ? "不改动" : fieldText("stop", out.stop, ""))
+      + "，目标 " + (out.target === null || out.target === undefined ? "不改动" : fieldText("target", out.target, ""));
+  const first = (out.points && out.points[0] && out.points[0].text)
+    || (out.claims && out.claims[0] && (out.claims[0].reading || out.claims[0].fact))
+    || (out.signals && out.signals[0] && (out.signals[0].reading || out.signals[0].item))
+    || out.narrative || out.critique || "";
+  const text = String(first).replace(/\s+/g, " ").trim();
+  return text.length > 56 ? text.slice(0, 56) + "…" : text;
+}
+
 function turnMeta(turn) {
   /* 卡片头：角色标签 · 步号 · 模型 · 耗时（轨迹里有才显示）· token */
   const call = turn.call;
@@ -201,12 +229,16 @@ function turnMeta(turn) {
   ];
 }
 
-function processCard(turn, body) {
-  /* 一张卡片 = 一次出场。被取代的旧版本默认折叠（details 不带 open）；每张都有
-     「查看提示词与原始回复」，点开就是原始事件页签里今天那个事件详情抽屉。 */
+function processCard(turn, body, defaultOpen) {
+  /* 一张卡片 = 一次出场。默认折叠，只给一行摘要（WP57：交付后不该是一面文字墙；
+     设计说明的读法也是「仅展开当前活跃角色」）；运行中活跃角色的最新出场由调用方
+     指定展开。被取代的旧版本永远折叠。每张都有「查看提示词与原始回复」，点开就是
+     原始事件页签里今天那个事件详情抽屉。 */
+  const digest = turnDigest(turn);
   const kids = [el("summary", null,
     el("span", { class: "phead" }, el("span", { class: "role-avatar" }, laneName(turn.actor).slice(0, 1)),
-      turnMeta(turn)),
+      turnMeta(turn),
+      digest ? el("span", { class: "pdigest" }, digest) : null),
     el("button", { class: "ctl raw small", type: "button", title: "打开事件抽屉：这次调用的提示词与原始回复",
                    on: { click: (ev) => { ev.preventDefault(); ev.stopPropagation(); openDetail(turn.seq); } } },
       "查看提示词与原始回复"))];
@@ -221,8 +253,9 @@ function processCard(turn, body) {
   } else {
     kids.push(el("div", { class: "pbody" }, body));
   }
+  const open = Boolean(defaultOpen) && !turn.superseded;
   return el("details", { class: "pcard" + (turn.superseded ? " old" : "") + " actor-" + turn.actor,
-                         open: turn.superseded ? null : "" }, kids);
+                         open: open ? "" : null }, kids);
 }
 
 function claimsList(claims) {
@@ -324,7 +357,7 @@ function verdictBody(turn) {
 
 /* ---------- 各节 ---------- */
 
-function sectionKids(model, turns, actors, hint) {
+function sectionKids(model, turns, actors, hint, openOf) {
   /* 一节里属于这些角色的出场，按首次出现顺序；附一句在飞行中的提示（轨迹里有开始没收尾的跨度） */
   const picked = turns.filter((t) => actors.includes(t.actor));
   if (!picked.length) return null;
@@ -335,7 +368,7 @@ function sectionKids(model, turns, actors, hint) {
   const kids = [];
   for (const actor of order)
     kids.push(el("div", { class: "pcol" },
-      picked.filter((t) => t.actor === actor).map((t) => processCard(t, bodyOf(t, model)))));
+      picked.filter((t) => t.actor === actor).map((t) => processCard(t, bodyOf(t, model), openOf && openOf(t)))));
   if (working.length) kids.push(el("p", { class: "note" }, working.join("、") + " 正在作答，结果返回后显示。"));
   if (hint) kids.push(el("p", { class: "note" }, hint));
   return kids;
@@ -395,6 +428,11 @@ function revisionsBlock(model, key, rowSpec, judgeTarget, title, currency) {
   return kids;
 }
 
+function setAllCards(box, open) {
+  /* 「全部展开 / 全部收起」：一次拨动这一页签里的所有角色卡（点下时才碰 document）。 */
+  box.querySelectorAll("details.pcard").forEach((card) => { card.open = open; });
+}
+
 function renderProcess(model, box) {
   if (!model.events.length) {
     fill(box, el("h2", null, "过程"),
@@ -402,8 +440,10 @@ function renderProcess(model, box) {
     return;
   }
   const kids = [el("h2", null, "过程"),
-    el("p", { class: "note" }, "按阶段讲述这次运行：每张卡片是一位角色的一次出场（模型、耗时与 token 都来自日志与轨迹），"
-      + "点卡片右上的「查看提示词与原始回复」可看这次调用的全部往来；被取代的旧版本默认折叠，点开即展开。")];
+    el("p", { class: "note" }, "一位角色一张卡：默认收起、只留一行摘要，点开看全部；也可用「全部展开」一次摊开。")];
+  kids.push(el("div", { class: "proc-toggle" },
+    el("button", { class: "ctl small", type: "button", on: { click: () => setAllCards(box, true) } }, "全部展开"),
+    el("button", { class: "ctl small", type: "button", on: { click: () => setAllCards(box, false) } }, "全部收起")));
   if (model.status === "running")
     kids.push(el("p", { class: "note" }, "运行进行中：以下各节随事件到齐逐步补全；正在作答的角色在流水线区有计时。"));
   if (model.status === "interrupted")
@@ -415,9 +455,14 @@ function renderProcess(model, box) {
   const turns = processTurns(model);
   const currency = (model.board["ledger/instrument"] || {}).currency || "";
   const parallel = ((model.started || {}).flow || {}).parallel !== false;
+  /* 运行中只展开当前活跃角色的出场（设计说明的读法）；其余一律收起。 */
+  const activeActors = new Set(model.spans.filter((s) => s.end === null).map((s) => s.role));
+  const openOf = model.status === "running"
+    ? (turn) => activeActors.has(turn.actor)
+    : null;
 
   const analysts = sectionKids(model, turns, ANALYST_KEYS,
-    parallel ? null : "串行模式：几位分析师按固定顺序依次运行。");
+    parallel ? null : "串行模式：几位分析师按固定顺序依次运行。", openOf);
   if (analysts) kids.push(el("h3", null, "分析师"), el("div", { class: "par-grid" }, analysts));
 
   const debate = debateRounds(turns).filter((r) => r.bull || r.bear);
@@ -428,11 +473,13 @@ function renderProcess(model, box) {
       kids.push(el("div", { class: "de-round" },
         el("div", { class: "round-tag" }, "第 " + round.round + " 轮"),
         el("div", { class: "de-two" },
-          round.bull ? processCard(round.bull, bodyOf(round.bull, model)) : el("p", { class: "note" }, "（多方未发言）"),
-          round.bear ? processCard(round.bear, bodyOf(round.bear, model)) : el("p", { class: "note" }, "（空方未发言）"))));
+          round.bull ? processCard(round.bull, bodyOf(round.bull, model), openOf && openOf(round.bull))
+                     : el("p", { class: "note" }, "（多方未发言）"),
+          round.bear ? processCard(round.bear, bodyOf(round.bear, model), openOf && openOf(round.bear))
+                     : el("p", { class: "note" }, "（空方未发言）"))));
   }
 
-  const manager = sectionKids(model, turns, ["manager"]);
+  const manager = sectionKids(model, turns, ["manager"], null, openOf);
   if (manager) {
     kids.push(el("h3", null, "研究主管"));
     kids.push(el("div", { class: "solo" }, manager));
@@ -441,7 +488,7 @@ function renderProcess(model, box) {
     if (thesisRev) kids.push(el("div", { class: "rev" }, thesisRev));
   }
 
-  const trader = sectionKids(model, turns, ["trader"]);
+  const trader = sectionKids(model, turns, ["trader"], null, openOf);
   if (trader) {
     kids.push(el("h3", null, "交易员"));
     kids.push(el("div", { class: "solo" }, trader));
@@ -459,7 +506,7 @@ function renderProcess(model, box) {
       kids.push(el("div", { class: "de-round" },
         el("div", { class: "round-tag" }, "第 " + round.round + " 轮"),
         el("div", { class: "risk-three" },
-          round.views.map((t) => processCard(t, bodyOf(t, model))))));
+          round.views.map((t) => processCard(t, bodyOf(t, model), openOf && openOf(t))))));
     const revision = riskRevision(model, turns);
     kids.push(el("p", { class: "note" }, revision
       ? "辩论后交易员修订了方案（" + (revision.changes.length ? revision.changes.join("；") : "字段未变")
@@ -475,7 +522,7 @@ function renderProcess(model, box) {
       const round = judges[i];
       kids.push(el("div", { class: "de-round" },
         el("div", { class: "round-tag" }, "第 " + (i + 1) + " 轮"),
-        el("div", { class: "par-grid" }, round.turns.map((t) => processCard(t, bodyOf(t, model))))));
+        el("div", { class: "par-grid" }, round.turns.map((t) => processCard(t, bodyOf(t, model), openOf && openOf(t))))));
       const after = judges[i + 1] ? judges[i + 1].statusSeq : Infinity;
       const route = model.routes.filter((r) => r.seq > round.statusSeq && r.seq < after)
                                 .sort((a, b) => a.seq - b.seq)[0] || null;

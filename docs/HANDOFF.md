@@ -4,7 +4,7 @@ The status board for the rewrite described in [BLUEPRINT.md](BLUEPRINT.md). The 
 
 **Every session reads this file first, and before it ends updates [section 2](#2-status) and appends to [section 8](#8-session-log).**
 
-Last updated: 2026-11-23 00:10, by WP56 (the strict-prototype visual pass; owner-asked). Submission is 2026-11-23 23:59.
+Last updated: 2026-11-23 09:20, by the owner-asked workbench polish (process tab collapsed digests, opaque drawer entrance, status-aware interrupt banner). Submission is 2026-11-23 23:59.
 
 > **Version 2.3 is built: work packages 40 to 52, WP38 and WP39 are done** (status table below); what remains is the owner's acceptance and the open questions of section 7. Questions 38, 43, 44 and 45 were fixed on 2026-11-21 (session log). The rest of this paragraph was written before the build and is kept as history. Version 2.3 was planned and authorised as work packages 40 to 52, in [BLUEPRINT.md section 20](BLUEPRINT.md#20-version-23-hardening-run-control-and-the-workbench-page). It fixes the defects a review of version 2.2 found (five of them before WP38 spends money), adds a timing trace beside the journal, cancel and resume from the page, and rebuilds the run page around the user's questions. Start with WP40 (alone). [Section 5.6](#56-version-23-work-packages-40-to-52) says which packages run at the same time and which files each owns; [section 4](#4-what-the-owner-has-authorised) the version 2.3 authorisations. **WP38 now runs on `v2.3`, after WP41 and WP42, with a cap of 2 USD. WP39 comes last.** Version 2.2 as built stays at the tag `v2.2`, which WP40 creates.
 
@@ -2608,6 +2608,22 @@ Result: done — owner 指令「我希望所有视觉元素都严格按照 OpenD
   无头 Chrome 截图：live 空屏（页头/hero/能力卡/历史行卡齐）；静态 replay 全页（结论卡径向紫光+版本胶囊+引用片行、流水线图标节点与底缘状态色、修订对照 ▲、评审卡）；四页签经一次性副本逐张（规则 rule-item 行、审计头带红/绿着色、用量四卡+瀑布图例、证据事实表、原始事件泳道）；480px 零溢出（页签收窄藏眉标、结论卡单列）。截图存 /tmp/wp56-shots/。
   setup 屏的交互流程（两步预估/取消模态开层/抽屉往返）未能在无头浏览器点按，结构由静态测试钉住、样式与已核验组件同一套；留主人实测。
   无网络请求（uv 走本地缓存）、无真实模型、未读未打印 `.env`。文档计数 915→933 同步（README/AGENTS/EVALUATION/ROADMAP）；未提交前的改动即本行所列文件。
+
+### 2026-11-23 09:20 · 工作台走查修订（owner 走查后直接提出：过程页签文字墙、抽屉穿透、中断横幅错怪） · coordinator session (ZCode)
+
+Result: done — owner 指令「整体过一下，有些不合理的地方帮我修复掉。分析结果页面的话，我觉得那个页面太长了。这样的话，一大堆文字摆在用户面前，根本不会去看的」。先用内嵌浏览器把全部可达状态走查一遍（空屏 / 新建分析 / 两步预估 / 工作台五页签 / 引用抽屉 / 中断可续跑 / 静态回放 / 取消模态），修三处，全在页面资产，后端一行未动：
+
+1. 过程页签不再是文字墙（主诉求）：角色卡默认收起、只留一行摘要。新纯函数 `turnDigest`（35-process.js）只挑产物里现成的值：交易员给「操作/入场/仓位」、主管给「评级/持有」、评审给「接受/反对（问题出在…）」、风控给「建议…」，其余取第一条论断或叙述、截 56 字；失败与无产出的出场不给摘要。运行中只展开当前活跃角色（设计说明「阶段下方仅展开当前活跃角色」的读法），交付后全部收起；页签头加「全部展开 / 全部收起」。`processCard` 增 `defaultOpen`、`sectionKids` 增 `openOf`；35-process.css 增 `.pdigest`（摘要占满第二行、超长省略）与 `.proc-toggle`。交付 demo 实测：收起 1675px / 展开 2676px，默认视图约 −37%，9 张卡全部一行可扫读；两个总开关往返有效。
+2. 抽屉入场动画去掉透明度渐变：走查截图截到一次「内容穿透」——结论卡的数字透过抽屉面板显示；实测定位为 `drawer-in` 的 `from{opacity:0}` 在动画重啓的窗口里把整块面板留在 opacity:0（computed opacity 读到 0 而视觉完好的瞬时race）。10-base.css 的 `drawer-in` 改为只做位移，没有这个失败模式；改后打开 450ms 截图干净实心。
+3. 中断横幅不再错怪程序：90-boot.js 记下收尾消息的 `status`（finished/interrupted，server 本来就发）到 `state.endStatus`；20-shell.js 的横幅按 status 分文案——interrupted 时说「这次运行没有跑完（…）。已完成的阶段仍可查看；中断的运行可以从『过去的运行』里续跑。」，替换「这是程序的问题，不是分析结论」（对取消/截断的运行是错怪）；程序错误连接失败等旧文案保留。server.py 未动（test_server.py:220 钉着「没有正常结束」原文）。wp49 中断运行实测新文案。
+
+另把过程页签说明里的「右上角可一次全部展开」改为与按钮实际位置一致的「也可用『全部展开』一次摊开」。
+
+测试与验收，输出末行：
+  ./scripts/check.sh → 全部六阶段通过（pytest 933 无增减、ruff、pyright、场景、重放、eval all 6/6）；「check.sh：全部阶段通过。」
+  浏览器实测（8899 实时页；.env 有真实密钥但全程只点脚本化 demo 场景，无模型调用、无花费）：折叠/展开高度、摘要行、总开关、抽屉干净、wp49 新横幅，逐张截图核对。
+  tests 无增减：行为变化由截图钉住，pytest/Node 的结构与纯函数钉点全部原样通过。
+  无网络请求、无真实模型、未读未打印 `.env`。
 
 ## 9. Prompts for starting a session
 
