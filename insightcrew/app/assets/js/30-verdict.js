@@ -339,7 +339,7 @@ function renderChart(model) {
   const chart = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "收盘价走势" });
   for (const value of [high, low]) {
     chart.append(svg("line", { x1: L, x2: W - R, y1: y(value), y2: y(value), class: "ch-grid" }),
-      svg("text", { x: L - 6, y: y(value) + 4, "text-anchor": "end", "font-size": 14, class: "ch-label" }, num(value, 2)));
+      svg("text", { x: L - 6, y: y(value) + 3, "text-anchor": "end", "font-size": 5.5, class: "ch-label" }, num(value, 2)));
   }
   chart.append(svg("polygon", { class: "ch-area", points: x(0).toFixed(1) + "," + (H - B) + " "
     + closes.map((c, i) => x(i).toFixed(1) + "," + y(c).toFixed(1)).join(" ") + " " + x(closes.length - 1).toFixed(1) + "," + (H - B) }));
@@ -352,16 +352,16 @@ function renderChart(model) {
     const lastX = x(closes.length - 1);
     chart.append(svg("line", { x1: lastX, x2: lastX, y1: T, y2: H - B, class: "ch-asof",
                               "stroke-dasharray": "2 4", opacity: "0.9" }),
-      svg("text", { x: lastX - 6, y: H - B - 6, "text-anchor": "end", "font-size": 14, class: "ch-label" }, "分析日 " + asOf));
+      svg("text", { x: lastX - 6, y: H - B - 5, "text-anchor": "end", "font-size": 5.5, class: "ch-label" }, "分析日 " + asOf));
   }
   const tags = levels.map(([label, value, color]) => ({ label, value, color, at: y(value) })).sort((a, b) => a.at - b.at);
-  for (let i = 1; i < tags.length; i++) tags[i].at = Math.max(tags[i].at, tags[i - 1].at + 13);   // 价位挨得近时把标签错开
+  for (let i = 1; i < tags.length; i++) tags[i].at = Math.max(tags[i].at, tags[i - 1].at + 8);   // 价位挨得近时把标签错开
   for (const tag of tags) {
     chart.append(svg("line", { x1: L, x2: W - R, y1: y(tag.value), y2: y(tag.value), style: "stroke:" + tag.color, "stroke-dasharray": "5 4" }),
-      svg("text", { x: W - R + 6, y: tag.at + 4, "font-size": 14, style: "fill:" + tag.color }, tag.label + " " + num(tag.value, 2)));
+      svg("text", { x: W - R + 6, y: tag.at + 2, "font-size": 6, style: "fill:" + tag.color }, tag.label + " " + num(tag.value, 2)));
   }
-  chart.append(svg("text", { x: L, y: H - 9, "font-size": 14, class: "ch-label" }, bars[0].date),
-    svg("text", { x: W - R, y: H - 9, "text-anchor": "end", "font-size": 14, class: "ch-label" }, bars[bars.length - 1].date));
+  chart.append(svg("text", { x: L, y: H - 8, "font-size": 5.5, class: "ch-label" }, bars[0].date),
+    svg("text", { x: W - R, y: H - 8, "text-anchor": "end", "font-size": 5.5, class: "ch-label" }, bars[bars.length - 1].date));
   const currency = state.currency || (board["ledger/instrument"] || {}).currency || "";
   fill(box, el("h2", null, "收盘价（截至分析日，" + bars.length + " 根" + (currency ? "，" + currency : "") + "）"), chart,
     levels.length ? null : el("p", { class: "note" }, outcome && outcome.status !== "delivered"

@@ -13,7 +13,9 @@
          border-radius:4px 4px 0 0; background:transparent; color:var(--muted); text-align:center; }
 .pnode:hover { background:var(--lane); color:var(--soft); }
 .pnode-rail { position:relative; display:flex; justify-content:center; align-items:center; height:34px; width:100%; }
-.pnode-rail::after { position:absolute; top:16px; left:calc(50% + 18px); width:calc(100% + 5px); height:1px;
+/* 连线从自己圆心外 18px 起、到下一个圆心外 18px 止（WP57：原 +5px 会穿过下一个圆；
+   done/halted 等状态的圆底是半透明色，线从圆里透出来像把圆挡住）。 */
+.pnode-rail::after { position:absolute; top:16px; left:calc(50% + 18px); width:calc(100% - 32px); height:1px;
                      background:var(--line-strong); content:""; }
 .pnode:last-child .pnode-rail::after, .pnode:last-of-type .pnode-rail::after { display:none; }
 .pnode-dot { position:relative; z-index:1; display:grid; place-items:center; width:32px; height:32px;

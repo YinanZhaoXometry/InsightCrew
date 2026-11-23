@@ -2625,6 +2625,20 @@ Result: done — owner 指令「整体过一下，有些不合理的地方帮我
   tests 无增减：行为变化由截图钉住，pytest/Node 的结构与纯函数钉点全部原样通过。
   无网络请求、无真实模型、未读未打印 `.env`。
 
+### 2026-11-23 10:35 · 工作台走查修订（第二轮，owner 四点：历史折叠、流水线连线穿圆、图表字过大、标题无下距） · coordinator session (ZCode)
+
+Result: done — owner 看过第一轮修订后在对话里点出四处，全在页面资产：
+
+1. 「过去的运行」默认只摊最近三次（55-launch.js 的 loadHistory：`HIST_SHOWN=3`，多于三次时追加「展开全部（还有 N 次）」/「收起，只看最近 3 次」开关，`historyShowAll` 模块级记忆；15-screens.css 加 `.hist-more`）。实测 50 条列表只占三行 + 一个开关。
+2. 流水线连线不再穿过圆圈（55-launch.css `.pnode-rail::after` 的宽度 `calc(100% + 5px)` → `calc(100% - 32px)`）：原值让线伸过下一个圆心 23px，而 done/halted/revised 状态的圆底是半透明语义色，线从圆里透出来像把圆挡住；现在线止于下一圆外 18px（圆半径 16px），不再与任何圆相交。
+3. 图表文字恢复比例（30-verdict.js 四处 `font-size:14` → 轴标/日期 5.5、价位标签 6，错开距 13 → 8）：根因是 viewBox 640 被拉到约 1376px 宽（2.15 倍），14 单位实际渲染约 30px，比正文 16px 还大——owner 说「图上的文字比我这个网页上的文字都要大」就是这个；按有效 ~12px 折算。
+4. 标题默认下距（10-base.css）：reset 把 h1–h4 归零后标题与内容贴死（owner 点名「过程记录」）；新增 `.view h2 { margin-bottom:var(--sp-3) }`、`.view h3/h4 { margin-bottom:var(--sp-2) }`，各视图自己的更具体外距（如 `#view-process h3`）照旧覆盖；抽屉正文 h3 也给了上 24/下 8。
+
+测试与验收，输出末行：
+  uv run pytest -q → 933 passed；ruff → All checks passed!；pyright → 0 errors（页面资产改动，scenario/重放/eval 三阶段与上次全量相同，未重跑）
+  浏览器实测：历史三行 + 开关、流水线线圆分离、图表字号、过程记录标题间隔，逐张截图核对。
+  无网络请求、无真实模型、未读未打印 `.env`。
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.

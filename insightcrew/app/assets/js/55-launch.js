@@ -405,6 +405,7 @@ function updateLaunchState() {
 
 /* ---------- 历史（屏外常驻一节：一行一次运行） ---------- */
 
+let historyShowAll = false;        // 历史默认只摊最近三次（WP57：历史不该占一整屏），这个开关翻开全部
 async function loadHistory() {
   const { status, data } = await getJSON("/api/runs");
   const body = $("history-body");
@@ -416,7 +417,9 @@ async function loadHistory() {
   if (!data.runs.length) { body.textContent = "还没有运行。从「新建分析」开始第一次分析。"; return; }
   const when = (id) => id.slice(0, 4) + "-" + id.slice(4, 6) + "-" + id.slice(6, 8) + " "
     + id.slice(9, 11) + ":" + id.slice(11, 13) + ":" + id.slice(13, 15);
-  fill(body, data.runs.map((run) => el("div", { class: "hist-row" + (run.status === "review" ? " is-review" : "") },
+  const HIST_SHOWN = 3;                            // 默认摊开的行数；其余收进「展开全部」
+  const shown = historyShowAll ? data.runs : data.runs.slice(0, HIST_SHOWN);
+  const rows = shown.map((run) => el("div", { class: "hist-row" + (run.status === "review" ? " is-review" : "") },
     el("button", { class: "hist-main", type: "button",
       on: { click: () => { openRun(run.run_id, false); window.scrollTo(0, 0); } } },
       el("span", { class: "hist-tick" }, el("b", null, run.ticker || "—"),
@@ -428,7 +431,13 @@ async function loadHistory() {
       el("span", { class: "hist-why muted" }, run.reason && run.reason !== "ok" ? approvalReasonText(run.reason) : ""),
       el("span", { class: "hist-chev" }, icon("chevron-right"))),
     run.resumable ? el("button", { class: "ctl small hist-resume", type: "button",
-      on: { click: () => resumeRun(run.run_id) } }, icon("play"), "续跑") : null)));
+      on: { click: () => resumeRun(run.run_id) } }, icon("play"), "续跑") : null));
+  if (data.runs.length > HIST_SHOWN)
+    rows.push(el("button", { class: "ctl small hist-more", type: "button",
+      on: { click: () => { historyShowAll = !historyShowAll; loadHistory(); } } },
+      historyShowAll ? "收起，只看最近 " + HIST_SHOWN + " 次"
+                     : "展开全部（还有 " + (data.runs.length - HIST_SHOWN) + " 次）"));
+  fill(body, rows);
 }
 
 /* 实时模式才重排表单：静态 replay.html 的 setup 屏整个隐藏，不进来 */

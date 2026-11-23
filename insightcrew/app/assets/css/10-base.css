@@ -32,6 +32,10 @@ h1, h2, h3, h4 { line-height:1.35; letter-spacing:0; font-weight:650; }
 h2 { font-size:var(--fs-5); }
 h3 { font-size:var(--fs-4); font-weight:600; }
 h4 { font-size:var(--fs-3); font-weight:600; }
+/* 视图里的标题与正文至少留出一口气（WP57：reset 归零后标题和内容贴死，
+   如「过程记录」）；各视图自己的更具体外距照旧覆盖这里。 */
+.view h2 { margin-bottom:var(--sp-3); }
+.view h3, .view h4 { margin-bottom:var(--sp-2); }
 [hidden] { display:none !important; }
 .muted { color:var(--muted); } .small { font-size:var(--fs-2); }
 .mono { font-family:var(--mono); font-size:12px; }
@@ -209,7 +213,7 @@ tr.total td { font-weight:600; background:var(--lane); }
 .drawer-head h2 { margin-top:4px; font-size:var(--fs-5); overflow-wrap:anywhere; }
 .drawer-head-actions { display:flex; gap:var(--sp-2); }
 .drawer-body { overflow-y:auto; padding:var(--sp-5); overscroll-behavior:contain; }
-.drawer-body h3 { font-size:var(--fs-4); }
+.drawer-body h3 { font-size:var(--fs-4); margin:var(--sp-5) 0 var(--sp-2); }
 .drawer-section + .drawer-section { margin-top:var(--sp-6); padding-top:var(--sp-5); border-top:1px solid var(--line); }
 pre { margin:0; padding:10px 12px; background:#0b1326; border:1px solid var(--line); border-radius:var(--radius-s);
       font:12px/1.6 var(--mono); white-space:pre-wrap; word-break:break-word; max-height:340px; overflow:auto;
