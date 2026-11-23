@@ -175,12 +175,13 @@
       </section>
     </section>
   </section>
-</main>
 
-<section class="card" id="history" hidden>
-  <h2>过去的运行</h2>
-  <div id="history-body" class="muted">（加载中）</div>
-</section>
+  <!-- 历史放在 main 里（WP57）：与其他卡片共用同一套左右边距；屏外常驻，showScreen 控制显隐 -->
+  <section class="card" id="history" hidden>
+    <h2>过去的运行</h2>
+    <div id="history-body" class="muted">（加载中）</div>
+  </section>
+</main>
 
 <!-- 抽屉（WP56 照原型：遮罩 + 抬头放对象类型与标题，返回/关闭是图标键；内容在 drawer-body） -->
 <div id="drawer-scrim" hidden></div>

@@ -97,6 +97,8 @@ fieldset.fgroup > legend { font-size:var(--fs-4); font-weight:650; color:var(--i
 #form label.chan-line { flex-direction:row; align-items:center; gap:9px; min-height:36px; font-size:var(--fs-2);
                         color:var(--soft); font-weight:400; }
 .chan-line input { flex:none; }
+/* 通道行的英文代号：降为 10px 小字备查（与证据页签/报告的编号对照），中文为主（WP57 owner） */
+.chan-code { font-size:10px; color:var(--faint); flex:none; }
 .chan-line b { color:var(--ink); font-weight:600; font-family:var(--mono); font-size:var(--fs-2); }
 .chan-line .muted { font-size:var(--fs-1); }
 #f-channels[data-off="1"] .chan-line { opacity:.55; }

@@ -2643,6 +2643,16 @@ Result: done — owner 看过第一轮修订后在对话里点出四处，全在
 
 Result: done — 品牌区原是纯 div 没接任何事件。page.html 给 `.brand` 加 `id="btn-home" role="button" tabindex="0"`；26-screens.js 接线：点击或回车/空格 → `openRun("")`（复用现成入口：清掉地址里的 `?run=`、关事件流、`showScreen("empty")`）；10-base.css 给 `.brand` 加 `cursor:pointer`。实测：工作台点品牌 → 回欢迎页、地址变 `/`、工作台隐藏；pytest 933 全过。无网络请求、无真实模型、未读未打印 `.env`。
 
+### 2026-11-23 11:25 · 工作台走查修订（第三轮，owner 三点：历史卡边距、历史标题下距、表单英文代号） · coordinator session (ZCode)
+
+Result: done —
+
+1. 历史卡边距与其他卡片一致：page.html 把 `#history` 挪进 `<main>`（原先在 main 外、横跨整个容器，比里面的卡片每边宽 32px）；挪入后自动共用 main 的边距节奏，实测左右边缘与 hero 卡逐像素相同（32/1397）。CSS 里 10-base 两处对 #history 的特例规则保持原样（挪入后无害）。
+2. 「过去的运行」标题下距：15-screens.css 加 `#history h2 { margin-bottom:var(--sp-3) }`（它不在 .view 里，第三处标题间距规则没覆盖到）。
+3. 表单以中文为主（owner：英文代号看不懂）：①离线场景选项改用 meta 里本就有的中文 `about` 说明 + 括号里留代号（36 个场景全有中文描述，之前页面只用 `name · ticker @ as_of`）；选完自动回填标的与日期，标签不再重复它们。②证据通道五行的主名换中文（新映射 `CHANNEL_TEXT`，05-labels.js）：基本面/公告/新闻/社交情绪/宏观序列；英文代号降为 10px 小字（`.chan-code`，title 说明「证据页签与报告里用这个代号」）保留对照。③预估面板「数据覆盖」行同样走 `CHANNEL_TEXT`。④组合文件选项中文化（`PORTFOLIO_TEXT`：空仓组合（全现金）/已持有 ACME 的组合/低现金组合）。后端零改动。
+
+测试与验收：uv run pytest -q → 933 passed；浏览器实测：历史卡与卡片区左右边缘逐像素对齐、标题有下距、场景/通道/组合选项中文为主，逐张截图核对。无网络请求、无真实模型、未读未打印 `.env`。
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.

@@ -102,7 +102,9 @@ function buildSetup() {
       el("div", { id: "f-channels", class: "chan" },
         CHANNELS.map(([name, line]) => el("label", { class: "chan-line" },
           el("input", { type: "checkbox", id: "fc-" + name, value: name }),
-          el("b", null, name), el("span", { class: "muted" }, line))),
+          el("b", null, CHANNEL_TEXT[name] || name),                       // 中文为主（WP57 owner）
+          el("span", { class: "muted mono chan-code", title: "证据页签与报告里用这个代号" }, name),
+          el("span", { class: "muted" }, line))),
         el("span", { class: "field-error", id: "err-channels" }))),
     el("details", { id: "adv", class: "fgroup adv" },
       el("summary", null, el("span", { class: "fold-title" }, "分析配置"),
@@ -178,7 +180,8 @@ function applyMetaDefaults() {
   if (Array.isArray(defaults.channels))
     for (const name of defaults.channels) { const box = $("fc-" + name); if (box) box.checked = true; }
   fill($("f-portfolio"), el("option", { value: "" }, "无"),
-    ((state.meta && state.meta.portfolios) || []).map((name) => el("option", { value: name }, name)));
+    ((state.meta && state.meta.portfolios) || [])
+      .map((name) => el("option", { value: name }, PORTFOLIO_TEXT[name] || name)));
   updateMacroGate();
 }
 
@@ -312,7 +315,7 @@ function renderEstimate(rows) {
   if (rows.channels.length) {
     kids.push(el("h4", null, "数据覆盖"), el("div", { class: "est-cover" }, rows.channels.map((channel) =>
       el("div", { class: "est-cover-row st-" + (channel.state || "off"), title: channel.reason || undefined },
-        el("b", null, channel.name),
+        el("b", null, CHANNEL_TEXT[channel.name] || channel.name),
         el("span", null, (PLAN_CHANNEL_WORD[channel.state] || channel.state || "—")
           + (channel.state === "unavailable" && channel.reason ? " · " + channel.reason : ""))))));
   }

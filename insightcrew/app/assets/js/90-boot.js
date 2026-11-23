@@ -117,8 +117,10 @@ async function startLive() {
   }
   state.meta = data;
   const scripted = data.mode !== "model";
+  /* 场景选项以中文说明为主（meta 本来就带 about），代号收进括号里备查（WP57 owner）；
+     选完场景会自动回填标的与日期，标签里不再重复。 */
   fill($("f-scenario"), el("option", { value: "" }, scripted ? "（不用场景）" : "（不用场景，调用真实模型）"),
-    data.scenarios.map((s) => el("option", { value: s.name }, s.name + " · " + s.ticker + " @ " + s.as_of)));
+    data.scenarios.map((s) => el("option", { value: s.name }, (s.about || s.name) + "（" + s.name + "）")));
   fill($("tickers"), data.instruments.map((i) => el("option", { value: i.ticker }, i.name)));
   $("f-judges").checked = data.defaults.judges;
   $("f-rounds").value = data.defaults.debate_rounds;

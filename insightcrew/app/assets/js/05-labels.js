@@ -46,6 +46,12 @@ const CHANNEL_STATE = {                       // 每条通道自己的三态文�
   news: { available: "可用", empty: "窗口内没有新闻", unavailable: "不可用" },
   sentiment: { available: "可用", empty: "窗口内没有帖子", unavailable: "不可用" },
   macro: { available: "可用", empty: "没有宏观序列", unavailable: "不可用" } };
+/* 证据通道与组合文件的中文主名（WP57 owner：表单以中文为主，英文代号降为小字，
+   仅用于与证据页签/报告里的编号对照）。缺失时回落键名本身。 */
+const CHANNEL_TEXT = { fundamentals: "基本面", disclosures: "公告", news: "新闻",
+                       sentiment: "社交情绪", macro: "宏观序列" };
+const PORTFOLIO_TEXT = { flat_usd: "空仓组合（全现金）", held_acme: "已持有 ACME 的组合",
+                         low_cash_usd: "低现金组合" };
 const DIRECTION_TEXT = { positive: "正面", negative: "负面", neutral: "中性" };
 const STANCE_TEXT = { positive: "正面", mixed: "混合", neutral: "中性", negative: "负面" };
 const RISK_NAME = { aggressive: "激进风控", conservative: "保守风控", neutral: "中立风控" };

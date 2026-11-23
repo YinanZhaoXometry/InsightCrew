@@ -110,6 +110,7 @@ details.fgroup.adv[open] > summary { border-bottom:1px solid var(--line); }
 /* 历史（屏外常驻一节）：一行一次运行（原型的 .history-row 行卡 + 状态徽章 + chevron）；
    默认只摊最近三次，其余收进「展开全部」（WP57：历史不该占一整屏） */
 #history { margin-top:var(--sp-5); }
+#history h2 { margin-bottom:var(--sp-3); }
 .hist-row { display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:var(--radius);
             background:rgba(18,26,51,.72); margin-bottom:var(--sp-2);
             transition:border-color 150ms ease, background-color 150ms ease; }
