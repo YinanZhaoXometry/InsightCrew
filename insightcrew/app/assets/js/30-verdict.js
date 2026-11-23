@@ -343,21 +343,22 @@ function renderChart(model) {
   }
   chart.append(svg("polygon", { class: "ch-area", points: x(0).toFixed(1) + "," + (H - B) + " "
     + closes.map((c, i) => x(i).toFixed(1) + "," + y(c).toFixed(1)).join(" ") + " " + x(closes.length - 1).toFixed(1) + "," + (H - B) }));
-  chart.append(svg("polyline", { fill: "none", class: "ch-line", "stroke-width": 1.6, "stroke-linejoin": "round",
+  chart.append(svg("polyline", { fill: "none", class: "ch-line", "stroke-width": 0.7, "stroke-linejoin": "round",
     points: closes.map((c, i) => x(i).toFixed(1) + "," + y(c).toFixed(1)).join(" ") }));
-  chart.append(svg("circle", { cx: x(closes.length - 1), cy: y(closes[closes.length - 1]), r: 3, class: "ch-dot" }));
+  chart.append(svg("circle", { cx: x(closes.length - 1), cy: y(closes[closes.length - 1]), r: 1.2, class: "ch-dot" }));
   const scope = board["request/scope"] || {}, request = (model.started || {}).request || {};
   const asOf = scope.as_of || request.as_of || "";                        // 分析日：最后一段收盘所在的那条竖线
   if (asOf) {
     const lastX = x(closes.length - 1);
     chart.append(svg("line", { x1: lastX, x2: lastX, y1: T, y2: H - B, class: "ch-asof",
-                              "stroke-dasharray": "2 4", opacity: "0.9" }),
+                              "stroke-width": 0.5, "stroke-dasharray": "1 2", opacity: "0.9" }),
       svg("text", { x: lastX - 6, y: H - B - 5, "text-anchor": "end", "font-size": 5.5, class: "ch-label" }, "分析日 " + asOf));
   }
   const tags = levels.map(([label, value, color]) => ({ label, value, color, at: y(value) })).sort((a, b) => a.at - b.at);
   for (let i = 1; i < tags.length; i++) tags[i].at = Math.max(tags[i].at, tags[i - 1].at + 8);   // 价位挨得近时把标签错开
   for (const tag of tags) {
-    chart.append(svg("line", { x1: L, x2: W - R, y1: y(tag.value), y2: y(tag.value), style: "stroke:" + tag.color, "stroke-dasharray": "5 4" }),
+    chart.append(svg("line", { x1: L, x2: W - R, y1: y(tag.value), y2: y(tag.value), style: "stroke:" + tag.color,
+                               "stroke-width": 0.5, "stroke-dasharray": "1.2 1.8" }),
       svg("text", { x: W - R + 6, y: tag.at + 2, "font-size": 6, style: "fill:" + tag.color }, tag.label + " " + num(tag.value, 2)));
   }
   chart.append(svg("text", { x: L, y: H - 8, "font-size": 5.5, class: "ch-label" }, bars[0].date),

@@ -2653,6 +2653,10 @@ Result: done —
 
 测试与验收：uv run pytest -q → 933 passed；浏览器实测：历史卡与卡片区左右边缘逐像素对齐、标题有下距、场景/通道/组合选项中文为主，逐张截图核对。无网络请求、无真实模型、未读未打印 `.env`。
 
+### 2026-11-23 11:40 · 价格图线条对齐行情站（owner：线太粗、虚线一节太宽） · coordinator session (ZCode)
+
+Result: done — 根因同字号：viewBox 640 被拉到约 1361px 宽（2.13 倍），旧值 1.6 单位的主线实际 ≈3.4px、`"5 4"` 的虚线一节 ≈11px。按行情站观感折算（30-verdict.js + 30-verdict.css）：价格主线 `stroke-width` 1.6 → 0.7（屏上 ≈1.5px）；网格线补 `.5`（≈1px 发丝线）；目标/入场/止损虚线宽 0.5、`"5 4"` → `"1.2 1.8"`（≈1px 线、2.6/3.8px 节距）；分析日竖虚线宽 0.5、`"2 4"` → `"1 2"`；末价圆点 r 3 → 1.2（≈5px 点）。实测截图：细线、密虚线，与行情站观感一致；pytest 933 全过。无网络请求、无真实模型、未读未打印 `.env`。
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.
