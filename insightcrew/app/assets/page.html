@@ -43,9 +43,10 @@
 </svg>
 
 <!-- 页头（WP56 照原型解剖）：品牌方章 + 名称/小节，右侧运行状态、模式徽章与新建键。
-     #title/#subtitle 保留为页头文案节点（渲染不再往里写运行信息：运行标识在 ws-head）。 -->
+     #title/#subtitle 保留为页头文案节点（渲染不再往里写运行信息：运行标识在 ws-head）。
+     品牌是回首页的入口（WP57 owner 提的惯例）：点它或按回车/空格回首页，26-screens 接线。 -->
 <header class="top">
-  <div class="brand" aria-label="InsightCrew 分析工作台">
+  <div class="brand" id="btn-home" role="button" tabindex="0" aria-label="回到首页：InsightCrew 分析工作台">
     <span class="brand-mark" aria-hidden="true">I/C</span>
     <div><h1 class="brand-name" id="title">InsightCrew</h1><span class="brand-section" id="subtitle">分析工作台</span></div>
   </div>

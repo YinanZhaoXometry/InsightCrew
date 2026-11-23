@@ -2639,6 +2639,10 @@ Result: done — owner 看过第一轮修订后在对话里点出四处，全在
   浏览器实测：历史三行 + 开关、流水线线圆分离、图表字号、过程记录标题间隔，逐张截图核对。
   无网络请求、无真实模型、未读未打印 `.env`。
 
+### 2026-11-23 10:50 · 品牌回首页（owner 第五点：点左上角 InsightCrew 没有反应） · coordinator session (ZCode)
+
+Result: done — 品牌区原是纯 div 没接任何事件。page.html 给 `.brand` 加 `id="btn-home" role="button" tabindex="0"`；26-screens.js 接线：点击或回车/空格 → `openRun("")`（复用现成入口：清掉地址里的 `?run=`、关事件流、`showScreen("empty")`）；10-base.css 给 `.brand` 加 `cursor:pointer`。实测：工作台点品牌 → 回欢迎页、地址变 `/`、工作台隐藏；pytest 933 全过。无网络请求、无真实模型、未读未打印 `.env`。
+
 ## 9. Prompts for starting a session
 
 The owner pastes one of these. Replace `<label>` with the package's label in the status table, for example `2`, `4A` or `9B`. Keep or delete the commit sentence; it is the authorisation in section 4.

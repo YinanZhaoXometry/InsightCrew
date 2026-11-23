@@ -86,4 +86,14 @@ if (typeof document !== "undefined" && document.getElementById("embedded")) {
   if (headerNew) headerNew.addEventListener("click", () => gotoSetup(false));
   const back = $("btn-back-work");
   if (back) back.addEventListener("click", () => showScreen(state.runId ? "work" : "empty"));
+  /* 品牌回首页（WP57 owner 提的惯例）：任何屏点左上角 InsightCrew 都回欢迎页；
+     openRun("") 会顺带清掉地址里的 ?run=。回车/空格也能触发（role=button）。 */
+  const home = $("btn-home");
+  if (home) {
+    const goHome = () => openRun("");
+    home.addEventListener("click", goHome);
+    home.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); goHome(); }
+    });
+  }
 }
